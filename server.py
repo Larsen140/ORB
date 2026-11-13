@@ -68,7 +68,7 @@ DEFAULT_CFG = {
 }
 # Damit ORB immer dein Claude-Code-Login (Max-Abo) nutzt und nie einen API-Schlüssel
 CLAUDE_ENV_DROP = ("ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "ANTHROPIC_BASE_URL")
-VERSION = "47"
+VERSION = "48"
 ORB_UI = ("Deine Oberfläche (die Larsen gerade sieht): in der Mitte du als flüssige leuchtende Kugel mit Tropfen, "
           "Orbit-Ringen und Sternenhimmel; links eine Uhr und darunter der Gesprächsverlauf mit Eingabefeld; rechts "
           "Karten für System (CPU, RAM, Akku), Wetter mit Stundenvorschau, Aktivität (was du gerade tust) und Vorschläge; "
@@ -884,6 +884,11 @@ def ask(text):
 
         threading.Thread(target=done, daemon=True).start()
         return True
+    if BRAIN.busy:
+        worte = re.sub(r"^(jarvis|orb)[,\s]+", "", text, flags=re.I).split()
+        titel = " ".join(worte[:4]).strip(" ,.!?") or "Aufgabe"
+        task_start(titel[:1].upper() + titel[1:], text)
+        return "parallel"
     return BRAIN.send(text)
 
 
@@ -1251,7 +1256,8 @@ class Handler(BaseHTTPRequestHandler):
             text = str(b.get("text", "")).strip()
             if not text:
                 return self.send(400, {"ok": False})
-            self.send(200 if ask(text) else 409, {"ok": True})
+            r = ask(text)
+            self.send(200 if r else 409, {"ok": True, "parallel": r == "parallel"})
         elif u.path == "/stop":
             self.send(200, {"ok": stop()})
         elif u.path == "/media":

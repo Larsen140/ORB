@@ -1030,7 +1030,8 @@ async function startup() {
 const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
 let rec = null, listening = false, recFinal = '', recLive = '', pttEnd = false, wakeRec = null, armedUntil = 0, hintTimer;
 function hint(t, ms = 2600) { $('hint').textContent = t; $('hint').classList.add('on'); clearTimeout(hintTimer); hintTimer = setTimeout(() => $('hint').classList.remove('on'), ms); }
-const NAME_RE = () => new RegExp('\\b(jarvis|' + (cfg.wakeword || 'jarvis').toLowerCase().replace(/[^a-zäöüß]/g, '') + ')\\b', 'i');
+const NAME_VARIANTEN = 'jarvis|jarwis|jarvi|jarviz|jarves|jervis|javis|charvis|tscharvis|tschawis|dscharvis|dschawis|dschavis|schavis|chavis|harvis|garvis';
+const NAME_RE = () => new RegExp('(?<![a-zäöüß])(' + NAME_VARIANTEN + '|' + ((cfg.wakeword || 'jarvis').toLowerCase().replace(/[^a-zäöüß]/g, '') || 'jarvis') + ')(?![a-zäöüß])', 'i');
 const STOP_WORT = /(?<![a-zäöüß])(stopp?|hör auf|hör mal auf|aufhören|ruhe|sei still|schluss|genug|das war'?s|tschüss)(?![a-zäöüß])/i;
 const STOP_RE = { test: t => { t = t.trim(); return t.split(/\s+/).length <= 5 && STOP_WORT.test(t); } };   // kurze Sätze mit Stopp-Wort
 async function ask(text) {
@@ -1054,6 +1055,7 @@ async function ask(text) {
   liveMsg(null); addMsg('me', text); stopAudio(); SFX.send(); ripple(1.1); caption('');
   try {
     const r = await fetch('/ask', { method:'POST', headers:{ 'Content-Type':'application/json' }, body:JSON.stringify({ text }) });
+    if (r.ok) { const j = await r.json().catch(() => ({})); if (j.parallel) { hint('Läuft parallel – eigenes Hologramm', 2500); SFX.holo(); } }
     if (r.status === 409) { hint('Ich arbeite noch – „Jarvis“ oder Esc unterbricht', 4000); addMsg('orb', 'Moment, ich bin noch an der letzten Sache dran. Sag „Jarvis“ oder drück Esc, dann höre ich auf.'); }
     fastPoll();
   } catch (e) { hint('Server nicht erreichbar'); }
@@ -1101,7 +1103,7 @@ function stopConvo(silent) {
 }
 function killConvoRec() { if (convoRec) { const r = convoRec; convoRec = null; try { r.abort(); } catch (e) {} } }
 function convoCanListen() {
-  return !S.call && convo && !S.sleep && !S.busy && !listening && !speakingNow() && performance.now() >= askGap && !['denkt', 'auftrag', 'wartet'].includes(S.mode);
+  return !S.call && convo && !S.sleep && !listening && !speakingNow() && performance.now() >= askGap && S.mode !== 'wartet';   // auch während er arbeitet – Neues läuft parallel
 }
 function convoListen() {
   if (convoRec || !convoCanListen() || performance.now() - convoLastStart < 500) return;
@@ -1167,8 +1169,17 @@ function interrupt() {
 /* ---------- Aktivierungswort ---------- */
 function startWake() {
   if (S.call || !SR || cfg.steuerung !== 'wort' || wakeRec || listening || convoRec || bargeRec) return;
-  wakeRec = new SR(); wakeRec.lang = 'de-DE'; wakeRec.continuous = true; wakeRec.interimResults = false;
-  wakeRec.onresult = e => { for (let i = e.resultIndex; i < e.results.length; i++) if (e.results[i].isFinal) onWake(e.results[i][0].transcript); };
+  wakeRec = new SR(); wakeRec.lang = 'de-DE'; wakeRec.continuous = true; wakeRec.interimResults = true; wakeRec.maxAlternatives = 3;
+  wakeRec.onresult = e => {
+    for (let i = e.resultIndex; i < e.results.length; i++) {
+      const r = e.results[i];
+      // alle Alternativen prüfen – oft steht „Jarvis“ nur in der zweiten oder dritten
+      let t = r[0].transcript;
+      for (let k = 1; k < r.length; k++) if (!NAME_RE().test(t) && NAME_RE().test(r[k].transcript)) t = r[k].transcript;
+      if (r.isFinal) { wakeRec._sig = false; onWake(t); }
+      else if (!wakeRec._sig && NAME_RE().test(t) && !S.sleep) { wakeRec._sig = true; SFX.listenOn(); ripple(.6); hint('Ich höre …', 3000); }   // sofortige Rückmeldung
+    }
+  };
   wakeRec.onend = () => { const was = wakeRec; wakeRec = null; if (was && !was._stopped && cfg.steuerung === 'wort') setTimeout(startWake, 300); };
   try { wakeRec.start(); } catch (e) { wakeRec = null; }
 }
@@ -1177,7 +1188,7 @@ function onWake(t) {
   const low = t.toLowerCase(), m = low.match(NAME_RE());
   const rest = m ? t.slice(m.index + m[0].length).replace(/^[\s,.!?:;]+/, '') : '';
   if (S.sleep) { if (m) wake(rest.length > 2 ? rest : ''); return; }   // aus Schlaf/Hintergrund: aufwachen und die Frage annehmen
-  if (S.busy || speakingNow()) return;
+  if (speakingNow()) return;   // während er arbeitet darf man ihn trotzdem ansprechen (läuft dann parallel)
   if (performance.now() < armedUntil) { armedUntil = 0; return ask(t); }
   if (!m) return;
   if (rest.length > 2) ask(rest); else { armedUntil = performance.now() + 8000; SFX.listenOn(); ripple(.6); hint('Ich höre …', 8000); }
