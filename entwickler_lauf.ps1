@@ -51,6 +51,8 @@ Regeln:
 - Melde während der Arbeit deinen Fortschritt (ORB zeigt ihn als Balken in Prozent):
   powershell -NoProfile -ExecutionPolicy Bypass -File C:\Users\larse\Orb\fortschritt.ps1 <Prozent> "<Schritt>"
   Richtwerte: 10 "Verstehen" (nach dem Einlesen), 30–70 "Bauen" (beim Fortschreiten erhöhen), 80 "Testen", 90 "Veröffentlichen", 100 "Fertig".
+- Hinterlege vor dem Abschluss eine kleine Einführung (2–4 kurze Punkte in einfachen Worten, dazu wie man es startet/benutzt):
+  powershell -NoProfile -ExecutionPolicy Bypass -File C:\Users\larse\Orb\neu.ps1 -Punkte "Punkt 1|Punkt 2" -Nutzen "So startest du es"
 - Deine letzte Antwort wird Larsen laut vorgelesen: EIN kurzer deutscher Satz, was fertig ist und wo er es findet.
 "@
 } else {
@@ -69,6 +71,9 @@ Regeln:
 - Melde während der Arbeit deinen Fortschritt (ORB zeigt ihn als Balken in Prozent):
   powershell -NoProfile -ExecutionPolicy Bypass -File C:\Users\larse\Orb\fortschritt.ps1 <Prozent> "<Schritt>"
   Richtwerte: 10 "Verstehen" (nach dem Einlesen), 30–70 "Bauen" (beim Fortschreiten erhöhen), 80 "Testen", 90 "Veröffentlichen", 100 "Fertig".
+- Hinterlege VOR dem Veröffentlichen eine kleine Einführung (2–4 kurze Punkte in einfachen Worten, was neu ist, dazu wie man es benutzt);
+  ORB zeigt sie nach dem Update als kleines Hologramm:
+  powershell -NoProfile -ExecutionPolicy Bypass -File C:\Users\larse\Orb\neu.ps1 -Punkte "Punkt 1|Punkt 2" -Nutzen "Sag: Jarvis, Gold"
 - Deine letzte Antwort wird Larsen laut vorgelesen: EIN kurzer deutscher Satz, was jetzt neu ist (ohne Dateinamen/Technik).
 "@
 }
@@ -99,7 +104,12 @@ try {
     "Ergebnis: $($res.result)" | Add-Content $log -Encoding UTF8
     if ($res -and -not $res.is_error) { "Dauer: $([int]((Get-Date) - $t0).TotalSeconds) s" | Add-Content $log -Encoding UTF8 }   # für ORBs Restzeit-Schätzung
     if (-not $res -or $res.is_error -or -not $satz) { Melde 'fehler' $null 'Nicht fertig geworden – siehe Protokoll.'; Ansage 'Der Entwickler ist mit deinem Auftrag nicht fertig geworden. Details stehen im Entwickler-Protokoll.' }
-    else { Melde 'fertig' $null $satz; Ansage ("Entwickler fertig: " + $satz) }
+    else {
+        Melde 'fertig' $null $satz; Ansage ("Entwickler fertig: " + $satz)
+        # Einführung „Was ist neu?“ als kleines Hologramm (bei ORB-Updates meist schon beim Neustart gezeigt)
+        try { $b = [Text.Encoding]::UTF8.GetBytes((@{ art = $Art; satz = $satz } | ConvertTo-Json))
+              Invoke-WebRequest http://127.0.0.1:8766/neu -Method Post -Headers (Tok) -ContentType 'application/json; charset=utf-8' -Body $b -UseBasicParsing -TimeoutSec 5 | Out-Null } catch {}
+    }
 } catch {
     "FEHLER: $($_.Exception.Message)" | Add-Content $log -Encoding UTF8
     Melde 'fehler' $null 'Fehler – siehe Protokoll.'

@@ -68,7 +68,7 @@ DEFAULT_CFG = {
 }
 # Damit ORB immer dein Claude-Code-Login (Max-Abo) nutzt und nie einen API-Schlüssel
 CLAUDE_ENV_DROP = ("ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "ANTHROPIC_BASE_URL")
-VERSION = "75"
+VERSION = "76"
 ORB_UI = ("Deine Oberfläche (die Larsen gerade sieht): in der Mitte du als flüssige leuchtende Kugel mit Tropfen, "
           "Orbit-Ringen und Sternenhimmel; links eine Uhr und darunter der Gesprächsverlauf mit Eingabefeld; rechts "
           "Karten für System (CPU, RAM, Akku), Wetter mit Stundenvorschau, Aktivität (was du gerade tust) und Vorschläge; "
@@ -1784,6 +1784,54 @@ def karte_setzen(b):
         return {"ok": True}
 
 
+# ---------- „Was ist neu?“ – kleine Einführung nach jedem Update (ORB) bzw. fertigen Projekt ----------
+NEU_ZULETZT = [0.0]
+
+
+def neu_datei(art):
+    return os.path.join(DEV_DIR, "projekt" if art == "projekt" else "orb", "neu.json")
+
+
+def neu_laden(art):
+    """Vom Entwickler (neu.ps1) hinterlegte Einführung holen und verbrauchen – nur, wenn sie frisch ist (< 3 Std.)."""
+    f = neu_datei(art)
+    try:
+        frisch = time.time() - os.path.getmtime(f) < 3 * 3600
+        with open(f, encoding="utf-8-sig") as fh:
+            d = json.load(fh)
+        os.remove(f)
+    except Exception:
+        return None
+    punkte = d.get("punkte") or []
+    punkte = [str(p).strip()[:120] for p in ([punkte] if isinstance(punkte, str) else punkte) if str(p).strip()][:4]
+    return {"punkte": punkte, "nutzen": str(d.get("nutzen") or "").strip()[:120]} if frisch and punkte else None
+
+
+def neu_zeigen(art, punkte, nutzen="", sagen=""):
+    """Kleines Hologramm „Neu …“: 2–4 Punkte + wie man es benutzt, 30 s sichtbar (oder bis X)."""
+    inhalt = [{"typ": "liste", "punkte": punkte[:4]}]
+    if nutzen:
+        inhalt.append({"typ": "text", "text": "So geht’s: " + nutzen})
+    karte_setzen({"id": "neu", "titel": "Neu im Projekt" if art == "projekt" else "Neu in ORB · Version %s" % VERSION,
+                  "groesse": "klein", "inhalt": inhalt, "dauer": 30})
+    NEU_ZULETZT[0] = time.time()
+    if sagen:
+        say_when_free(sagen)
+
+
+def neu_nach_entwickler(art, satz):
+    """entwickler_lauf.ps1 ist fertig: Projekt → Einführung sofort; ORB → nur falls das Update sie nicht schon gezeigt hat."""
+    satz = clean(str(satz or "")).strip()[:160]
+    if art != "projekt" and (os.path.exists(neu_datei(art)) or time.time() - NEU_ZULETZT[0] < 900):
+        return False   # Update wird noch eingespielt (zeigt sie dann selbst) bzw. wurde schon gezeigt
+    n = neu_laden(art)
+    if n:
+        neu_zeigen(art, n["punkte"], n["nutzen"], sagen="Neu: " + n["punkte"][0])
+    elif satz:
+        neu_zeigen(art, [satz])   # Ergebnis wurde schon angesagt – nur anzeigen
+    return bool(n or satz)
+
+
 def karten_liste():
     now = time.time()
     with _karten_lock:
@@ -2056,6 +2104,8 @@ class Handler(BaseHTTPRequestHandler):
                 self.send(200, {"ok": task_cancel(str(b.get("id", "")))})
             else:
                 self.send(400, {"ok": False})
+        elif u.path == "/neu":   # entwickler_lauf.ps1 am Ende: Einführung „Was ist neu?“
+            self.send(200, {"ok": neu_nach_entwickler(str(b.get("art", "orb")), b.get("satz"))})
         elif u.path == "/karte":   # holo.ps1: freies Hologramm anlegen/ändern/schließen
             self.send(200, karte_setzen(b if isinstance(b, dict) else {}))
         elif u.path == "/bild":   # bild_zeigen.ps1: Bild sofort als Hologramm einblenden

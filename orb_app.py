@@ -375,7 +375,12 @@ def announce_update():
             f.write(sha)
         if alt:
             time.sleep(4)   # Fenster hat sich inzwischen neu geladen
-            server.write_answer("Update installiert, Version %s." % server.VERSION, heard="")
+            n = server.neu_laden("orb")   # Einführung vom Entwickler (neu.ps1)?
+            if n:
+                server.neu_zeigen("orb", n["punkte"], n["nutzen"])
+                server.write_answer("Update installiert. Neu: %s" % n["punkte"][0], heard="")
+            else:
+                server.write_answer("Update installiert, Version %s." % server.VERSION, heard="")
 
 
 def backup_jarvis():

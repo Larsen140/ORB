@@ -20,6 +20,7 @@ Voraussetzung für Antworten: [Claude Code](https://claude.com/claude-code) inst
 - **Web-Hologramme**: echte Webseiten zum Klicken, Scrollen und Tippen direkt im Hologramm (`web_zeigen.ps1`).
 - **Echte Farben**: Schalter im Bild-/Web-Hologramm (oder `-Rein` an `bild_zeigen.ps1`/`web_zeigen.ps1`) zeigt den Inhalt ohne Hologramm-Effekte; die Bild-Werkstatt (Port 8790) startet immer so.
 - **Gold live** („Jarvis, Gold“): XAU/USD jede Sekunde, mit Farbblitz pro Tick und mitlaufender Kurve.
+- **Was ist neu?**: nach jedem Update (ORB oder Projekt) erscheint kurz ein kleines Hologramm mit den Neuerungen und wie man sie benutzt.
 - **Wissensbasis**: arbeitet im Ordner `Documents\Jarvis` und merkt sich dort alles.
 
 ## Aufbau
@@ -31,6 +32,7 @@ Voraussetzung für Antworten: [Claude Code](https://claude.com/claude-code) inst
 | `icloud.py` | iCloud-Kalender über CalDAV (Zugang in der Windows-Anmeldeinformationsverwaltung) |
 | `hook.py` | Claude-Code-Hooks → zeigt in ORB an, was Claude gerade tut |
 | `index.html` | Oberfläche (WebGL-Kugel, Effekte, Sounds, Einstellungen) |
+| `neu.ps1` | Entwickler hinterlegt die Einführung „Was ist neu?“ (2–4 Punkte + wie benutzen) – ORB zeigt sie nach dem Update 30 s als kleines Hologramm und liest den ersten Punkt vor |
 | `fortschritt.ps1` | Entwickler meldet seinen Fortschritt (Prozent + Schritt) – ORB zeigt ihn als Balken im Entwickler-Hologramm |
 | `web_zeigen.ps1` | zeigt eine Webseite als echte, bedienbare Seite im Hologramm (sonst echte Webansicht darüber) |
 | `whatsapp.ps1` | WhatsApp-Nachricht (Text/Bild) in Sekunden vorbereiten, Abschicken erst nach Bestätigung |
