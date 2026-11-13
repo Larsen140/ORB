@@ -418,6 +418,7 @@
     <div class="row col"><div class="lbl">Klatsch-Empfindlichkeit<span class="v" id="v_empf"></span></div><input type="range" id="s_empf" min="1" max="10" step="1"></div>
     <div class="row">Dauerhaft zuhören bis „Stopp“<input type="checkbox" class="sw" id="s_dauer"></div>
     <div class="row">Mit „Jarvis“ unterbrechen<input type="checkbox" class="sw" id="s_unterbrechen"></div>
+    <div class="row">Nur auf „Jarvis“ reagieren<input type="checkbox" class="sw" id="s_nurjarvis"></div>
     <div class="row">Mit Wetter begrüßen<input type="checkbox" class="sw" id="s_gruss"></div>
     <div class="row">Einschlafen nach<select id="s_schlaf"><option value="0">nie</option><option value="2">2 Min.</option><option value="5">5 Min.</option><option value="10">10 Min.</option><option value="30">30 Min.</option></select></div>
     <div class="row">Dein Name<input type="text" id="s_name" placeholder="optional"></div>
@@ -494,7 +495,7 @@ const PAL = () => [BASE, BASE2, BASE3, BASE4];
 const pcol = (i, a, k = 0) => `rgba(${rgb(mix(PAL()[i % 4], [255,255,255], k))},${a})`;
 let cfg = { farbe:'rot', effekte:'mittel', untertitel:true, lautstaerke:90, sfx:true, sfxlaut:60, ambient:false,
   steuerung:'wort', schnipsen:true, wakeword:'Jarvis', stimme:'', tempo:'+15%', hoehe:'+0Hz', laenge:'kurz', rechte:'auto', tempo_claude:'low', ordner:'',
-  schlaf_schliessen:true, bildschirm:false, klatschen:true, dauerzuhoeren:true, unterbrechen:true, empfindlichkeit:6, begruessung:true, ort:'', name:'', schlafen:5, vollbild:true, autostart:true };
+  schlaf_schliessen:true, bildschirm:false, klatschen:true, dauerzuhoeren:true, unterbrechen:true, nur_jarvis:true, empfindlichkeit:6, begruessung:true, ort:'', name:'', schlafen:5, vollbild:true, autostart:true };
 const S = { mode:'idle', seq:-1, busy:false, energy:.12, holo:0, think:0, speakVis:0, listenVis:0, level:0, warn:0, boot:0, sleep:false, sleepVis:0, px:0, py:0 };
 const mix = (a, b, t) => a.map((v, i) => Math.round(v + (b[i] - v) * t));
 const rgb = c => `${c[0]},${c[1]},${c[2]}`;
@@ -1047,10 +1048,12 @@ function stopPTT() { if (rec && listening && !pttEnd) { pttEnd = true; SFX.liste
 function pttDown() { if (S.sleep) return wake(); startPTT(); }
 
 /* ---------- Dauerhaft zuhören ---------- */
-let convo = false, convoRec = null, convoLastStart = 0, convoLastSpeech = 0, askGap = 0;
+let convo = false, convoRec = null, convoLastStart = 0, convoLastSpeech = 0, askGap = 0, followUntil = 0;
+// „Nur auf Jarvis reagieren“: ohne Namen nur kurz nach einer Antwort (Nachfrage-Fenster) annehmen
+const FOLLOW_MS = 8000, followOpen = () => !cfg.nur_jarvis || performance.now() < followUntil;
 function startConvo() {
   if (S.sleep || !SR) return;
-  convo = true; convoLastSpeech = performance.now(); lastAct = performance.now();
+  convo = true; convoLastSpeech = performance.now(); lastAct = performance.now(); followUntil = performance.now() + FOLLOW_MS;
   SFX.listenOn(); ripple(.8);
 }
 function stopConvo(silent) {
@@ -1071,7 +1074,7 @@ function convoListen() {
       const x = e.results[i];
       if (x.isFinal) { const t = x[0].transcript.trim(); if (t) return handleConvo(t); } else interim += x[0].transcript;
     }
-    if (interim.trim()) { liveMsg(interim.trim()); convoLastSpeech = performance.now(); }
+    if (interim.trim() && (followOpen() || NAME_RE().test(interim))) { liveMsg(interim.trim()); convoLastSpeech = performance.now(); }
   };
   r.onerror = e => { if (e.error === 'not-allowed' || e.error === 'service-not-allowed') { hint('Mikrofon blockiert', 5000); stopConvo(true); } };
   r.onend = () => { if (convoRec === r) convoRec = null; };
@@ -1080,7 +1083,16 @@ function convoListen() {
 function handleConvo(t) {
   convoLastSpeech = performance.now();
   if (STOP_RE.test(t.replace(/[.!?,]+$/g, '').trim())) { liveMsg(null); return stopConvo(); }
-  killConvoRec(); askGap = performance.now() + 1800; ask(t);
+  if (cfg.nur_jarvis) {
+    const m = t.match(NAME_RE());
+    if (!m && !followOpen()) { liveMsg(null); return; }   // Hintergrundgespräch, Fernseher … ignorieren
+    if (m) {
+      const vorne = !t.slice(0, m.index).replace(/[\s,.!?:;]+/g, '').length;
+      if (vorne) t = t.slice(m.index + m[0].length).replace(/^[\s,.!?:;]+/, '');   // „Jarvis, …“ → nur die Frage
+      if (t.replace(/[.!?,\s]+/g, '').length <= 2) { liveMsg(null); followUntil = performance.now() + FOLLOW_MS; SFX.listenOn(); ripple(.6); hint('Ich höre …', FOLLOW_MS); return; }
+    }
+  }
+  followUntil = 0; killConvoRec(); askGap = performance.now() + 1800; ask(t);
 }
 
 /* ---------- Unterbrechen mit „Jarvis“ ---------- */
@@ -1110,7 +1122,7 @@ function interrupt() {
   killBarge(); stopAudio(); caption('');
   if (S.busy) fetch('/stop', { method:'POST' }).catch(() => {});
   SFX.barge(); ripple(1.2); burst(24); hint('Ja?', 1500);
-  askGap = performance.now() + 400; convo = true; convoLastSpeech = performance.now();
+  askGap = performance.now() + 400; convo = true; convoLastSpeech = performance.now(); followUntil = performance.now() + FOLLOW_MS;
 }
 
 /* ---------- Aktivierungswort ---------- */
@@ -1514,6 +1526,7 @@ function frame(now) {
   if (wasSpeaking && !speaking) { if (!S.busy) caption(''); if (listenAfterSpeech) { listenAfterSpeech = false; setTimeout(startListening, 250); } }
   wasSpeaking = speaking;
   if (convo) {
+    if (speaking || S.busy) followUntil = now + FOLLOW_MS;   // Nachfrage-Fenster läuft ab Ende der Antwort
     if (!convoRec && convoCanListen()) convoListen();
     if (convoRec && !convoCanListen()) killConvoRec();
     if (now - convoLastSpeech > 120000 && !S.busy && !speaking) stopConvo();
@@ -1783,7 +1796,7 @@ document.querySelectorAll('.swc').forEach(el => el.onclick = () => { saveCfg({ f
 const segs = { seg_eff:'tempo_claude', seg_len:'laenge', seg_rechte:'rechte', seg_fx:'effekte' };
 for (const [id, key] of Object.entries(segs)) $(id).querySelectorAll('button').forEach(b => b.onclick = () => { saveCfg({ [key]:b.dataset.v }); SFX.click(); });
 function fillRange(el) { el.style.setProperty('--p', (el.value - el.min) / (el.max - el.min) * 100 + '%'); }
-const CHK = { s_klatsch:'klatschen', s_schnipsen:'schnipsen', s_dauer:'dauerzuhoeren', s_unterbrechen:'unterbrechen', s_gruss:'begruessung', s_voll:'vollbild', s_auto:'autostart', s_schliessen:'schlaf_schliessen', s_screen:'bildschirm', s_unter:'untertitel', s_sfx:'sfx', s_amb:'ambient' };
+const CHK = { s_klatsch:'klatschen', s_schnipsen:'schnipsen', s_dauer:'dauerzuhoeren', s_unterbrechen:'unterbrechen', s_nurjarvis:'nur_jarvis', s_gruss:'begruessung', s_voll:'vollbild', s_auto:'autostart', s_schliessen:'schlaf_schliessen', s_screen:'bildschirm', s_unter:'untertitel', s_sfx:'sfx', s_amb:'ambient' };
 function syncSettingsUI() {
   const set = (id, v) => { const el = $(id); if (el && document.activeElement !== el) el.value = v; };
   set('s_stimme', cfg.stimme); set('s_tempo', parseInt(cfg.tempo) || 0); set('s_hoehe', parseInt(cfg.hoehe) || 0);
