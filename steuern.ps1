@@ -3,12 +3,16 @@
 #   ... steuern.ps1 klick 640 380          ... steuern.ps1 doppelklick 640 380     ... steuern.ps1 rechtsklick 640 380
 #   ... steuern.ps1 tippen "Hallo Welt"     ... steuern.ps1 taste enter              ... steuern.ps1 taste ctrl+s
 #   ... steuern.ps1 scrollen -5             ... steuern.ps1 bewegen 640 380
+# SCHNELL – mehrere Schritte in EINEM Aufruf (spart je Schritt ~1–2 s Startzeit), am Ende optional neuer Screenshot:
+#   ... steuern.ps1 folge "klick 640 380; tippen Hallo Welt; taste enter; warten 800; scrollen -3" -Bild
+#   ... steuern.ps1 klick 640 380 -Bild      (-Bild: danach sofort bildschirm.ps1 – spart einen zweiten Aufruf)
 # Tasten: enter, tab, esc, space, backspace, delete, up, down, left, right, home, end, pageup, pagedown, win, f1–f12,
 #         Kombinationen mit ctrl+ / alt+ / shift+ (z. B. ctrl+c, alt+tab, ctrl+shift+t)
-param([Parameter(Mandatory = $true)][string]$Aktion, [string]$A, [string]$B)
+param([Parameter(Mandatory = $true)][string]$Aktion, [string]$A, [string]$B, [switch]$Bild)
 $ErrorActionPreference = 'Stop'
 Add-Type -AssemblyName System.Windows.Forms
-Add-Type @'
+$dll = "$env:LOCALAPPDATA\ORB\orbin_v1.dll"
+$code = @'
 using System; using System.Runtime.InteropServices;
 public class OrbIn {
   [StructLayout(LayoutKind.Sequential)] public struct PT { public int X; public int Y; }
@@ -30,12 +34,16 @@ public class OrbIn {
   [DllImport("user32.dll")] public static extern bool ShowWindow(IntPtr h, int c);
 }
 '@
+if (-not ('OrbIn' -as [type])) {
+  try { if (Test-Path $dll) { Add-Type -Path $dll } else { Add-Type -TypeDefinition $code -OutputAssembly $dll; Add-Type -Path $dll } }
+  catch { Add-Type -TypeDefinition $code }
+}
 # Echte Pixel verwenden (Bildschirm 150 % usw.) – zuerst Per-Monitor-V2, sonst klassisch
 try { if (-not [OrbIn]::SetProcessDpiAwarenessContext([IntPtr](-4))) { [OrbIn]::SetProcessDPIAware() | Out-Null } } catch { [OrbIn]::SetProcessDPIAware() | Out-Null }
 $sw = [OrbIn]::GetSystemMetrics(0); $sh = [OrbIn]::GetSystemMetrics(1)
 # ORBs eigenes Fenster aus dem Weg (sonst landen Klicks auf ORB)
 $orb = Get-Process msedge -ErrorAction SilentlyContinue | Where-Object { $_.MainWindowTitle -eq 'ORB' } | Select-Object -First 1
-if ($orb) { [OrbIn]::ShowWindow($orb.MainWindowHandle, 6) | Out-Null; Start-Sleep -Milliseconds 300 }
+if ($orb -and $Aktion -notin 'scrollen', 'warten') { [OrbIn]::ShowWindow($orb.MainWindowHandle, 6) | Out-Null; Start-Sleep -Milliseconds 150 }
 # Maßstab Screenshot -> echte Pixel (Komma oder Punkt; unplausible Werte verwerfen)
 $f = $sw / [Math]::Min(1600, $sw)
 try {
@@ -66,6 +74,7 @@ $VK = @{ win = 0x5B; ctrl = 0x11; alt = 0x12; shift = 0x10 }
 $SK = @{ enter='{ENTER}'; tab='{TAB}'; esc='{ESC}'; space=' '; backspace='{BACKSPACE}'; delete='{DELETE}'; up='{UP}'; down='{DOWN}';
          left='{LEFT}'; right='{RIGHT}'; home='{HOME}'; end='{END}'; pageup='{PGUP}'; pagedown='{PGDN}' }
 1..12 | ForEach-Object { $SK["f$_"] = "{F$_}" }
+function Tu([string]$Aktion, [string]$A, [string]$B) {
 switch ($Aktion.ToLower()) {
   'klick'       { Pos $A $B; Klick 0x02 0x04; "Geklickt bei $A,$B" }
   'doppelklick' { Pos $A $B; Klick 0x02 0x04; Start-Sleep -Milliseconds 80; Klick 0x02 0x04; "Doppelklick bei $A,$B" }
@@ -87,5 +96,17 @@ switch ($Aktion.ToLower()) {
     }
     "Taste: $A"
   }
-  default { "Unbekannte Aktion: $Aktion (klick, doppelklick, rechtsklick, bewegen, scrollen, tippen, taste)"; exit 1 }
-}
+  'warten'      { Start-Sleep -Milliseconds ([int]$A); "Gewartet $A ms" }
+  default { "Unbekannte Aktion: $Aktion (klick, doppelklick, rechtsklick, bewegen, scrollen, tippen, taste, warten)" }
+}}
+if ($Aktion.ToLower() -eq 'folge') {
+  foreach ($schritt in ($A -split ';')) {
+    $w = $schritt.Trim(); if (-not $w) { continue }
+    $teil = $w -split '\s+', 2; $akt = $teil[0]; $rest = if ($teil.Count -gt 1) { $teil[1] } else { '' }
+    if ($akt -in 'tippen', 'taste', 'warten', 'scrollen') { Tu $akt $rest '' }
+    else { $xy = $rest -split '[\s,]+'; Tu $akt $xy[0] $xy[1] }
+    Start-Sleep -Milliseconds 60
+  }
+} else { Tu $Aktion $A $B }
+if ($Bild) { Start-Sleep -Milliseconds 250; & "$PSScriptRoot\bildschirm.ps1" }
+

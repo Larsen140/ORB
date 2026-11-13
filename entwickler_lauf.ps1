@@ -7,9 +7,11 @@ $job  = "$env:LOCALAPPDATA\ORB\entwickler\$Art"
 $log  = "$job\protokoll.txt"
 $auftrag = [IO.File]::ReadAllText("$job\auftrag.txt", [Text.Encoding]::UTF8)
 $tokHdr = @{ 'X-ORB-Token' = (Get-Content "$env:LOCALAPPDATA\ORB\token.txt" -ErrorAction SilentlyContinue) }
+# Token bei jedem Aufruf frisch lesen – nach update.ps1 startet ORB neu und hat ein neues
+function Tok { @{ 'X-ORB-Token' = (Get-Content "$env:LOCALAPPDATA\ORB\token.txt" -ErrorAction SilentlyContinue) } }
 function Ansage($t) {
     try { $b = [Text.Encoding]::UTF8.GetBytes((@{ text = $t } | ConvertTo-Json))
-          Invoke-WebRequest http://127.0.0.1:8766/announce -Method Post -Headers $tokHdr -ContentType 'application/json; charset=utf-8' -Body $b -UseBasicParsing | Out-Null } catch {}
+          Invoke-WebRequest http://127.0.0.1:8766/announce -Method Post -Headers (Tok) -ContentType 'application/json; charset=utf-8' -Body $b -UseBasicParsing | Out-Null } catch {}
 }
 # Eigenes Hologramm in ORB: Fortschritt live melden
 $tid = "dev-$Art"
@@ -18,7 +20,7 @@ function Melde($status, $schritt, $ergebnis) {
           if ($schritt) { $h.schritt = $schritt }; if ($ergebnis) { $h.ergebnis = $ergebnis }
           if ($status -eq 'laeuft' -and -not $schritt) { $h.titel = $(if ($Art -eq 'projekt') { 'Projekt-Entwickler' } else { 'ORB-Entwickler' }) }
           $b = [Text.Encoding]::UTF8.GetBytes(($h | ConvertTo-Json))
-          Invoke-WebRequest http://127.0.0.1:8766/aufgabe -Method Post -Headers $tokHdr -ContentType 'application/json; charset=utf-8' -Body $b -UseBasicParsing -TimeoutSec 3 | Out-Null } catch {}
+          Invoke-WebRequest http://127.0.0.1:8766/aufgabe -Method Post -Headers (Tok) -ContentType 'application/json; charset=utf-8' -Body $b -UseBasicParsing -TimeoutSec 3 | Out-Null } catch {}
 }
 # Fortschritt in Prozent: der Entwickler schreibt ihn per fortschritt.ps1 in eine Statusdatei, ORB liest sie
 $env:ORB_DEV_ART = $Art
@@ -27,7 +29,7 @@ $fortschritt = Join-Path $o 'fortschritt.ps1'
 $kurz = $(if ($auftrag.Length -gt 90) { $auftrag.Substring(0, 90) + ' …' } else { $auftrag })
 function MeldeAuftrag {
     try { $b = [Text.Encoding]::UTF8.GetBytes((@{ aktion = 'melde'; id = $tid; auftrag = $kurz } | ConvertTo-Json))
-          Invoke-WebRequest http://127.0.0.1:8766/aufgabe -Method Post -Headers $tokHdr -ContentType 'application/json; charset=utf-8' -Body $b -UseBasicParsing -TimeoutSec 3 | Out-Null } catch {}
+          Invoke-WebRequest http://127.0.0.1:8766/aufgabe -Method Post -Headers (Tok) -ContentType 'application/json; charset=utf-8' -Body $b -UseBasicParsing -TimeoutSec 3 | Out-Null } catch {}
 }
 Melde 'laeuft' $null $null
 MeldeAuftrag

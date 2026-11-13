@@ -350,7 +350,7 @@ def update_loop():
             if not sha or sha == launcher.local_sha() or sha in getattr(launcher, "bad_shas", lambda: [])():
                 continue
             st = server.read_state()
-            ruhig = (not server.BRAIN.busy and st.get("mode") not in ("denkt", "auftrag", "wartet")
+            ruhig = (not server.BRAIN.busy and not any(t.get("status") == "laeuft" for t in server.TASKS.values()) and st.get("mode") not in ("denkt", "auftrag", "wartet")
                      and time.time() - float(st.get("time", 0)) > 12
                      and time.time() - server.LAST_ACTIVE[0] > 60)   # nicht mitten im Sprechen/Zuhören   # gerade nichts gesagt/getan
             if ruhig:

@@ -68,7 +68,7 @@ DEFAULT_CFG = {
 }
 # Damit ORB immer dein Claude-Code-Login (Max-Abo) nutzt und nie einen API-Schlüssel
 CLAUDE_ENV_DROP = ("ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "ANTHROPIC_BASE_URL")
-VERSION = "67"
+VERSION = "68"
 ORB_UI = ("Deine Oberfläche (die Larsen gerade sieht): in der Mitte du als flüssige leuchtende Kugel mit Tropfen, "
           "Orbit-Ringen und Sternenhimmel; links eine Uhr und darunter der Gesprächsverlauf mit Eingabefeld; rechts "
           "Karten für System (CPU, RAM, Akku), Wetter mit Stundenvorschau, Aktivität (was du gerade tust) und Vorschläge; "
@@ -421,6 +421,9 @@ def clean_exit(grund):
     """Gewolltes Beenden: protokollieren, Markierung entfernen, Prozess sofort beenden."""
     log_close(grund)
     mark_running(False)
+    for t in list(TASKS.values()):
+        if t.get("status") == "laeuft" and t.get("pid"):
+            subprocess.run(["taskkill", "/F", "/T", "/PID", str(t["pid"])], capture_output=True, creationflags=NO_WINDOW)
     os._exit(0)
 
 
@@ -1156,6 +1159,8 @@ class Brain:
         if self.busy and self.alive():
             self.stopped = True
             self.kill()
+            self.busy = False
+            write_answer("Okay, abgebrochen.")
             return True
         return False
 
@@ -1169,6 +1174,8 @@ def ask(text):
     except Exception as e:
         print("Lokaler Auftrag fehlgeschlagen:", e)
         local = None
+    if local and BRAIN.busy:
+        return "lokal"   # schon ausgeführt – die laufende Antwort nicht unterbrechen
     if local:
         task, detail, say = local
         write_state(mode="auftrag", heard=text, task=task, detail=detail, say="", parts=[], aid="",
@@ -1567,7 +1574,7 @@ def task_set(tid, **kw):
         if kw.get("schritt") and kw["schritt"] != t.get("schritt"):
             t["schritte"] = t.get("schritte", 0) + 1
         t.update({k: v for k, v in kw.items() if v is not None})
-        if t["status"] in ("fertig", "fehler") and not t["ende"]:
+        if t["status"] in ("fertig", "fehler", "abgebrochen") and not t["ende"]:
             t["ende"] = time.time()
         return dict(t)
 
@@ -1688,6 +1695,7 @@ def run_task(tid, auftrag):
         p.stdin.write(auftrag.encode("utf-8"))
         p.stdin.close()
         for raw in p.stdout:
+            TASKS.get(tid, {})["aus"] = time.time()
             try:
                 o = json.loads(raw.decode("utf-8", "ignore"))
             except Exception:
@@ -1733,12 +1741,68 @@ def task_cancel(tid):
     return False
 
 
+# ---------- Freie Hologramme („Karten“): beliebig viele, je mit mehreren Inhalten ----------
+KARTEN, KARTEN_V, _karten_lock = {}, [0], threading.Lock()
+BILD_ENDUNGEN = (".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp")
+BLOCK_TYPEN = ("text", "titel", "liste", "zahl", "fortschritt", "bild", "web", "tabelle", "trenner")
+
+
+def karte_setzen(b):
+    """Neues/aktualisiertes Hologramm. b: {id?, titel, groesse: klein|mittel|gross, breite?, hoehe?, farbe?,
+    inhalt: [{typ:text|titel|liste|zahl|fortschritt|bild|web|tabelle|trenner, ...}], dauer: Sekunden (0 = bleibt),
+    anhaengen: true (Inhalte anfügen statt ersetzen)} – oder {id, zu: true} / {alle_zu: true}."""
+    with _karten_lock:
+        if b.get("alle_zu"):
+            KARTEN.clear()
+        elif b.get("zu"):
+            KARTEN.pop(str(b.get("id", "")), None)
+        else:
+            kid = re.sub(r"[^\w-]", "", str(b.get("id") or "")) or "k%d" % int(time.time() * 1000)
+            inhalt = []
+            for blk in (b.get("inhalt") or [])[:60]:
+                if not isinstance(blk, dict) or blk.get("typ") not in BLOCK_TYPEN:
+                    continue
+                if blk["typ"] == "bild":
+                    pfad = os.path.abspath(os.path.expandvars(str(blk.get("pfad", ""))))
+                    if not (pfad.lower().endswith(BILD_ENDUNGEN) and os.path.isfile(pfad)):
+                        continue
+                    blk = dict(blk, pfad=pfad)
+                inhalt.append(blk)
+            alt = KARTEN.get(kid, {})
+            if b.get("anhaengen") and alt:
+                inhalt = (alt.get("inhalt") or []) + inhalt
+            KARTEN[kid] = {"id": kid, "titel": str(b.get("titel") or alt.get("titel") or "")[:80],
+                           "groesse": str(b.get("groesse") or alt.get("groesse") or "mittel"),
+                           "breite": b.get("breite") or alt.get("breite"), "hoehe": b.get("hoehe") or alt.get("hoehe"),
+                           "farbe": str(b.get("farbe") or alt.get("farbe") or ""), "inhalt": inhalt[-60:],
+                           "dauer": float(b.get("dauer") or 0), "zeit": time.time(), "v": alt.get("v", 0) + 1}
+            KARTEN_V[0] += 1
+            return {"ok": True, "id": kid}
+        KARTEN_V[0] += 1
+        return {"ok": True}
+
+
+def karten_liste():
+    now = time.time()
+    with _karten_lock:
+        weg = [k for k, c in KARTEN.items() if c["dauer"] and now - c["zeit"] > c["dauer"]]
+        for k in weg:
+            del KARTEN[k]
+        if weg:
+            KARTEN_V[0] += 1
+        return list(KARTEN.values())
+
+
 def idle_reaper():
     """Claude nach 15 Minuten ohne Frage beenden, damit es keinen Speicher belegt (~250 MB)."""
     while True:
         time.sleep(30)
         if BRAIN.alive() and not BRAIN.busy and time.time() - BRAIN.last_used > 600:
             BRAIN.kill()
+        for t in list(TASKS.values()):
+            if t.get("status") == "laeuft" and t.get("pid") and time.time() - t.get("aus", t["start"]) > 600:
+                task_cancel(t["id"])
+                task_set(t["id"], status="fehler", ergebnis="Hing 10 Minuten ohne Fortschritt – abgebrochen.")
         if BRAIN.busy and time.time() - BRAIN.last_out > 180:
             # Gehirn hängt (3 Min. ohne jede Ausgabe) → abbrechen statt ewig „denkt“
             BRAIN.stopped = True
@@ -1814,7 +1878,9 @@ class Handler(BaseHTTPRequestHandler):
                 write_state(mode="idle", task="", detail="", log=[])
                 st = read_state()
             st["busy"] = BRAIN.busy
-            st["aufgaben"] = tasks_list()   # Hintergrund-Aufgaben + Entwickler (je ein Hologramm)
+            st["aufgaben"] = tasks_list()
+            karten_liste()   # abgelaufene Hologramme wegräumen
+            st["karten_v"] = KARTEN_V[0]   # Hintergrund-Aufgaben + Entwickler (je ein Hologramm)
             st["bild"] = {"n": BILD["n"], "name": BILD["name"], "rein": BILD["rein"]}   # Bild-Hologramm
             st["gold"] = GOLD["n"]   # Gold-Hologramm auf Zuruf
             st["web"] = {"n": WEB["n"], "url": WEB["url"], "titel": WEB["titel"], "modus": WEB["modus"],
@@ -1824,6 +1890,19 @@ class Handler(BaseHTTPRequestHandler):
             for i, p in enumerate(st.get("parts") or []):   # Stimme für alle Stücke vorbereiten
                 ensure((st.get("aid"), i), p)
             self.send(200, st)
+        elif u.path == "/karten":
+            self.send(200, {"karten": [dict(c, inhalt=[{k: v for k, v in blk.items() if k != "pfad"} for blk in c["inhalt"]])
+                                       for c in karten_liste()]})
+        elif u.path == "/karte/datei":   # Bild aus einem Hologramm (nur Bilddateien, die beim Anlegen geprüft wurden)
+            c = KARTEN.get(q.get("id", ""))
+            try:
+                pfad = c["inhalt"][int(q.get("i", -1))]["pfad"]
+                with open(pfad, "rb") as f:
+                    data = f.read()
+            except Exception:
+                return self.send(404, b"", "text/plain")
+            ext = os.path.splitext(pfad)[1].lower().lstrip(".")
+            self.send(200, data, "image/" + {"jpg": "jpeg"}.get(ext, ext))
         elif u.path == "/bild":   # aktuelles Bild-Hologramm ausliefern
             pfad = BILD["pfad"]
             try:
@@ -1903,7 +1982,7 @@ class Handler(BaseHTTPRequestHandler):
             if not text:
                 return self.send(400, {"ok": False})
             r = ask(text)
-            self.send(200 if r else 409, {"ok": True, "parallel": r == "parallel"})
+            self.send(200 if r else 409, {"ok": True, "parallel": r == "parallel", "lokal": r == "lokal"})
         elif u.path == "/stop":
             self.send(200, {"ok": stop()})
         elif u.path == "/media":
@@ -1975,6 +2054,8 @@ class Handler(BaseHTTPRequestHandler):
                 self.send(200, {"ok": task_cancel(str(b.get("id", "")))})
             else:
                 self.send(400, {"ok": False})
+        elif u.path == "/karte":   # holo.ps1: freies Hologramm anlegen/ändern/schließen
+            self.send(200, karte_setzen(b if isinstance(b, dict) else {}))
         elif u.path == "/bild":   # bild_zeigen.ps1: Bild sofort als Hologramm einblenden
             self.send(200, {"ok": bild_zeigen(b.get("pfad"), b.get("rein"))})
         elif u.path == "/web":   # web_zeigen.ps1: Webseite als bedienbares Hologramm

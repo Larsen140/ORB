@@ -324,6 +324,38 @@
     background:repeating-linear-gradient(0deg, rgba(var(--hl),.16) 0 1px, transparent 1px 3px); animation:holoScan 2.2s linear infinite; }
   #holo::after { content:''; position:absolute; left:0; right:0; height:26%; top:-30%; pointer-events:none;
     background:linear-gradient(180deg, transparent, rgba(var(--hl),.22), transparent); animation:holoSweep 2.6s var(--ease) infinite; }
+  /* Freie Hologramme (holo.ps1): beliebig viele, verschiebbar, Größe per Ecke */
+  #karten { position:fixed; inset:0; z-index:6; pointer-events:none; }
+  .karte { --hl:var(--c3); position:absolute; pointer-events:auto; display:flex; flex-direction:column; border-radius:18px; color:#eaf6ff;
+    background:linear-gradient(165deg, color-mix(in srgb, var(--hl) 16%, transparent), rgba(8,12,26,.72));
+    border:1px solid color-mix(in srgb, var(--hl) 65%, transparent); backdrop-filter:blur(8px);
+    box-shadow:0 0 30px color-mix(in srgb, var(--hl) 30%, transparent), inset 0 0 22px color-mix(in srgb, var(--hl) 14%, transparent);
+    resize:both; overflow:hidden; min-width:200px; min-height:110px; max-width:96vw; max-height:90vh;
+    animation:thIn .7s var(--spring) backwards; }
+  .karte::before { content:''; position:absolute; inset:0; pointer-events:none; opacity:.22; border-radius:inherit;
+    background:repeating-linear-gradient(0deg, transparent 0 2px, color-mix(in srgb, var(--hl) 45%, transparent) 2px 3px); }
+  .karte::after { content:''; position:absolute; left:0; right:0; height:22%; top:-30%; pointer-events:none;
+    background:linear-gradient(transparent, color-mix(in srgb, var(--hl) 22%, transparent), transparent); animation:thScan 3.4s linear infinite; }
+  .karte .kh { display:flex; align-items:center; gap:8px; padding:10px 12px 8px 14px; cursor:grab; user-select:none; flex:none;
+    font-size:11.5px; font-weight:700; letter-spacing:.16em; text-transform:uppercase; border-bottom:1px solid color-mix(in srgb, var(--hl) 25%, transparent); }
+  .karte .kh::before { content:''; width:7px; height:7px; border-radius:50%; background:var(--hl); box-shadow:0 0 8px var(--hl); }
+  .karte .kh span { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .karte .kh button { border:0; background:none; color:inherit; opacity:.6; cursor:pointer; font-size:14px; padding:0 2px; }
+  .karte .kh button:hover { opacity:1; }
+  .karte .kb { flex:1; overflow:auto; padding:10px 14px 14px; display:flex; flex-direction:column; gap:10px; font-size:14px; line-height:1.45; }
+  .karte .b-titel { font-size:17px; font-weight:700; }
+  .karte .b-liste { margin:0; padding-left:18px; } .karte .b-liste li { margin:2px 0; }
+  .karte .b-liste li::marker { color:var(--hl); }
+  .karte .b-zahl { display:flex; align-items:baseline; gap:8px; } .karte .b-zahl b { font-size:30px; font-weight:300; color:#fff; text-shadow:0 0 14px var(--hl); }
+  .karte .b-zahl i { font-style:normal; opacity:.7; font-size:12.5px; }
+  .karte .b-fort .bar { height:6px; border-radius:6px; background:color-mix(in srgb, var(--hl) 18%, transparent); overflow:hidden; margin-top:5px; }
+  .karte .b-fort .bar i { display:block; height:100%; background:var(--hl); box-shadow:0 0 10px var(--hl); transition:width .6s var(--spring); }
+  .karte .b-bild img { width:100%; border-radius:10px; display:block; }
+  .karte .b-web { flex:1; min-height:220px; border:0; border-radius:10px; background:#fff; }
+  .karte table { border-collapse:collapse; width:100%; font-size:13px; } .karte th { text-align:left; color:var(--hl); font-weight:600; }
+  .karte td, .karte th { padding:4px 8px; border-bottom:1px solid color-mix(in srgb, var(--hl) 18%, transparent); }
+  .karte hr { border:0; border-top:1px solid color-mix(in srgb, var(--hl) 30%, transparent); margin:2px 0; width:100%; }
+  .karte .reihe { display:grid; grid-template-columns:repeat(auto-fit, minmax(120px, 1fr)); gap:10px; }
   /* Aufgaben-Hologramme: eins pro laufender Aufgabe (Multitasking) */
   /* Platz wird laufend berechnet (holoPlatz): unter der Kugel, zwischen den Widget-Spalten, über Untertitel und Dock */
   #tasks { position:fixed; left:var(--mid,50%); top:62%; transform:translateX(-50%); z-index:5; display:flex; gap:12px; padding:6px 4px 10px;
@@ -373,6 +405,7 @@
   .th .tt { padding-right:18px; }
   .th.ziehen { transition:none; }
   .th.wisch { opacity:0 !important; transition:opacity .35s, transform .35s; }
+  .karte.weg { opacity:0; transform:scale(.92) rotateX(20deg); transition:opacity .45s, transform .45s; }
   .th.weg { animation:holoAb .42s cubic-bezier(.5,0,.75,0) forwards; pointer-events:none; }
   /* Einblenden wie eine Projektion: erst eine Lichtlinie, die sich weich zur Karte öffnet – Ausblenden umgekehrt */
   @keyframes holoAuf { 0% { opacity:0; clip-path:inset(49% 8% 49% 8% round 16px); filter:blur(4px) brightness(2.2); }
@@ -691,6 +724,7 @@
   <p class="note">Leertaste halten = sprechen · Esc = stoppen · S = Stopp-Knopf · T = tippen · M = Stimme · F = Vollbild · E = Einstellungen</p></div>
 </aside>
 <div id="tasks"></div>
+<div id="karten"></div>
 <div id="start"><div class="glass rim">Tippen zum Aktivieren</div></div>
 
 <script>
@@ -1160,7 +1194,12 @@ async function startClap() {
     clapTimer = ac.createScriptProcessor(512, 1, 1);   // Ersatz für alte Browser
     clapTimer.onaudioprocess = e => { clapBuf = e.inputBuffer.getChannelData(0); pegelMerken(clapBuf); clapTick(); };
   }
-  micSrc.connect(clapTimer); clapTimer.connect(mute);
+  // eigener, UNGEFILTERTER Mikrofon-Zugang: Echo-/Rauschunterdrückung schneidet genau die hellen Anteile weg,
+  // an denen man Schnipsen erkennt (sonst klang ein Schnipser „dumpf wie Klatschen“)
+  let src = micSrc;
+  try { const roh = await navigator.mediaDevices.getUserMedia({ audio:{ echoCancellation:false, noiseSuppression:false, autoGainControl:false } });
+        src = ac.createMediaStreamSource(roh); } catch (e) {}
+  src.connect(clapTimer); clapTimer.connect(mute);
   clapStarting = false;
 }
 let fBuf = null, snapT = 0, snapRms = 0, snapLaut = 0, clapPk = [], slowRms = 1, snapTest = 0, snapTestT = 0;   // slowRms: Lautstärke der letzten ~1–2 s
@@ -1224,15 +1263,15 @@ function clapTick(tBlock) {
           fetch('/mouse').then(r => r.json()).then(j => { if (j.eingabe > 1 && j.ago > 1) onSnap(); else snapInfo('Knall gehört – aber Maus/Tastatur war gerade in Benutzung'); }).catch(() => {}); }, 900);
       }
       else if (knall && !cand.snap && testet) snapInfo('Knall gehört – klang eher dumpf wie Klatschen');
-      else if (knall && !cand.snap && !mouse) { snapT = 0; clapPk.push([cand.t, cand.pk]); checkSysMouse(cand.t); }
+      else if (knall && !cand.snap && !mouse) { snapT = 0; clapPk.push([cand.t, cand.pk]); clapPk = clapPk.slice(-4); checkSysMouse(cand.t); }
       else if (!knall) claps = [];   // Dauergeräusch statt Knall
       cand = null;
     }
   }
   else if (!mouse && now - lastClap > 140) {
     const mf = (musikAn() ? 2.5 : 1) * (ownSpeak ? 2 : 1);   // läuft Musik oder spricht ORB: nur deutliche Knalle zählen
-    const base = .0006 * (11 - (+cfg.empfindlichkeit || 6)) * mf, thr = Math.max(base, floorRms * 40);
-    if (pk > thr && rms > Math.max(floorRms * 10, base * .2)) {
+    const base = .0006 * (11 - (+cfg.empfindlichkeit || 6)) * mf, thr = Math.max(base, floorRms * 40), thrS = Math.max(base, floorRms * 12);   // Schnipser sind leiser als Klatscher
+    if (pk > thrS && rms > Math.max(floorRms * 3, base * .2)) {
       // Klatschen ist breitbandig, ein Mausklick fast nur hohes Klicken: Anteil hoher Frequenzen prüfen
       let d = 0; for (let i = 1; i < clapBuf.length; i++) { const q = clapBuf[i] - clapBuf[i - 1]; d += q * q; }
       const hf = d / (s || 1), hfMax = 2 - 2 * Math.cos(2 * Math.PI * 4800 / ac.sampleRate);
@@ -1241,8 +1280,8 @@ function clapTick(tBlock) {
       const still = pre < rms * .3;   // davor (30–150 ms) war es deutlich leiser – bei Sprache fast nie
       // Schnipsen nur, wenn es sich deutlich vom Raumgeräusch der letzten Sekunde abhebt (nicht bei Gesprächen/Werkzeug)
       const ruhig = slow < rms * (.05 + .035 * sEmpf) && pre < rms * .4;
-      if (hf > snapHf && pk > Math.max(floorRms * 60, (.034 - .003 * sEmpf) * mf) && pk / rms < 16 && pre < rms * .4) cand = { t:now, rms, pk, snap:true, ruhig };
-      else if (hf < hfMax && pk / rms < 18 && still) cand = { t:now, rms, pk, snap:snapRatio() > 1.4, ruhig };
+      if (hf > snapHf && pk > Math.max(floorRms * 18, (.02 - .0015 * sEmpf) * mf) && pk / rms < 16 && pre < rms * .4) cand = { t:now, rms, pk, snap:true, ruhig };
+      else if (hf < hfMax && pk / rms < 18 && still && pk > thr && rms > floorRms * 10) cand = { t:now, rms, pk, snap:snapRatio() > 1.4, ruhig };
     }
   }
   floorRms = rms < floorRms ? rms : floorRms * .995 + Math.min(rms, .2) * .005;   // Stille sofort übernehmen
@@ -1358,7 +1397,7 @@ async function ask(text) {
   liveMsg(null); addMsg('me', text); stopAudio(); SFX.send(); ripple(1.1); caption('');
   try {
     const r = await fetch('/ask', { method:'POST', headers:{ 'Content-Type':'application/json' }, body:JSON.stringify({ text }) });
-    if (r.ok) { const j = await r.json().catch(() => ({})); if (j.parallel) { hint('Läuft parallel – eigenes Hologramm', 2500); SFX.holo(); } }
+    if (r.ok) { const j = await r.json().catch(() => ({})); if (j.parallel) { hint('Läuft parallel – eigenes Hologramm', 2500); SFX.holo(); } if (j.lokal) { hint('Erledigt', 1500); SFX.done(); } }
     if (r.status === 409) { hint('Ich arbeite noch – „Jarvis“ oder Esc unterbricht', 4000); addMsg('orb', 'Moment, ich bin noch an der letzten Sache dran. Sag „Jarvis“ oder drück Esc, dann höre ich auf.'); }
     fastPoll();
   } catch (e) { hint('Server nicht erreichbar'); }
@@ -1441,7 +1480,7 @@ function stopConvo(silent) {
   convo = false; killConvoRec(); liveMsg(null);
   if (!silent) { goldZu(); SFX.listenOff(); ripple(.5); hint('Zuhören beendet · 2× klatschen zum Weiterreden', 4500); }
 }
-function killConvoRec() { if (convoRec) { const r = convoRec; convoRec = null; try { r.abort(); } catch (e) {} } sbReset(); }
+function killConvoRec() { if (convoRec) { const r = convoRec; convoRec = null; try { r.abort(); } catch (e) {} } if (sb.t && sb.t.trim()) { try { sbFlush(); } catch (e) {} } sbReset(); }
 function convoCanListen() {
   return !S.call && convo && !S.sleep && !listening && !speakingNow() && performance.now() >= askGap && S.mode !== 'wartet';   // auch während er arbeitet – Neues läuft parallel
 }
@@ -1665,6 +1704,7 @@ function addMsg(who, text) {
   const m = $('msgs'); m.querySelector('.empty')?.remove();
   history.push({ who, text, t:Date.now() }); saveHistory();
   const el = msgEl(who, text); m.insertBefore(el, typingEl && typingEl.parentNode ? typingEl : null); scrollChat();
+  while (m.children.length > 80) m.removeChild(m.firstElementChild);   // alte Nachrichten aus der Anzeige nehmen
   el.classList.add('shine'); setTimeout(() => el.classList.remove('shine'), 1800);   // Glanzwelle nur kurz beim Erscheinen
   return el;
 }
@@ -1709,7 +1749,10 @@ async function poll() {
   poll._busy = true;
   try {
     const aktiv = speakingNow() || listening || !!convoRec ? '1' : '0';
-    const st = await (await fetch('/state?aktiv=' + aktiv, { cache:'no-store' })).json(); lastOk = performance.now(); S.busy = !!st.busy; renderTasks(st.aufgaben); if (st.bild) bildHolo(st.bild); if (st.gold !== undefined) goldHolo(st.gold); if (st.web) webHolo(st.web);
+    const resp = await fetch('/state?aktiv=' + aktiv, { cache:'no-store' });
+    if (resp.status === 403 && !poll._reload) { poll._reload = true; setTimeout(() => location.reload(), 300); }   // ORB neu gestartet → neues Token
+    const st = await resp.json(); lastOk = performance.now(); S.busy = !!st.busy; renderTasks(st.aufgaben);
+    if (st.karten_v !== undefined && st.karten_v !== kartenV) { kartenV = st.karten_v; ladeKarten(); } if (st.bild) bildHolo(st.bild); if (st.gold !== undefined) goldHolo(st.gold); if (st.web) webHolo(st.web);
     if (!!st.anruf !== !!S.call) { S.call = !!st.anruf; if (S.call) { stopWake(); killConvoRec(); killBarge(); hint('Meeting erkannt – ich höre nicht zu', 3500); } else if (cfg.steuerung === 'wort') startWake(); }
     // neue ORB-Version läuft → Seite neu laden (sonst sieht man Änderungen erst nach Fenster-Neustart)
     if (st.version) { if (!poll._v) poll._v = st.version; else if (st.version !== poll._v) { location.replace(S.sleep ? '/#schlaf' : '/#wake'); location.reload(); return; } }
@@ -1924,6 +1967,81 @@ function holoPlatz(cx, cy, R) {
   tb.style.top = tasksTop + 'px'; tb.style.width = Math.min(900, spalteB) + 'px';
   tb.style.maxHeight = Math.max(60, H - 118 - tasksTop) + 'px';   // höchstens bis knapp über das Dock
 }
+/* ---------- Freie Hologramme (holo.ps1) ---------- */
+let kartenV = -1, kartenLaden = false;
+const kartenEls = {}, KGROESSE = { klein:[320, 220], mittel:[460, 340], gross:[700, 500], riesig:[980, 640] };
+const KFARBEN = { blau:'#5cc8ff', gruen:'#5dffb0', rot:'#ff5c6c', gelb:'#ffd35c', lila:'#b07cff', pink:'#ff6ad5', weiss:'#e8f4ff', orange:'#ffa04d' };
+let kartenPlatz = 0;
+async function ladeKarten() {
+  if (kartenLaden) return; kartenLaden = true;
+  try { renderKarten((await (await fetch('/karten')).json()).karten || []); } catch (e) {}
+  kartenLaden = false;
+}
+function blockHtml(b, kid, i) {
+  const t = v => esc(String(v ?? ''));
+  switch (b.typ) {
+    case 'titel': return `<div class="b-titel">${t(b.text)}</div>`;
+    case 'text': return `<div class="b-text">${t(b.text).replace(/\n/g, '<br>')}</div>`;
+    case 'liste': return `<ul class="b-liste">${(b.punkte || []).slice(0, 50).map(p => `<li>${t(p)}</li>`).join('')}</ul>`;
+    case 'zahl': return `<div class="b-zahl"><b>${t(b.wert)}${b.einheit ? `<small style="font-size:16px"> ${t(b.einheit)}</small>` : ''}</b><i>${t(b.label)}</i></div>`;
+    case 'fortschritt': { const p = Math.max(0, Math.min(100, +b.prozent || 0));
+      return `<div class="b-fort"><div style="display:flex;justify-content:space-between"><span>${t(b.label)}</span><span>${p} %</span></div><div class="bar"><i style="width:${p}%"></i></div></div>`; }
+    case 'bild': return `<div class="b-bild"><img data-k="${t(kid)}" data-i="${i}" alt=""></div>`;
+    case 'web': return /^https?:\/\//i.test(b.url || '') ? `<iframe class="b-web" src="${t(b.url)}" sandbox="allow-scripts allow-same-origin allow-forms allow-popups"></iframe>` : '';
+    case 'tabelle': return `<table>${(b.kopf || []).length ? `<tr>${b.kopf.map(k => `<th>${t(k)}</th>`).join('')}</tr>` : ''}${(b.zeilen || []).slice(0, 80).map(z => `<tr>${(z || []).map(c => `<td>${t(c)}</td>`).join('')}</tr>`).join('')}</table>`;
+    case 'trenner': return '<hr>';
+  }
+  return '';
+}
+function renderKarten(list) {
+  const box = $('karten'); if (!box) return;
+  const seen = new Set();
+  for (const c of list) {
+    seen.add(c.id);
+    let el = kartenEls[c.id];
+    if (!el) {
+      el = kartenEls[c.id] = document.createElement('div'); el.className = 'karte';
+      el.innerHTML = '<div class="kh"><span></span><button title="Schließen">✕</button></div><div class="kb"></div>';
+      const [w, h] = KGROESSE[c.groesse] || KGROESSE.mittel;
+      const bw = Math.min(+c.breite || w, innerWidth - 32), bh = Math.min(+c.hoehe || h, innerHeight - 140);
+      const n = kartenPlatz++ % 8;   // neue Hologramme versetzt in der Mitte stapeln
+      el.style.width = bw + 'px'; el.style.height = bh + 'px';
+      // freien Platz suchen (zuerst Mitte, dann links/rechts davon), sonst versetzt stapeln
+      const belegt = Object.values(kartenEls).filter(k => k !== el && !k.classList.contains('weg')).map(k => ({ left:k.offsetLeft, top:k.offsetTop, right:k.offsetLeft + k.offsetWidth, bottom:k.offsetTop + k.offsetHeight }));   // ohne Einblend-Animation messen
+      let pos = null;
+      for (let y = 80; y + bh < innerHeight - 120 && !pos; y += 40)
+        for (const dx of [0, -1, 1, -2, 2, -3, 3, -4, 4]) {
+          const x = innerWidth / 2 - bw / 2 + dx * 60;
+          if (x < 16 || x + bw > innerWidth - 16) continue;
+          if (!belegt.some(r => x < r.right + 12 && x + bw > r.left - 12 && y < r.bottom + 12 && y + bh > r.top - 12)) { pos = [x, y]; break; }
+        }
+      if (!pos) pos = [Math.max(16, Math.min(innerWidth - bw - 16, innerWidth / 2 - bw / 2 + (n % 4) * 34 - 50)), Math.max(70, Math.min(innerHeight - bh - 130, 90 + n * 30))];
+      el.style.left = pos[0] + 'px'; el.style.top = pos[1] + 'px';
+      el.querySelector('button').onclick = () => { SFX.close(); el.classList.add('weg'); fetch('/karte', { method:'POST', headers:{ 'Content-Type':'application/json' }, body:JSON.stringify({ id:c.id, zu:true }) }).catch(() => {}); };
+      // verschieben am Kopf
+      const kh = el.querySelector('.kh');
+      kh.onpointerdown = e => { if (e.target.tagName === 'BUTTON') return; kh.setPointerCapture(e.pointerId); const sx = e.clientX - el.offsetLeft, sy = e.clientY - el.offsetTop; kh.style.cursor = 'grabbing';
+        kh.onpointermove = m => { el.style.left = Math.max(0, Math.min(innerWidth - 60, m.clientX - sx)) + 'px'; el.style.top = Math.max(0, Math.min(innerHeight - 40, m.clientY - sy)) + 'px'; };
+        kh.onpointerup = () => { kh.onpointermove = null; kh.style.cursor = ''; }; };
+      el.onpointerdown = () => { el.style.zIndex = ++renderKarten.z || (renderKarten.z = 1); };
+      box.appendChild(el); SFX.holo(); ripple(.6);
+    }
+    if (el._v === c.v) continue;
+    el._v = c.v;
+    el.style.setProperty('--hl', KFARBEN[c.farbe] || (c.farbe && /^#[0-9a-f]{3,8}$/i.test(c.farbe) ? c.farbe : 'var(--c3)'));
+    el.querySelector('.kh span').textContent = c.titel || 'Hologramm';
+    // nebeneinander: Blöcke mit "reihe": true in eine Zeile
+    let html = '', reihe = [];
+    const flush = () => { if (reihe.length) { html += `<div class="reihe">${reihe.join('')}</div>`; reihe = []; } };
+    c.inhalt.forEach((b, i) => { const h = blockHtml(b, c.id, i); if (b.reihe) reihe.push(h); else { flush(); html += h; } });
+    flush();
+    el.querySelector('.kb').innerHTML = html;
+    el.querySelectorAll('img[data-k]').forEach(img => fetch(`/karte/datei?id=${encodeURIComponent(img.dataset.k)}&i=${img.dataset.i}`)
+      .then(r => r.ok ? r.blob() : null).then(bl => { if (bl) img.src = URL.createObjectURL(bl); }).catch(() => {}));
+  }
+  for (const id of Object.keys(kartenEls)) if (!seen.has(id)) { const el = kartenEls[id]; el.classList.add('weg'); setTimeout(() => el.remove(), 500); delete kartenEls[id]; }
+}
+
 /* ---------- Aufgaben-Hologramme ---------- */
 const taskEls = {};
 function fmtZeit(s) { s = Math.max(0, s | 0); return s < 60 ? s + 's' : Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); }

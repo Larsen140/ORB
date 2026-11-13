@@ -42,10 +42,19 @@ def load():
 def save(st):
     st["seq"] = int(st.get("seq", 0)) + 1
     st["time"] = time.time()
-    tmp = STATE + ".tmp"
+    tmp = "%s.%d.tmp" % (STATE, os.getpid())
     with open(tmp, "w", encoding="utf-8") as f:
         json.dump(st, f, ensure_ascii=False)
-    os.replace(tmp, STATE)
+    for i in range(20):
+        try:
+            os.replace(tmp, STATE)
+            return
+        except PermissionError:
+            time.sleep(.02 * (i + 1))
+    try:
+        os.remove(tmp)
+    except OSError:
+        pass
 
 
 def label_for(tool):
