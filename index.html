@@ -311,6 +311,37 @@
     background:repeating-linear-gradient(0deg, rgba(var(--hl),.16) 0 1px, transparent 1px 3px); animation:holoScan 2.2s linear infinite; }
   #holo::after { content:''; position:absolute; left:0; right:0; height:26%; top:-30%; pointer-events:none;
     background:linear-gradient(180deg, transparent, rgba(var(--hl),.22), transparent); animation:holoSweep 2.6s var(--ease) infinite; }
+  /* Aufgaben-Hologramme: eins pro laufender Aufgabe (Multitasking) */
+  #tasks { position:fixed; left:50%; bottom:190px; transform:translateX(-50%); z-index:5; display:flex; gap:14px;
+    flex-wrap:wrap-reverse; justify-content:center; width:min(900px, calc(100vw - 32px)); pointer-events:none; }
+  .th { --hl:var(--c3); position:relative; width:206px; padding:12px 14px 11px; border-radius:16px; pointer-events:auto; cursor:default;
+    background:linear-gradient(160deg, rgba(var(--hlr,120,220,255),.16), rgba(10,14,30,.55)); color:#e9f6ff;
+    border:1px solid color-mix(in srgb, var(--hl) 70%, transparent); backdrop-filter:blur(6px);
+    box-shadow:0 0 22px color-mix(in srgb, var(--hl) 35%, transparent), inset 0 0 18px color-mix(in srgb, var(--hl) 18%, transparent);
+    transform:perspective(700px) rotateX(10deg); animation:thIn .7s var(--spring) backwards, holoFlick 4.2s steps(1) infinite;
+    overflow:hidden; transition:opacity .5s, transform .5s; }
+  .th::before { content:''; position:absolute; inset:0; pointer-events:none; opacity:.35;
+    background:repeating-linear-gradient(0deg, transparent 0 2px, color-mix(in srgb, var(--hl) 40%, transparent) 2px 3px); }
+  .th::after { content:''; position:absolute; left:0; right:0; height:30%; top:-35%; pointer-events:none;
+    background:linear-gradient(transparent, color-mix(in srgb, var(--hl) 30%, transparent), transparent); animation:thScan 2.6s linear infinite; }
+  .th.dev { --hl:var(--c4); } .th.fertig { --hl:#5dffb0; } .th.fehler, .th.abgebrochen { --hl:#ff6b6b; }
+  .th .tt { display:flex; align-items:center; gap:8px; font-size:11px; font-weight:700; letter-spacing:.14em; text-transform:uppercase; }
+  .th .ring { width:14px; height:14px; border-radius:50%; flex:none; border:2px solid color-mix(in srgb, var(--hl) 35%, transparent);
+    border-top-color:var(--hl); animation:spin .9s linear infinite; }
+  .th.fertig .ring, .th.fehler .ring, .th.abgebrochen .ring { animation:none; border-color:var(--hl); background:var(--hl); box-shadow:0 0 10px var(--hl); }
+  .th .nm { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .th .zt { font-variant-numeric:tabular-nums; opacity:.7; font-weight:500; letter-spacing:0; }
+  .th .st { margin-top:7px; font-size:12.5px; line-height:1.35; opacity:.9; display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden; min-height:17px; }
+  .th .bar { margin-top:8px; height:2px; border-radius:2px; background:color-mix(in srgb, var(--hl) 20%, transparent); overflow:hidden; }
+  .th .bar i { display:block; height:100%; width:30%; background:var(--hl); box-shadow:0 0 8px var(--hl); animation:thBar 1.6s ease-in-out infinite; }
+  .th.fertig .bar i, .th.fehler .bar i, .th.abgebrochen .bar i { width:100%; animation:none; }
+  .th .x { position:absolute; top:6px; right:8px; border:0; background:none; color:inherit; opacity:.0; cursor:pointer; font-size:14px; transition:opacity .2s; }
+  .th:hover .x { opacity:.7; }
+  .th.weg { opacity:0; transform:perspective(700px) rotateX(30deg) translateY(20px) scale(.9); }
+  @keyframes thIn { from { opacity:0; transform:perspective(700px) rotateX(70deg) translateY(40px) scale(.6); filter:blur(6px); } }
+  @keyframes thScan { to { top:120%; } }
+  @keyframes thBar { 0% { transform:translateX(-110%); } 100% { transform:translateX(360%); } }
+  @keyframes spin { to { transform:rotate(360deg); } }
   #holo.glitch { animation:holoGlitch .45s steps(2) 1; }
   #holo .ico { font-size:38px; line-height:1.1; filter:grayscale(1) brightness(1.8) drop-shadow(0 0 10px rgb(var(--hl))); }
   #holo .big { font-size:46px; font-weight:250; line-height:1.05; letter-spacing:-.01em; }
@@ -471,6 +502,7 @@
   </div><div style="margin-top:9px"><button class="btn" id="schlafjetzt">☾ Jetzt schlafen</button><button class="btn red" id="beenden">⏻ ORB ganz beenden</button></div>
   <p class="note">Leertaste halten = sprechen · Esc = stoppen · T = tippen · M = Stimme · F = Vollbild · E = Einstellungen</p></div>
 </aside>
+<div id="tasks"></div>
 <div id="start"><div class="glass rim">Tippen zum Aktivieren</div></div>
 
 <script>
@@ -1216,7 +1248,7 @@ async function poll() {
   poll._busy = true;
   try {
     const aktiv = speakingNow() || listening || !!convoRec ? '1' : '0';
-    const st = await (await fetch('/state?aktiv=' + aktiv, { cache:'no-store' })).json(); lastOk = performance.now(); S.busy = !!st.busy;
+    const st = await (await fetch('/state?aktiv=' + aktiv, { cache:'no-store' })).json(); lastOk = performance.now(); S.busy = !!st.busy; renderTasks(st.aufgaben);
     if (!!st.anruf !== !!S.call) { S.call = !!st.anruf; if (S.call) { stopWake(); killConvoRec(); killBarge(); hint('Meeting erkannt – ich höre nicht zu', 3500); } else if (cfg.steuerung === 'wort') startWake(); }
     // neue ORB-Version läuft → Seite neu laden (sonst sieht man Änderungen erst nach Fenster-Neustart)
     if (st.version) { if (!poll._v) poll._v = st.version; else if (st.version !== poll._v) { location.replace(S.sleep ? '/#schlaf' : '/#wake'); location.reload(); return; } }
@@ -1252,6 +1284,38 @@ async function runDemo() {
 }
 let lastDemo = null;
 document.addEventListener('keydown', e => { if ((e.key === 'd' || e.key === 'D') && e.target.tagName !== 'INPUT') runDemo(); });
+/* ---------- Aufgaben-Hologramme ---------- */
+const taskEls = {};
+function fmtZeit(s) { s = Math.max(0, s | 0); return s < 60 ? s + 's' : Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); }
+function renderTasks(list) {
+  const box = $('tasks'); if (!box) return;
+  const seen = new Set();
+  for (const t of list || []) {
+    seen.add(t.id);
+    let el = taskEls[t.id];
+    if (!el) {
+      el = taskEls[t.id] = document.createElement('div');
+      el.innerHTML = '<div class="tt"><span class="ring"></span><span class="nm"></span><span class="zt"></span></div><div class="st"></div><div class="bar"><i></i></div><button class="x" title="Abbrechen / ausblenden">✕</button>';
+      el.querySelector('.x').onclick = () => {
+        if (el._status === 'laeuft' && el._art !== 'entwickler') fetch('/aufgabe', { method:'POST', headers:{ 'Content-Type':'application/json' }, body:JSON.stringify({ aktion:'abbrechen', id:t.id }) }).catch(() => {});
+        else { el._weg = true; el.classList.add('weg'); SFX.close(); }
+      };
+      box.appendChild(el); SFX.holo(); ripple(.5);
+    }
+    if (el._weg) continue;
+    if (el._status && el._status !== t.status) { if (t.status === 'fertig') { SFX.done(); burst(30); } else if (t.status !== 'laeuft') SFX.close(); else SFX.holo(); }
+    el._status = t.status; el._art = t.art;
+    el.className = 'th ' + t.status + (t.art === 'entwickler' ? ' dev' : '');
+    el.querySelector('.nm').textContent = (t.art === 'entwickler' ? '⚙ ' : '') + t.titel;
+    el.querySelector('.zt').textContent = t.status === 'laeuft' ? fmtZeit(t.laeuft_seit) : (t.status === 'fertig' ? '✓' : '✕');
+    el.querySelector('.st').textContent = t.status === 'laeuft' ? (t.schritt || 'Arbeitet …') : (t.ergebnis || '');
+    // fertige Hologramme nach 45 s ausblenden
+    if (t.status !== 'laeuft' && t.jetzt - t.ende > 45) { el._weg = true; el.classList.add('weg'); }
+  }
+  for (const id of Object.keys(taskEls)) if (!seen.has(id)) { const el = taskEls[id]; el.classList.add('weg'); setTimeout(() => el.remove(), 600); delete taskEls[id]; }
+}
+const tasksRunning = () => Object.values(taskEls).some(el => el._status === 'laeuft');
+
 function onState(st, first) {
   if (st.demo !== undefined && st.demo !== lastDemo) { if (lastDemo !== null || !first) runDemo(); lastDemo = st.demo; }
   if (first) lastDemo = st.demo ?? 0;
@@ -1541,7 +1605,7 @@ function frame(now) {
   }
   if (bargeWanted()) bargeListen(); else if (bargeRec) killBarge();
   if (speaking || listening || S.busy || convo) lastAct = now;
-  if (!S.sleep && cfg.klatschen && +cfg.schlafen > 0 && now - lastAct > cfg.schlafen * 60000 && !autoSleepCheck) {
+  if (!S.sleep && cfg.klatschen && +cfg.schlafen > 0 && now - lastAct > cfg.schlafen * 60000 && !autoSleepCheck && !tasksRunning()) {   // nicht einschlafen, solange Aufgaben laufen
     // nur einschlafen, wenn wirklich niemand ORB benutzt: Fenster im Vordergrund + Eingaben am PC = Larsen ist da
     autoSleepCheck = true;
     fetch('/mouse').then(r => r.json()).then(j => {

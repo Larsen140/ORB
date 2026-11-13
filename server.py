@@ -68,7 +68,7 @@ DEFAULT_CFG = {
 }
 # Damit ORB immer dein Claude-Code-Login (Max-Abo) nutzt und nie einen API-Schlüssel
 CLAUDE_ENV_DROP = ("ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "ANTHROPIC_BASE_URL")
-VERSION = "45"
+VERSION = "46"
 ORB_UI = ("Deine Oberfläche (die Larsen gerade sieht): in der Mitte du als flüssige leuchtende Kugel mit Tropfen, "
           "Orbit-Ringen und Sternenhimmel; links eine Uhr und darunter der Gesprächsverlauf mit Eingabefeld; rechts "
           "Karten für System (CPU, RAM, Akku), Wetter mit Stundenvorschau, Aktivität (was du gerade tust) und Vorschläge; "
@@ -80,6 +80,17 @@ KURZ_REGELN = ("Antworte immer auf Deutsch. Du sprichst über ORB, eine Sprachob
                "bestätigen. Bei Erledigtem reicht z. B. „Erledigt.“ oder „Läuft.“.")
 LANG_REGELN = ("Antworte immer auf Deutsch. Du sprichst über ORB, eine Sprachoberfläche; alles wird laut vorgelesen. Antworte natürlich "
                "gesprochen ohne Markdown oder Listen; ausführlicher ist erlaubt, wenn es nötig ist.")
+
+AUFGABEN_REGELN = (
+    "MULTITASKING: Alles, was länger als etwa 15 Sekunden dauern würde (Recherche im Netz, mehrere Schritte, Dateien "
+    "durchsuchen/zusammenfassen/erstellen, Mails auswerten, Vergleiche, Pläne), machst du NICHT selbst, sondern startest es "
+    "als Hintergrund-Aufgabe – dann kann Larsen sofort weiterreden, und für jede Aufgabe erscheint ein eigenes Hologramm:\n"
+    "  powershell -NoProfile -ExecutionPolicy Bypass -File C:\\Users\\larse\\Orb\\aufgabe.ps1 \"<kurzer Titel, 2-4 Wörter>\" "
+    "\"<vollständiger Auftrag mit allem Kontext>\"\n"
+    "Danach nur kurz sagen, z. B. „Läuft im Hintergrund.“ Das Ergebnis sagt ORB selbst an, sobald es fertig ist. "
+    "Mehrere Aufgaben gleichzeitig sind erlaubt. Kurze Sachen (Fragen beantworten, App öffnen, Musik, Termin eintragen) "
+    "machst du direkt. Programmwünsche an ORB und große Projekte gehen wie bisher an den Entwickler (entwickler.ps1) – "
+    "der bekommt automatisch auch ein eigenes Hologramm.")
 
 MAIL_REGELN = (
     "Larsens Gmail erreichst du über die claude.ai-Connector-Werkzeuge (mcp__claude_ai_Gmail__…; bei Bedarf mit "
@@ -110,7 +121,8 @@ def system_prompt(cfg):
     except Exception:
         kal = ""
     return ((persona + "\n\n" if persona else "") + ORB_UI + "\n\n"
-            + (KURZ_REGELN if cfg.get("laenge") == "kurz" else LANG_REGELN) + "\n\n" + MAIL_REGELN + kal)
+            + (KURZ_REGELN if cfg.get("laenge") == "kurz" else LANG_REGELN) + "\n\n" + AUFGABEN_REGELN + "\n\n"
+            + MAIL_REGELN + kal)
 
 
 KURZ_PROMPT = ("Du sprichst gerade über ORB, eine Sprachoberfläche; deine Antwort wird laut vorgelesen. "
@@ -986,6 +998,113 @@ def media_key(cmd):
     return True
 
 
+# ---------- Hintergrund-Aufgaben (Multitasking, je Aufgabe ein Hologramm) ----------
+TASKS, _tasks_lock = {}, threading.Lock()
+BG_REGELN = ("Du erledigst für ORB, Larsens Sprachassistenten, eine Aufgabe im Hintergrund, während Larsen weiter mit ORB redet. "
+             "Arbeite selbstständig und vollständig, ohne Rückfragen. Lege längere Ergebnisse (Recherchen, Listen, Texte) als "
+             "Markdown-Datei in C:\\Users\\larse\\Documents\\Jarvis\\ergebnisse an. Ändere nichts am ORB-Programm. "
+             "Deine letzte Antwort wird laut vorgelesen: 1-2 kurze deutsche Sätze mit dem Ergebnis (bei Dateien: wo es liegt). "
+             "Kein Markdown.")
+
+
+def task_set(tid, **kw):
+    with _tasks_lock:
+        t = TASKS.setdefault(tid, {"id": tid, "titel": "Aufgabe", "art": "hintergrund", "status": "laeuft",
+                                   "schritt": "", "schritte": 0, "start": time.time(), "ende": 0, "ergebnis": ""})
+        if kw.get("status") == "laeuft" and t.get("status") != "laeuft":
+            t.update(start=time.time(), ende=0, ergebnis="", schritte=0)   # neue Runde (z. B. nächster Entwickler-Auftrag)
+        if kw.get("schritt") and kw["schritt"] != t.get("schritt"):
+            t["schritte"] = t.get("schritte", 0) + 1
+        t.update({k: v for k, v in kw.items() if v is not None})
+        if t["status"] in ("fertig", "fehler") and not t["ende"]:
+            t["ende"] = time.time()
+        return dict(t)
+
+
+def tasks_list():
+    now = time.time()
+    with _tasks_lock:
+        for tid in [k for k, t in TASKS.items() if t["ende"] and now - t["ende"] > 600]:
+            del TASKS[tid]   # fertige Aufgaben nach 10 Minuten wegräumen
+        return [dict(t, laeuft_seit=round(now - t["start"]), jetzt=now) for t in sorted(TASKS.values(), key=lambda t: t["start"])]
+
+
+def say_when_free(text):
+    """Ansage, sobald ORB nicht gerade selbst antwortet (max. 2 Min. warten)."""
+    def run():
+        for _ in range(240):
+            if not BRAIN.busy and read_state().get("mode") not in ("denkt", "auftrag"):
+                break
+            time.sleep(.5)
+        write_answer(text, heard="")
+    threading.Thread(target=run, daemon=True).start()
+
+
+def run_task(tid, auftrag):
+    cfg = load_cfg()
+    args = [find_claude(), "-p", "--output-format", "stream-json", "--verbose", "--model", cfg["modell"],
+            "--permission-mode", "auto", "--append-system-prompt", BG_REGELN]
+    ordner = cfg["ordner"] if os.path.isdir(cfg["ordner"]) else os.path.expanduser("~")
+    env = {k: v for k, v in os.environ.items() if k not in CLAUDE_ENV_DROP}
+    env["ORB_RUN"] = "1"
+    env["ORB_BG"] = "1"
+    try:
+        import hook as _hook
+    except Exception:
+        _hook = None
+    ergebnis, fehler = "", False
+    try:
+        p = subprocess.Popen(args, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
+                             cwd=ordner, env=env, creationflags=NO_WINDOW)
+        task_set(tid, pid=p.pid)
+        p.stdin.write(auftrag.encode("utf-8"))
+        p.stdin.close()
+        for raw in p.stdout:
+            try:
+                o = json.loads(raw.decode("utf-8", "ignore"))
+            except Exception:
+                continue
+            if o.get("type") == "assistant":
+                for c in (o.get("message") or {}).get("content") or []:
+                    if c.get("type") == "tool_use":
+                        name = c.get("name", "")
+                        lab = _hook.label_for(name) if _hook else name
+                        det = _hook.detail_for(c.get("input")) if _hook else ""
+                        task_set(tid, schritt=(lab + (": " + det if det else ""))[:90])
+                    elif c.get("type") == "text" and c.get("text", "").strip():
+                        task_set(tid, schritt="Denkt nach …")
+            elif o.get("type") == "result":
+                ergebnis, fehler = str(o.get("result") or ""), bool(o.get("is_error"))
+        p.wait()
+    except Exception as e:
+        ergebnis, fehler = str(e), True
+    if TASKS.get(tid, {}).get("status") == "abgebrochen":
+        return
+    satz = clean(ergebnis).strip() or ("Fertig." if not fehler else "")
+    if fehler or not satz:
+        task_set(tid, status="fehler", schritt="", ergebnis="Hat nicht geklappt.")
+        say_when_free("Die Aufgabe „%s“ hat leider nicht geklappt." % TASKS[tid]["titel"])
+    else:
+        task_set(tid, status="fertig", schritt="", ergebnis=satz[:600])
+        say_when_free(satz[:600])
+
+
+def task_start(titel, auftrag):
+    tid = "t%d" % int(time.time() * 1000)
+    task_set(tid, titel=(titel or "Aufgabe")[:40], art="hintergrund", status="laeuft", schritt="Startet …")
+    threading.Thread(target=run_task, args=(tid, auftrag), daemon=True).start()
+    return tid
+
+
+def task_cancel(tid):
+    t = TASKS.get(tid)
+    if t and t.get("status") == "laeuft" and t.get("pid"):
+        subprocess.run(["taskkill", "/F", "/T", "/PID", str(t["pid"])], capture_output=True, creationflags=NO_WINDOW)
+        task_set(tid, status="abgebrochen", schritt="", ergebnis="Abgebrochen.")
+        return True
+    return False
+
+
 def idle_reaper():
     """Claude nach 15 Minuten ohne Frage beenden, damit es keinen Speicher belegt (~250 MB)."""
     while True:
@@ -1067,6 +1186,7 @@ class Handler(BaseHTTPRequestHandler):
                 write_state(mode="idle", task="", detail="", log=[])
                 st = read_state()
             st["busy"] = BRAIN.busy
+            st["aufgaben"] = tasks_list()   # Hintergrund-Aufgaben + Entwickler (je ein Hologramm)
             st["anruf"] = in_call()   # während Meet/Teams/Zoom nicht zuhören
             st["version"] = VERSION   # Fenster lädt sich neu, wenn eine neue Version läuft
             for i, p in enumerate(st.get("parts") or []):   # Stimme für alle Stücke vorbereiten
@@ -1187,6 +1307,17 @@ class Handler(BaseHTTPRequestHandler):
                         threading.Thread(target=lambda: (time.sleep(3.5), ON_UPDATE[0](neu)), daemon=True).start()
                     else:
                         write_answer("Du bist auf dem neuesten Stand, Version %s." % VERSION, heard="")
+        elif u.path == "/aufgabe":   # Hintergrund-Aufgabe starten / Fortschritt melden (Entwickler) / abbrechen
+            a = str(b.get("aktion", "start"))
+            if a == "start" and str(b.get("auftrag", "")).strip():
+                self.send(200, {"id": task_start(str(b.get("titel", "")).strip(), str(b["auftrag"]).strip())})
+            elif a == "melde" and re.fullmatch(r"[\w-]{1,40}", str(b.get("id", ""))):
+                self.send(200, task_set(str(b["id"]), **{k: b.get(k) for k in ("titel", "art", "status", "schritt", "ergebnis")
+                                                         if b.get(k) is not None}))
+            elif a == "abbrechen":
+                self.send(200, {"ok": task_cancel(str(b.get("id", "")))})
+            else:
+                self.send(400, {"ok": False})
         elif u.path == "/announce":  # z. B. update.ps1: „Update fertig“ laut sagen
             text = str(b.get("text", "")).strip()
             if text:

@@ -148,6 +148,8 @@ def main():
     raw = sys.stdin.buffer.read().decode("utf-8", "ignore").lstrip("﻿")
     data = json.loads(raw) if raw.strip() else {}
     ev = data.get("hook_event_name", "")
+    if os.environ.get("ORB_BG") == "1":
+        return   # Hintergrund-Aufgaben/Entwickler haben ihr eigenes Hologramm – ORBs Hauptanzeige nicht anfassen
     if not ORB_RUN:
         return   # andere Claude-Code-Sitzungen (Terminal, Entwickler) dürfen ORBs Anzeige und Antworten nicht überschreiben
     st = load()
