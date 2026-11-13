@@ -12,7 +12,7 @@ Voraussetzung für Antworten: [Claude Code](https://claude.com/claude-code) inst
 ## Was ORB kann
 - **Wecken mit Doppelklatschen** – auch direkt nach dem PC-Start (lauscht unsichtbar im Hintergrund, ~70 MB).
 - **Gespräch**: hört dauerhaft zu, bis man „Stopp“ sagt; „Jarvis“ unterbricht ihn.
-- **Antwortet laut** auf Deutsch (Microsoft-Neural-Stimmen), Satz für Satz, während die Antwort entsteht.
+- **Antwortet laut** auf Deutsch (Microsoft-Neural-Stimmen), Satz für Satz, während die Antwort entsteht – jede Stimme auf einheitlich −14 LUFS normalisiert, mit Klang-EQ, Limiter und gekürzten Pausen (Lautstärke bis 300 %, ORB im Windows-Mixer immer auf 100 %).
 - **Apps & Webseiten öffnen**, Wetter, Termine, Spotify-Steuerung – ohne Token.
 - **iCloud-Kalender**: Termine eintragen, lesen und löschen (Einstellungen → iCloud-Kalender, app-spezifisches Passwort).
 - **Oberfläche** im Liquid-Glass-Stil mit Uhr, Gesprächsverlauf, System, Wetter, Termine, Spotify und Vorschlägen.

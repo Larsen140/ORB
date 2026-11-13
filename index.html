@@ -649,7 +649,7 @@
     <div class="row col">Sprecher<select id="s_stimme"></select></div>
     <div class="row col"><div class="lbl">Sprechtempo<span class="v" id="v_tempo"></span></div><input type="range" id="s_tempo" min="-20" max="50" step="5"></div>
     <div class="row col"><div class="lbl">Tonhöhe<span class="v" id="v_hoehe"></span></div><input type="range" id="s_hoehe" min="-20" max="20" step="2"></div>
-    <div class="row col"><div class="lbl">Lautstärke<span class="v" id="v_laut"></span></div><input type="range" id="s_laut" min="0" max="200" step="5"></div>
+    <div class="row col"><div class="lbl">Lautstärke<span class="v" id="v_laut"></span></div><input type="range" id="s_laut" min="0" max="300" step="5"></div>
     <div class="row">Stimme an<input type="checkbox" class="sw" id="s_voice"></div>
   </div><div style="margin-top:9px"><button class="btn" id="probe">▶ Probe hören</button></div></div>
   <div class="grp"><h4>Gehirn · Opus 5.5</h4><div class="card">
@@ -908,14 +908,13 @@ function initAudio() {
     ac = new (window.AudioContext || window.webkitAudioContext)({ latencyHint:'interactive' });
     analyser = ac.createAnalyser(); analyser.fftSize = 256; analyser.smoothingTimeConstant = .55;
     freq = new Uint8Array(analyser.frequencyBinCount); tdata = new Uint8Array(analyser.fftSize);
-    // Stimme: Vorverstärkung -> Kompressor (gleicht leise Stellen an) -> Lautstärke (bis 200 %) -> Limiter gegen Übersteuern
-    const pre = ac.createGain(); pre.gain.value = 1.6;
-    const comp = ac.createDynamicsCompressor();
-    comp.threshold.value = -24; comp.knee.value = 12; comp.ratio.value = 4; comp.attack.value = .004; comp.release.value = .2;
+    // Stimme: jedes Stück ist schon auf -14 LUFS normalisiert (prepVoice) -> Klang-EQ -> Lautstärke (bis 300 %) -> Limiter
+    const eq = (type, f, g, q) => { const b = ac.createBiquadFilter(); b.type = type; b.frequency.value = f; if (g != null) b.gain.value = g; if (q != null) b.Q.value = q; return b; };
+    const hp = eq('highpass', 75, null, .7), mud = eq('peaking', 260, -2, 1), pres = eq('peaking', 3200, 2.5, .9), air = eq('highshelf', 8500, 2);
     const lim = ac.createDynamicsCompressor();
-    lim.threshold.value = -2; lim.knee.value = 0; lim.ratio.value = 20; lim.attack.value = .001; lim.release.value = .08;
+    lim.threshold.value = -3; lim.knee.value = 2; lim.ratio.value = 20; lim.attack.value = .001; lim.release.value = .1;
     outGain = ac.createGain();
-    analyser.connect(pre); pre.connect(comp); comp.connect(outGain); outGain.connect(lim); lim.connect(ac.destination);
+    analyser.connect(hp); hp.connect(mud); mud.connect(pres); pres.connect(air); air.connect(outGain); outGain.connect(lim); lim.connect(ac.destination);
     sfxGain = ac.createGain(); sfxGain.connect(ac.destination);
     applyAudio();
   }
@@ -928,6 +927,51 @@ function applyAudio() {
   setAmbient(cfg.ambient && cfg.sfx);
 }
 const audioOk = () => ac && ac.state === 'running';
+// Lautheit (ITU BS.1770, K-Gewichtung + Gating) eines Kanals in LUFS
+function lufs(x, sr) {
+  const bq = (b0, b1, b2, a1, a2) => { let x1 = 0, x2 = 0, y1 = 0, y2 = 0; return v => { const y = b0 * v + b1 * x1 + b2 * x2 - a1 * y1 - a2 * y2; x2 = x1; x1 = v; y2 = y1; y1 = y; return y; }; };
+  let K = Math.tan(Math.PI * 1681.974 / sr), Q = .70718, Vh = Math.pow(10, 3.99984 / 20), Vb = Math.pow(Vh, .49967), a0 = 1 + K / Q + K * K;
+  const f1 = bq((Vh + Vb * K / Q + K * K) / a0, 2 * (K * K - Vh) / a0, (Vh - Vb * K / Q + K * K) / a0, 2 * (K * K - 1) / a0, (1 - K / Q + K * K) / a0);
+  K = Math.tan(Math.PI * 38.1355 / sr); Q = .50033; a0 = 1 + K / Q + K * K;
+  const f2 = bq(1, -2, 1, 2 * (K * K - 1) / a0, (1 - K / Q + K * K) / a0);
+  const hop = Math.round(sr * .1), sq = new Float64Array(Math.ceil(x.length / hop));
+  for (let i = 0; i < x.length; i++) { const y = f2(f1(x[i])); sq[(i / hop) | 0] += y * y; }
+  const ms = [];
+  for (let i = 0; i + 4 <= sq.length || (i === 0 && sq.length); i++) {
+    const n = Math.min(4, sq.length - i); let e = 0; for (let j = 0; j < n; j++) e += sq[i + j];
+    ms.push(e / (n * hop)); if (n < 4) break;
+  }
+  const L = m => -.691 + 10 * Math.log10(m), avg = a => a.reduce((p, v) => p + v, 0) / a.length;
+  let g = ms.filter(m => m > 0 && L(m) > -70); if (!g.length) return -99;
+  const rel = L(avg(g)) - 10; g = g.filter(m => L(m) > rel);
+  return L(avg(g));
+}
+// Stimm-Stück aufbereiten: Stille vorn/hinten kürzen (schnellere erste Silbe, kürzere Satzpausen),
+// auf einheitlich -14 LUFS bringen und mit Vorschau-Limiter unter -1 dBFS halten – gleich laut für jede Stimme
+function prepVoice(buf) {
+  try {
+    const sr = buf.sampleRate, nc = buf.numberOfChannels, x0 = buf.getChannelData(0), thr = .006;
+    let a = 0, b = x0.length - 1;
+    while (a < b && Math.abs(x0[a]) < thr) a++;
+    while (b > a && Math.abs(x0[b]) < thr) b--;
+    if (b - a < sr * .05) return buf;
+    a = Math.max(0, a - Math.round(sr * .012)); b = Math.min(x0.length, b + Math.round(sr * .16));
+    const len = b - a, out = ac.createBuffer(nc, len, sr);
+    const L = lufs(x0.subarray(a, b), sr), gain = L > -90 ? Math.min(8, Math.max(.25, Math.pow(10, (-14 - L) / 20))) : 1;
+    const ceil = .89, W = Math.max(1, Math.round(sr * .003)), rel = 1 / (sr * .08);
+    const env = new Float32Array(len);
+    let e = 1;   // rückwärts: Verstärkung schon vor der Spitze absenken (Vorschau)
+    for (let i = len - 1; i >= 0; i--) {
+      let pk = 0; for (let c = 0; c < nc; c++) pk = Math.max(pk, Math.abs(buf.getChannelData(c)[a + i]));
+      const t = pk * gain > ceil ? ceil / (pk * gain) : 1;
+      e = Math.min(t, e + 1 / W); env[i] = e;
+    }
+    e = 1;   // vorwärts: langsam wieder auf (kein Pumpen)
+    for (let i = 0; i < len; i++) { e = Math.min(env[i], e + rel); env[i] = e * gain; }
+    for (let c = 0; c < nc; c++) { const src = buf.getChannelData(c), dst = out.getChannelData(c); for (let i = 0; i < len; i++) dst[i] = src[a + i] * env[i]; }
+    return out;
+  } catch (e) { return buf; }
+}
 function tone(f, dur, o = {}) {
   if (!audioOk() || !cfg.sfx) return;
   lastSfx = performance.now() + ((o.delay || 0) + dur) * 1000;
@@ -1051,7 +1095,7 @@ function onParts(st, first) {
 async function fetchPart(aid, i, text) {
   let buf = null;
   if (voiceOn && audioOk()) {
-    try { const r = await fetch(`/tts?aid=${encodeURIComponent(aid)}&i=${i}`); if (r.ok) buf = await ac.decodeAudioData(await r.arrayBuffer()); } catch (e) {}
+    try { const r = await fetch(`/tts?aid=${encodeURIComponent(aid)}&i=${i}`); if (r.ok) buf = prepVoice(await ac.decodeAudioData(await r.arrayBuffer())); } catch (e) {}
   }
   if (aid !== curAid || aid === mutedAid) return;
   pending[i] = { buf, text }; scheduleReady();
@@ -2566,7 +2610,7 @@ $('probe').onclick = async () => {
   $('probe').textContent = '… lade';
   try {
     const q = new URLSearchParams({ stimme:cfg.stimme, tempo:cfg.tempo, hoehe:cfg.hoehe });
-    const buf = await ac.decodeAudioData(await (await fetch('/preview?' + q)).arrayBuffer());
+    const buf = prepVoice(await ac.decodeAudioData(await (await fetch('/preview?' + q)).arrayBuffer()));
     stopAudio(); const s = ac.createBufferSource(); s.buffer = buf; s.connect(analyser);
     const st = ac.currentTime + .02; s.start(st); sched.push({ src:s, start:st, end:st + buf.duration }); endTime = st + buf.duration;
   } catch (e) { hint('Probe fehlgeschlagen'); }

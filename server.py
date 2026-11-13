@@ -68,7 +68,7 @@ DEFAULT_CFG = {
 }
 # Damit ORB immer dein Claude-Code-Login (Max-Abo) nutzt und nie einen API-Schlüssel
 CLAUDE_ENV_DROP = ("ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "ANTHROPIC_BASE_URL")
-VERSION = "63"
+VERSION = "64"
 ORB_UI = ("Deine Oberfläche (die Larsen gerade sieht): in der Mitte du als flüssige leuchtende Kugel mit Tropfen, "
           "Orbit-Ringen und Sternenhimmel; links eine Uhr und darunter der Gesprächsverlauf mit Eingabefeld; rechts "
           "Karten für System (CPU, RAM, Akku), Wetter mit Stundenvorschau, Aktivität (was du gerade tust) und Vorschläge; "
@@ -583,7 +583,7 @@ def load_cfg():
         cfg.update(data)
     except Exception:
         pass
-    cfg["lautstaerke"] = max(0, min(200, int(cfg.get("lautstaerke", 160) or 0)))
+    cfg["lautstaerke"] = max(0, min(300, int(cfg.get("lautstaerke", 160) or 0)))
     return cfg
 
 
@@ -1456,6 +1456,30 @@ def duck(an):
         return True
 
 
+def eigene_lautstaerke_voll():
+    """ORBs eigene Lautstärke im Windows-Mixer auf 100 % halten – sonst wird die Stimme dort heimlich gedrosselt."""
+    import ctypes
+    eigene = _eigene_pids()
+
+    def f(pid, aktiv, pk, vol):
+        if vol and pid in eigene:
+            v = ctypes.c_float()
+            if not _vcall(vol, 4, [ctypes.POINTER(ctypes.c_float)], ctypes.byref(v)) and v.value < .99:
+                _vcall(vol, 3, [ctypes.c_float, ctypes.c_void_p], 1.0, None)
+    with _AUDIO_LOCK:
+        try:
+            _audio_sessions(f)
+        except Exception:
+            pass
+
+
+def _mixer_wache():
+    while True:
+        time.sleep(20)   # Fenster und Tonsitzung brauchen kurz, bis es sie gibt
+        eigene_lautstaerke_voll()
+        time.sleep(100)
+
+
 def _duck_wache():
     """Sicherheitsnetz: meldet sich die Oberfläche nicht mehr, wird die Musik nach 30 s wieder laut."""
     while _DUCK["vol"]:
@@ -1999,6 +2023,7 @@ def make_server():
     threading.Thread(target=idle_reaper, daemon=True).start()
     if not os.environ.get("ORB_PORT"):
         threading.Thread(target=bild_wache, daemon=True).start()   # neue Bilder als Hologramm
+        threading.Thread(target=_mixer_wache, daemon=True).start()   # ORB im Windows-Mixer auf 100 %
     return srv
 
 
