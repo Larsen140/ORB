@@ -985,7 +985,7 @@ async function ask(text) {
   liveMsg(null); addMsg('me', text); stopAudio(); SFX.send(); ripple(1.1); caption('');
   try {
     const r = await fetch('/ask', { method:'POST', headers:{ 'Content-Type':'application/json' }, body:JSON.stringify({ text }) });
-    if (r.status === 409) hint('Ich arbeite noch – „Jarvis“ oder Esc unterbricht');
+    if (r.status === 409) { hint('Ich arbeite noch – „Jarvis“ oder Esc unterbricht', 4000); addMsg('orb', 'Moment, ich bin noch an der letzten Sache dran. Sag „Jarvis“ oder drück Esc, dann höre ich auf.'); }
     fastPoll();
   } catch (e) { hint('Server nicht erreichbar'); }
 }
