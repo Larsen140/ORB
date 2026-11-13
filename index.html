@@ -191,6 +191,7 @@
   .row.col { flex-direction:column; align-items:stretch; gap:9px; }
   .row .v { color:var(--sub); font-size:13px; } .row .lbl { display:flex; justify-content:space-between; }
   .note { font-size:12px; color:var(--sub); line-height:1.5; margin:8px 16px 0; }
+  .note.ok { color:var(--c2); font-weight:600; } .note.nein { color:#ffb199; }
   input.sw { appearance:none; -webkit-appearance:none; width:52px; height:32px; border-radius:999px; flex:none; cursor:pointer; margin:0;
     background:rgba(255,255,255,.16); position:relative; transition:background .35s; box-shadow:inset 0 1px 2px rgba(0,0,0,.3); }
   input.sw::before { content:''; position:absolute; top:2px; left:2px; width:28px; height:28px; border-radius:999px;
@@ -447,6 +448,8 @@
     <div class="row">Schnipsen schickt ORB in den Hintergrund<input type="checkbox" class="sw" id="s_schnipsen"></div>
     <div class="row">„Jarvis“ rufen – ORB hört jederzeit zu<input type="checkbox" class="sw" id="s_jarvis"></div>
     <div class="row col"><div class="lbl">Klatsch-Empfindlichkeit<span class="v" id="v_empf"></span></div><input type="range" id="s_empf" min="1" max="10" step="1"></div>
+    <div class="row col"><div class="lbl">Schnips-Empfindlichkeit<span class="v" id="v_sempf"></span></div><input type="range" id="s_sempf" min="1" max="10" step="1"></div>
+    <div class="row col"><button class="btn" id="snaptest">Schnipsen testen</button><p class="note" id="snap_test" style="margin:6px 0 0">Startet einen 15-Sekunden-Test – ORB verschwindet dabei nicht.</p></div>
     <div class="row">Dauerhaft zuhören bis „Stopp“<input type="checkbox" class="sw" id="s_dauer"></div>
     <div class="row">Mit „Jarvis“ unterbrechen<input type="checkbox" class="sw" id="s_unterbrechen"></div>
     <div class="row">Nur auf „Jarvis“ reagieren<input type="checkbox" class="sw" id="s_nurjarvis"></div>
@@ -527,7 +530,7 @@ const PAL = () => [BASE, BASE2, BASE3, BASE4];
 const pcol = (i, a, k = 0) => `rgba(${rgb(mix(PAL()[i % 4], [255,255,255], k))},${a})`;
 let cfg = { farbe:'rot', effekte:'mittel', untertitel:true, lautstaerke:90, sfx:true, sfxlaut:60, ambient:false,
   steuerung:'wort', schnipsen:true, wakeword:'Jarvis', stimme:'', tempo:'+15%', hoehe:'+0Hz', laenge:'kurz', rechte:'auto', tempo_claude:'low', ordner:'',
-  schlaf_schliessen:true, bildschirm:false, klatschen:true, dauerzuhoeren:true, unterbrechen:true, nur_jarvis:true, empfindlichkeit:6, begruessung:true, ort:'', name:'', schlafen:5, vollbild:true, autostart:true };
+  schlaf_schliessen:true, bildschirm:false, klatschen:true, dauerzuhoeren:true, unterbrechen:true, nur_jarvis:true, empfindlichkeit:6, schnips_empf:6, begruessung:true, ort:'', name:'', schlafen:5, vollbild:true, autostart:true };
 const S = { mode:'idle', seq:-1, busy:false, energy:.12, holo:0, think:0, speakVis:0, listenVis:0, level:0, warn:0, boot:0, sleep:false, sleepVis:0, px:0, py:0 };
 const mix = (a, b, t) => a.map((v, i) => Math.round(v + (b[i] - v) * t));
 const rgb = c => `${c[0]},${c[1]},${c[2]}`;
@@ -892,7 +895,7 @@ function startClap() {
   micSrc.connect(clapTimer); clapTimer.connect(mute); mute.connect(ac.destination);
   clapTimer.onaudioprocess = e => { clapBuf = e.inputBuffer.getChannelData(0); clapTick(); };
 }
-let fBuf = null, snapT = 0, snapRms = 0, clapPk = [], slowRms = 1;   // slowRms: Lautstärke der letzten ~1–2 s
+let fBuf = null, snapT = 0, snapRms = 0, snapLaut = 0, clapPk = [], slowRms = 1, snapTest = 0, snapTestT = 0;   // slowRms: Lautstärke der letzten ~1–2 s
 // Schnipsen klingt hell (Energie um 2–5 kHz), Klatschen voll (viel Energie unter 1,5 kHz)
 function snapRatio() {
   const pw = f => { const w = 2 * Math.cos(2 * Math.PI * f / ac.sampleRate); let a = 0, b = 0;
@@ -902,7 +905,14 @@ function snapRatio() {
   for (let f = 2000; f < 5500; f += 400) hi += pw(f) / 9;
   return hi / (lo || 1e-12);
 }
+// Test-Modus in den Einstellungen: zeigt nur an, ob ein Schnipser erkannt wurde
+function snapInfo(txt, ok) {
+  if (performance.now() > snapTest) return;
+  const el = $('snap_test'); el.textContent = txt; el.className = 'note ' + (ok ? 'ok' : 'nein');
+  if (ok) ripple(.5);
+}
 function onSnap() {
+  if (performance.now() < snapTest) return snapInfo('✓ Schnipsen erkannt', true);
   if (S.sleep) return;
   SFX.close(); ripple(.8); hint('Bis gleich · zweimal klatschen holt mich zurück', 2500);
   goSleep(true, 'Schnipsen erkannt'); toBack(1200, 'Schnipsen erkannt');
@@ -918,7 +928,8 @@ function toBack(ms, grund = 'unbekannt') {
   }, ms);
 }
 function clapTick() {
-  if ((!cfg.klatschen && !cfg.schnipsen) || S.call) return;   // im Meeting nicht reagieren
+  const testet = performance.now() < snapTest;
+  if ((!cfg.klatschen && !cfg.schnipsen && !testet) || S.call) return;   // im Meeting nicht reagieren
   let pk = 0, s = 0;
   for (const v of clapBuf) { const a = Math.abs(v); if (a > pk) pk = a; s += v * v; }
   const rms = Math.sqrt(s / clapBuf.length), now = performance.now();
@@ -926,21 +937,26 @@ function clapTick() {
   hist.push(rms); if (hist.length > 16) hist.shift();
   const slow = slowRms; slowRms = slowRms * .99 + rms * .01;
   // Nach einem Schnipser muss es still bleiben – Hämmern, Gespräche, Klicken gehen weiter → kein Schnipser
-  if (snapT && now - snapT > 150 && rms > snapRms * .25) snapT = 0;
+  // (einzelne Nachhall-Blöcke zählen nicht – erst anhaltender Lärm bricht ab)
+  const sEmpf = +cfg.schnips_empf || 6;
+  if (snapT && now - snapT > 150 && rms > snapRms * (.2 + .05 * sEmpf) && ++snapLaut > 4) { snapT = 0; snapInfo('Knall gehört – danach war es nicht still (Hintergrundgeräusch)'); }
   const ownSpeak = speakingNow() || now < lastSfx + 500;   // eigene Stimme/Sounds
   const own = ownSpeak || listening || convoRec;
   const mouse = now - lastMouse < 400;   // Klickgeräusch der Maus ist kein Klatschen
   if (cand) {
     if (now - cand.t >= 75) {
       const knall = rms < cand.rms * (cand.snap ? .5 : .35);
-      if (knall && cand.snap && cand.ruhig && !ownSpeak && !mouse && cfg.schnipsen && !S.sleep && !S.busy) {
+      if (knall && cand.snap && !cand.ruhig && testet) snapInfo('Knall gehört – aber zu viel Hintergrundgeräusch');
+      if (knall && cand.snap && cand.ruhig && !ownSpeak && !mouse && (testet || (cfg.schnipsen && !S.sleep && !S.busy))) {
         // Schnipser: kurz warten – bleibt es still und kommt kein zweiter Knall, verschwindet ORB
-        const t = cand.t; snapT = t; snapRms = cand.rms; claps = [];
-        setTimeout(() => { if (snapT !== t || lastClap > t + 50) return;
+        const t = cand.t; snapT = t; snapRms = cand.rms; snapLaut = 0; claps = [];
+        setTimeout(() => { if (snapT !== t) return;
           snapT = 0;
+          if (lastClap > t + 50) return snapInfo('Zwei Knalle gehört – das zählt als Klatschen');
           // nicht beim Tippen oder Klicken (klingt ähnlich hell); im Zweifel bleibt ORB da
-          fetch('/mouse').then(r => r.json()).then(j => { if (j.eingabe > 1.5 && j.ago > 1.5) onSnap(); }).catch(() => {}); }, 900);
+          fetch('/mouse').then(r => r.json()).then(j => { if (j.eingabe > 1 && j.ago > 1) onSnap(); else snapInfo('Knall gehört – aber Maus/Tastatur war gerade in Benutzung'); }).catch(() => {}); }, 900);
       }
+      else if (knall && !cand.snap && testet) snapInfo('Knall gehört – klang eher dumpf wie Klatschen');
       else if (knall && !cand.snap && !own && !mouse && cfg.klatschen) { snapT = 0; clapPk.push([cand.t, cand.pk]); checkSysMouse(cand.t); }
       else if (!knall) claps = [];   // Dauergeräusch statt Knall
       cand = null;
@@ -955,8 +971,9 @@ function clapTick() {
       const snapHf = 2 - 2 * Math.cos(2 * Math.PI * 5500 / ac.sampleRate);   // Schwerpunkt über ~5,5 kHz
       if (window.ORB_DEBUG) console.log('Knall', 'pk', pk.toFixed(3), 'hf', hf.toFixed(2), 'crest', (pk / rms).toFixed(1));
       const still = pre < rms * .3;   // davor (30–150 ms) war es deutlich leiser – bei Sprache fast nie
-      const ruhig = slow < rms * .08 && pre < rms * .25;   // Schnipsen nur aus echter Stille (nicht bei Gesprächen/Werkzeug)
-      if (hf > snapHf && pk > Math.max(thr * 1.5, .02) && pk / rms < 16 && pre < rms * .4) cand = { t:now, rms, pk, snap:true, ruhig };
+      // Schnipsen nur, wenn es sich deutlich vom Raumgeräusch der letzten Sekunde abhebt (nicht bei Gesprächen/Werkzeug)
+      const ruhig = slow < rms * (.05 + .035 * sEmpf) && pre < rms * .4;
+      if (hf > snapHf && pk > Math.max(floorRms * 60, .034 - .003 * sEmpf) && pk / rms < 16 && pre < rms * .4) cand = { t:now, rms, pk, snap:true, ruhig };
       else if (hf < hfMax && pk / rms < 18 && still) cand = { t:now, rms, pk, snap:snapRatio() > 1.4, ruhig };
     }
   }
@@ -1891,12 +1908,12 @@ function syncSettingsUI() {
   const set = (id, v) => { const el = $(id); if (el && document.activeElement !== el) el.value = v; };
   set('s_stimme', cfg.stimme); set('s_tempo', parseInt(cfg.tempo) || 0); set('s_hoehe', parseInt(cfg.hoehe) || 0);
   set('s_laut', cfg.lautstaerke); set('s_sfxl', cfg.sfxlaut); set('s_ordner', cfg.ordner); set('s_wake', cfg.wakeword);
-  set('s_empf', cfg.empfindlichkeit); set('s_schlaf', String(cfg.schlafen)); set('s_name', cfg.name); set('s_ort', cfg.ort);
+  set('s_empf', cfg.empfindlichkeit); set('s_sempf', cfg.schnips_empf); set('s_schlaf', String(cfg.schlafen)); set('s_name', cfg.name); set('s_ort', cfg.ort);
   for (const [id, key] of Object.entries(CHK)) $(id).checked = !!cfg[key];
   $('s_jarvis').checked = cfg.steuerung === 'wort';
   $('s_voice').checked = voiceOn;
   $('v_tempo').textContent = cfg.tempo; $('v_hoehe').textContent = cfg.hoehe; $('v_laut').textContent = cfg.lautstaerke + ' %';
-  $('v_sfxl').textContent = cfg.sfxlaut + ' %'; $('v_empf').textContent = cfg.empfindlichkeit;
+  $('v_sfxl').textContent = cfg.sfxlaut + ' %'; $('v_empf').textContent = cfg.empfindlichkeit; $('v_sempf').textContent = cfg.schnips_empf;
   document.querySelectorAll('#set input[type=range]').forEach(fillRange);
   for (const [id, key] of Object.entries(segs)) $(id).querySelectorAll('button').forEach(b => b.classList.toggle('on', b.dataset.v === cfg[key]));
   document.querySelectorAll('.swc').forEach(el => el.classList.toggle('on', el.dataset.k === cfg.farbe));
@@ -1905,6 +1922,13 @@ for (const [id, key] of Object.entries(CHK)) $(id).onchange = e => { saveCfg({ [
 $('s_voice').onchange = e => setVoice(e.target.checked);
 $('s_jarvis').onchange = e => { saveCfg({ steuerung:e.target.checked ? 'wort' : 'taste' }); e.target.checked ? SFX.on() : SFX.off(); };
 $('s_empf').oninput = e => saveCfg({ empfindlichkeit:+e.target.value });
+$('s_sempf').oninput = e => saveCfg({ schnips_empf:+e.target.value });
+$('snaptest').onclick = () => {
+  snapTest = performance.now() + 15000; ensureMic().then(startClap).catch(() => {});
+  const el = $('snap_test'); el.className = 'note'; el.textContent = 'Jetzt schnipsen … (15 Sekunden)';
+  clearTimeout(snapTestT);
+  snapTestT = setTimeout(() => { el.textContent = el.className === 'note' ? 'Test beendet – kein Knall gehört. Empfindlichkeit erhöhen?' : el.textContent + ' · Test beendet'; }, 15000);
+};
 $('s_schlaf').onchange = e => saveCfg({ schlafen:+e.target.value });
 $('s_name').onchange = e => saveCfg({ name:e.target.value.trim() });
 $('s_ort').onchange = e => { saveCfg({ ort:e.target.value.trim() }); setTimeout(loadWeather, 600); };
