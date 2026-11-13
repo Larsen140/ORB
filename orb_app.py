@@ -153,16 +153,23 @@ def clap_loop():
                     rms = math.sqrt(sum(v * v for v in x) / len(x)) / 32768.0
                     if cand:
                         if now - cand[0] >= .075:
-                            if rms < cand[1] * .35:
+                            # Klatschen klingt kurz nach; Mausklick im selben Moment -> verwerfen
+                            if rms < cand[1] * .35 and server.mouse_ago() > .4:
                                 last = cand[0]
-                                claps = [c for c in claps if last - c < 1.3] + [last]
-                                if len(claps) >= 2 and .15 < claps[-1] - claps[-2] < 1.2:
+                                claps = [c for c in claps if last - c < 1.1] + [last]
+                                if len(claps) >= 2 and .22 < claps[-1] - claps[-2] < 1.0:
                                     claps = []
                                     show(wake=True)
                                     break
+                            elif rms >= cand[1] * .35:
+                                claps = []   # Dauergeräusch statt Knall
                             cand = None
-                    elif now - last > .14 and pk > max(thr_base, floor * 40) and rms > floor * 6:
-                        cand = (now, rms)
+                    elif now - last > .14 and pk > max(thr_base, floor * 40) and rms > max(floor * 10, thr_base * .2):
+                        # Klatschen ist breitbandig; ein Mausklick ist fast nur hohes Klicken
+                        e = sum(v * v for v in x) or 1
+                        hf = sum((x[i] - x[i - 1]) ** 2 for i in range(1, len(x))) / e
+                        if hf < 2.6 and pk / rms < 18 and server.mouse_ago() > .4:
+                            cand = (now, rms)
                     floor = rms if rms < floor else floor * .995 + min(rms, .2) * .005   # Stille sofort übernehmen
         except Exception as e:
             print("Mikrofon:", e)

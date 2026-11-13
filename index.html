@@ -857,16 +857,35 @@ function clapTick() {
   for (const v of clapBuf) { const a = Math.abs(v); if (a > pk) pk = a; s += v * v; }
   const rms = Math.sqrt(s / clapBuf.length), now = performance.now();
   const own = speakingNow() || listening || convoRec || now < lastSfx + 500;
-  if (cand) { if (now - cand.t >= 75) { if (rms < cand.rms * .35 && !own) registerClap(cand.t); cand = null; } }
-  else if (!own && now - lastClap > 140) {
-    const thr = Math.max(.0006 * (11 - (+cfg.empfindlichkeit || 6)), floorRms * 40);
-    if (pk > thr && rms > floorRms * 6) cand = { t:now, rms };
+  const mouse = now - lastMouse < 400;   // Klickgeräusch der Maus ist kein Klatschen
+  if (cand) {
+    if (now - cand.t >= 75) {
+      if (rms < cand.rms * .35 && !own && !mouse) checkSysMouse(cand.t);
+      else if (rms >= cand.rms * .35) claps = [];   // Dauergeräusch statt Knall
+      cand = null;
+    }
+  }
+  else if (!own && !mouse && now - lastClap > 140) {
+    const base = .0006 * (11 - (+cfg.empfindlichkeit || 6)), thr = Math.max(base, floorRms * 40);
+    if (pk > thr && rms > Math.max(floorRms * 10, base * .2)) {
+      // Klatschen ist breitbandig, ein Mausklick fast nur hohes Klicken: Anteil hoher Frequenzen prüfen
+      let d = 0; for (let i = 1; i < clapBuf.length; i++) { const q = clapBuf[i] - clapBuf[i - 1]; d += q * q; }
+      const hf = d / (s || 1), hfMax = 2 - 2 * Math.cos(2 * Math.PI * 4800 / ac.sampleRate);
+      if (hf < hfMax && pk / rms < 18) cand = { t:now, rms };
+    }
   }
   floorRms = rms < floorRms ? rms : floorRms * .995 + Math.min(rms, .2) * .005;   // Stille sofort übernehmen
 }
+let lastMouse = -1e9;
+['pointerdown', 'mousedown', 'pointerup', 'mouseup'].forEach(ev => addEventListener(ev, () => { lastMouse = performance.now(); }, true));
+function checkSysMouse(t) {   // auch Klicks außerhalb des Fensters (systemweit) ausschließen
+  lastClap = t;
+  fetch('/mouse').then(r => r.json()).then(j => { if (!(j.ago < .5)) registerClap(t); }).catch(() => registerClap(t));
+}
 function registerClap(t) {
-  lastClap = t; claps = claps.filter(c => t - c < 1300); claps.push(t); ripple(.4);
-  if (claps.length >= 2) { const gap = claps[claps.length - 1] - claps[claps.length - 2]; if (gap > 150 && gap < 1200) { claps = []; onDoubleClap(); } }
+  if (t - lastMouse < 400) return;
+  lastClap = t; claps = claps.filter(c => t - c < 1100); claps.push(t); ripple(.4);
+  if (claps.length >= 2) { const gap = claps[claps.length - 1] - claps[claps.length - 2]; if (gap > 220 && gap < 1000) { claps = []; onDoubleClap(); } }
 }
 function onDoubleClap() {
   SFX.clap();

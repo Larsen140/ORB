@@ -66,7 +66,7 @@ DEFAULT_CFG = {
 }
 # Damit ORB immer dein Claude-Code-Login (Max-Abo) nutzt und nie einen API-Schlüssel
 CLAUDE_ENV_DROP = ("ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "ANTHROPIC_BASE_URL")
-VERSION = "32"
+VERSION = "33"
 ORB_UI = ("Deine Oberfläche (die Larsen gerade sieht): in der Mitte du als flüssige leuchtende Kugel mit Tropfen, "
           "Orbit-Ringen und Sternenhimmel; links eine Uhr und darunter der Gesprächsverlauf mit Eingabefeld; rechts "
           "Karten für System (CPU, RAM, Akku), Wetter mit Stundenvorschau, Aktivität (was du gerade tust) und Vorschläge; "
@@ -110,6 +110,34 @@ LAST_ACTIVE = [0.0]   # wann das Fenster zuletzt gesprochen/zugehört hat  # wan
 ON_SHOW = [None]    # wird von orb_app gesetzt: öffnet/zeigt das Fenster
 ON_HIDE = [None]    # schließt das Fenster (Schlaf spart Speicher)
 ON_UPDATE = [None]  # neuesten Stand von GitHub holen und neu starten
+
+_mouse = {"t": 0.0, "on": False}
+
+
+def mouse_ago():
+    """Sekunden seit dem letzten Mausklick (systemweit). Klickgeräusche sollen nicht als Klatschen zählen.
+    Startet beim ersten Aufruf einen kleinen Beobachter (nur Windows)."""
+    if not _mouse["on"]:
+        _mouse["on"] = True
+
+        def watch():
+            try:
+                import ctypes
+                gks = ctypes.windll.user32.GetAsyncKeyState
+            except Exception:
+                return
+            down = set()
+            while True:
+                for vk in (1, 2, 4, 5, 6):   # links, rechts, Mitte, Seitentasten
+                    if gks(vk) & 0x8000:
+                        if vk not in down:
+                            down.add(vk)
+                            _mouse["t"] = time.time()
+                    else:
+                        down.discard(vk)
+                time.sleep(.01)
+        threading.Thread(target=watch, daemon=True).start()
+    return time.time() - _mouse["t"]
 
 
 # ---------- Zustand & Einstellungen ----------
@@ -915,6 +943,8 @@ class Handler(BaseHTTPRequestHandler):
             self.send(200, {"config": c, "stimmen": STIMMEN})
         elif u.path == "/version":
             self.send(200, {"version": VERSION})
+        elif u.path == "/mouse":
+            self.send(200, {"ago": round(mouse_ago(), 3)})
         elif u.path == "/sys":
             try:
                 import psutil
