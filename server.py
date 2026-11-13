@@ -68,7 +68,7 @@ DEFAULT_CFG = {
 }
 # Damit ORB immer dein Claude-Code-Login (Max-Abo) nutzt und nie einen API-Schlüssel
 CLAUDE_ENV_DROP = ("ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "ANTHROPIC_BASE_URL")
-VERSION = "65"
+VERSION = "66"
 ORB_UI = ("Deine Oberfläche (die Larsen gerade sieht): in der Mitte du als flüssige leuchtende Kugel mit Tropfen, "
           "Orbit-Ringen und Sternenhimmel; links eine Uhr und darunter der Gesprächsverlauf mit Eingabefeld; rechts "
           "Karten für System (CPU, RAM, Akku), Wetter mit Stundenvorschau, Aktivität (was du gerade tust) und Vorschläge; "
@@ -1419,6 +1419,47 @@ def musik_status():
         return {"an": an, "quelle": _MUSIK["quelle"], "leiser": bool(_DUCK["vol"])}
 
 
+DUCK_FILE = os.path.join(os.environ.get("LOCALAPPDATA", os.path.expanduser("~")), "ORB", "absenkung.json")
+
+
+def _duck_saved():
+    try:
+        with open(DUCK_FILE, encoding="utf-8") as f:
+            return json.load(f)
+    except Exception:
+        return {}
+
+
+def _duck_save(d):
+    try:
+        if d:
+            with open(DUCK_FILE, "w", encoding="utf-8") as f:
+                json.dump(d, f)
+        elif os.path.exists(DUCK_FILE):
+            os.remove(DUCK_FILE)
+    except Exception:
+        pass
+
+
+def duck_reparieren():
+    """Beim Start: war ORB mitten im Absenken beendet worden, die gemerkten Lautstärken zurückholen."""
+    import ctypes
+    saved = _duck_saved()
+    if not saved:
+        return
+
+    def g(pid, aktiv, pk, vol):
+        n = _pname(pid)
+        if vol and n in saved:
+            _vcall(vol, 3, [ctypes.c_float, ctypes.c_void_p], float(saved[n]), None)
+    with _AUDIO_LOCK:
+        try:
+            _audio_sessions(g)
+        except Exception:
+            pass
+    _duck_save({})
+
+
 def duck(an):
     """Musik leiser stellen, während ORB zuhört/antwortet (an=True), danach wieder auf die alte Lautstärke."""
     import ctypes
@@ -1427,19 +1468,21 @@ def duck(an):
             _DUCK["t"] = time.time()
             if _DUCK["vol"]:
                 return True
-            eigene, alt = _eigene_pids(), {}
+            eigene, alt, saved = _eigene_pids(), {}, _duck_saved()
 
             def f(pid, aktiv, pk, vol):
                 if vol and pid and pid not in eigene and (aktiv or _pname(pid) == "spotify.exe"):
                     v = ctypes.c_float()
                     if not _vcall(vol, 4, [ctypes.POINTER(ctypes.c_float)], ctypes.byref(v)):
-                        alt[pid] = v.value
-                        _vcall(vol, 3, [ctypes.c_float, ctypes.c_void_p], v.value * .25, None)
+                        orig = float(saved.get(_pname(pid), v.value))   # gemerkte Original-Lautstärke hat Vorrang
+                        alt[pid] = orig
+                        _vcall(vol, 3, [ctypes.c_float, ctypes.c_void_p], orig * .3, None)
             try:
                 _audio_sessions(f)
             except Exception:
                 pass
             _DUCK["vol"] = alt
+            _duck_save({_pname(p): v for p, v in alt.items()})
             if alt:
                 threading.Thread(target=_duck_wache, daemon=True).start()
             return bool(alt)
@@ -1453,6 +1496,7 @@ def duck(an):
                 _audio_sessions(g)
         except Exception:
             pass
+        _duck_save({})
         return True
 
 
@@ -1474,6 +1518,10 @@ def eigene_lautstaerke_voll():
 
 
 def _mixer_wache():
+    try:
+        duck_reparieren()
+    except Exception:
+        pass
     while True:
         time.sleep(20)   # Fenster und Tonsitzung brauchen kurz, bis es sie gibt
         eigene_lautstaerke_voll()

@@ -674,7 +674,7 @@
   </div></div>
   <div class="grp"><h4>Sound</h4><div class="card">
     <div class="row">Soundeffekte<input type="checkbox" class="sw" id="s_sfx"></div>
-    <div class="row col"><div class="lbl">Effekt-Lautstärke<span class="v" id="v_sfxl"></span></div><input type="range" id="s_sfxl" min="0" max="100" step="5"></div>
+    <div class="row col"><div class="lbl">Effekt-Lautstärke<span class="v" id="v_sfxl"></span></div><input type="range" id="s_sfxl" min="0" max="200" step="5"></div>
     <div class="row">Ambient-Brummen<input type="checkbox" class="sw" id="s_amb"></div>
   </div></div>
   <div class="grp"><h4>Geschlossene Hologramme</h4><div class="card" id="hlist"></div>
@@ -916,7 +916,9 @@ function initAudio() {
     lim.threshold.value = -3; lim.knee.value = 2; lim.ratio.value = 20; lim.attack.value = .001; lim.release.value = .1;
     outGain = ac.createGain();
     analyser.connect(hp); hp.connect(mud); mud.connect(pres); pres.connect(air); air.connect(outGain); outGain.connect(lim); lim.connect(ac.destination);
-    sfxGain = ac.createGain(); sfxGain.connect(ac.destination);
+    const sfxLim = ac.createDynamicsCompressor();
+    sfxLim.threshold.value = -4; sfxLim.knee.value = 3; sfxLim.ratio.value = 12; sfxLim.attack.value = .002; sfxLim.release.value = .12;
+    sfxGain = ac.createGain(); sfxGain.connect(sfxLim); sfxLim.connect(ac.destination);
     applyAudio();
   }
   if (ac.state !== 'running') ac.resume();
@@ -924,7 +926,7 @@ function initAudio() {
 function applyAudio() {
   if (!ac) return;
   outGain.gain.value = (+cfg.lautstaerke) / 100;
-  sfxGain.gain.value = cfg.sfx ? (+cfg.sfxlaut) / 100 * .6 : 0;
+  sfxGain.gain.value = cfg.sfx ? (+cfg.sfxlaut) / 100 * 2.2 : 0;   // Effekte waren viel zu leise
   setAmbient(cfg.ambient && cfg.sfx);
 }
 const audioOk = () => ac && ac.state === 'running';
