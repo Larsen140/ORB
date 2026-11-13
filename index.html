@@ -293,6 +293,10 @@
   #set.on { visibility:visible; transition:transform .75s var(--spring), opacity .35s, filter .4s; }
   #g_cpu, #g_ram, #g_bat { filter:none; }
   body.sleeping .glass { backdrop-filter:none; -webkit-backdrop-filter:none; }
+  /* aufgeräumt: ausgeblendete Widgets, Aktivität nur beim Arbeiten */
+  .col > [data-w].aus { display:none !important; }
+  #act:not(.busy) { display:none; }
+  #act.busy { animation:cardIn .7s var(--spring) both; }
   /* gleicher Innenabstand für alle Karten – egal in welcher Spalte sie liegen */
   .col > [data-w] { padding:16px 18px; flex:none; }
   /* Drag & Drop der Widgets */
@@ -426,6 +430,8 @@
     <div class="row col"><div class="lbl">Effekt-Lautstärke<span class="v" id="v_sfxl"></span></div><input type="range" id="s_sfxl" min="0" max="100" step="5"></div>
     <div class="row">Ambient-Brummen<input type="checkbox" class="sw" id="s_amb"></div>
   </div></div>
+  <div class="grp"><h4>Widgets anzeigen</h4><div class="card" id="wlist"></div>
+  <p class="note">„Aktivität“ erscheint von selbst, solange ORB arbeitet. Verschieben: Widget am Titel greifen.</p></div>
   <div class="grp"><h4>Steuerung</h4><div class="card">
     <div class="row col">Sprechen mit<div class="seg" id="seg_st"><button data-v="taste">Taste / Klatschen</button><button data-v="wort">Aktivierungswort</button></div></div>
     <div class="row">Aktivierungswort<input type="text" id="s_wake"></div>
@@ -451,6 +457,7 @@ const THEMES = {
 };
 const AMBER = [255,165,30];
 let BASE = THEMES.rot[0], BASE2 = THEMES.rot[1], BASE3 = THEMES.rot[2], BASE4 = THEMES.rot[3];
+const CALM = true;   // ruhiges Design: weniger Effekte, mehr Platz für die Kugel
 const PAL = () => [BASE, BASE2, BASE3, BASE4];
 const pcol = (i, a, k = 0) => `rgba(${rgb(mix(PAL()[i % 4], [255,255,255], k))},${a})`;
 let cfg = { farbe:'rot', effekte:'mittel', untertitel:true, lautstaerke:90, sfx:true, sfxlaut:60, ambient:false,
@@ -550,30 +557,32 @@ void main(){
   vec2 p2 = (fc - uC)/uR; float rr = length(p2);
   vec3 col = bg(uv, p2, rr)*(1. - .8*uSleep);
   col *= 1. - .5*dot(uv, uv);
-  col += uCol*exp(-max(rr - .7, 0.)*2.3)*(.13 + .28*uLevel + .1*uEnergy)*(1. - .7*uSleep);
-  col += uCol2*exp(-max(rr - .9, 0.)*1.2)*.05*(1. - uSleep);
-  if (rr < 2.2){
-    vec3 ro = vec3(0., 0., 3.2), rd = normalize(vec3(p2*.3125, -1.));
-    float t = 1.7, dm = 9.; bool hit = false;
-    for (int i = 0; i < 52; i++){ float d = map(ro + rd*t); dm = min(dm, d); if (d < .0015){ hit = true; break; } t += d*.85; if (t > 5.) break; }
-    if (hit){
-      vec3 p = ro + rd*t, n = nrm(p), v = -rd;
-      float ndv = max(dot(n, v), 0.), fr = pow(1. - ndv, 2.6);
-      vec3 L1 = normalize(vec3(-.55, .72, .6)), L2 = normalize(vec3(.75, -.45, .45));
-      float s1 = pow(max(dot(reflect(-L1, n), v), 0.), 90.), s2 = pow(max(dot(reflect(-L2, n), v), 0.), 22.);
-      vec3 irid = .5 + .5*cos(6.2831*(fr*1.15 + n.y*.22 + uT*.035) + vec3(0., 2.1, 4.2));
-      float sw = .7 + .3*sin(p.x*5.5 + uT*1.4 + sin(p.y*4.5 - uT))*sin(p.z*5. + uT*.6);
-      // Innenleben wandert langsam durch die Palette (Farbströme in der Flüssigkeit)
-      vec3 flow = mix(uCol, pal(p.y*.35 + p.x*.2 + uT*.03), .45);
-      vec3 inner = flow*(.10 + .85*pow(ndv, 1.7))*sw*(.7 + .8*uLevel + .3*uEnergy);
-      inner += uCol3*pow(ndv, 6.)*.22*(.5 + uLevel);
-      vec3 rim = mix(pal(n.y*.5 + uT*.02 + .3), irid, .5)*fr*1.25;
-      vec3 env = mix(vec3(0.), mix(uCol, vec3(1.), .25)*.45, smoothstep(-.2, .9, reflect(rd, n).y))*fr;
-      col = (inner + rim + env + vec3(1.)*s1*1.2 + mix(uCol2, vec3(1.), .5)*s2*.32)*(1. - .55*uSleep);
-    } else {
-      col += mix(pal(atan(p2.y, p2.x)/6.2831 + uT*.02), vec3(1.), .25)*(1. - smoothstep(0., .02, dm))*.55*(1. - .6*uSleep);
-      col += pal(atan(p2.y, p2.x)/6.2831 + .25)*exp(-dm*20.)*.3*(1. - .6*uSleep);
+  // ===== Leuchtende Energiekugel: rund, Plasma innen, heißer Kern, glühender Rand, Korona pulsiert mit der Stimme =====
+  float on = 1. - .7*uSleep;
+  float ang = atan(p2.y, p2.x);
+  // weiches Glühen um die Kugel
+  col += uCol*exp(-max(rr - 1., 0.)*(3.2 - 1.4*uLevel))*(.22 + .45*uLevel + .12*uEnergy)*on;
+  col += uCol2*exp(-max(rr - 1., 0.)*1.1)*.06*on;
+  // Korona: Strahlenkranz, der beim Sprechen aufflackert
+  float cor = .5 + .5*sin(ang*7. + uT*.7)*sin(ang*13. - uT*.5 + sin(uT*.3)*2.);
+  col += pal(ang/6.2831 + uT*.015)*smoothstep(1., 1.02, rr)*exp(-(rr - 1.)*(7. - 3.*uLevel))*(.12 + .5*uLevel*cor + .15*uEnergy)*on;
+  if (rr < 1.){
+    float z = sqrt(1. - rr*rr); vec3 n = vec3(p2, z);
+    // Plasma dreht sich langsam (schneller beim Nachdenken)
+    float a = uT*(.12 + .25*uThink); vec3 q = n;
+    q.xz = mat2(cos(a), -sin(a), sin(a), cos(a))*q.xz;
+    vec3 w = q*2.3; float pl = 0.;
+    for (int i = 0; i < 4; i++){
+      w += .38*vec3(sin(w.y*1.7 + uT*.55), sin(w.z*1.9 - uT*.45), sin(w.x*1.5 + uT*.4));
+      pl += .5/(1. + abs(sin(w.x + w.y + w.z))*3.2);
     }
+    pl /= 4.;
+    float fr = pow(1. - z, 2.);
+    vec3 c = mix(uCol*.45, pal(pl*1.6 + uT*.02), .45)*(.3 + pl*1.9)*(.85 + .9*uLevel + .35*uEnergy);   // Plasma
+    c += mix(uCol, vec3(1.), .6)*pow(z, 5.)*(.35 + 1.1*uLevel);                                         // heißer Kern
+    c += mix(uCol2, uCol3, .5 + .5*sin(ang*2. + uT*.3))*fr*(1.2 + .6*uLevel);                           // glühender Rand
+    c += vec3(1.)*pow(max(dot(n, normalize(vec3(-.45, .55, .7))), 0.), 40.)*.35;                        // Glanzpunkt
+    col = mix(col, c*(1. - .55*uSleep), smoothstep(1., .985, rr));
   }
   col = 1. - exp(-col*1.7);
   gl_FragColor = vec4(pow(col, vec3(.9)), 1.);
@@ -619,7 +628,7 @@ function renderGL(t, cx, cy, R, speaking) {
   gl.uniform2f(U.uRes, glc.width, glc.height);
   gl.uniform2f(U.uC, cx * glScale, (H - cy) * glScale);
   gl.uniform2f(U.uPar, S.px, S.py);
-  gl.uniform1f(U.uR, R / .86 * glScale); gl.uniform1f(U.uT, t);
+  gl.uniform1f(U.uR, R * glScale); gl.uniform1f(U.uT, t);
   gl.uniform3f(U.uCol, c1[0], c1[1], c1[2]); gl.uniform3f(U.uCol2, c2[0], c2[1], c2[2]);
   const c3 = mix(BASE3, AMBER, S.warn).map(v => v / 255), c4 = mix(BASE4, AMBER, S.warn).map(v => v / 255);
   gl.uniform3f(U.uCol3, c3[0], c3[1], c3[2]); gl.uniform3f(U.uCol4, c4[0], c4[1], c4[2]);
@@ -1215,6 +1224,25 @@ addEventListener('mousemove', e => {
   if (c) { const r = c.getBoundingClientRect(); c.style.setProperty('--mx', (e.clientX - r.left) + 'px'); c.style.setProperty('--my', (e.clientY - r.top) + 'px'); }
 }, { passive:true });
 loadLayout();
+
+/* ================= Widgets ein-/ausblenden ================= */
+const WNAMES = { uhr:'Uhr', termine:'Termine', gespraech:'Gespräch', wetter:'Wetter', spotify:'Spotify', system:'System', vorschlaege:'Vorschläge' };
+let hiddenW = ['system', 'vorschlaege'];
+try { const h = JSON.parse(localStorage.getItem('orbHiddenW') || 'null'); if (Array.isArray(h)) hiddenW = h; } catch (e) {}
+function applyWidgets() {
+  for (const w of Object.keys(WNAMES)) { const el = document.querySelector(`[data-w="${w}"]`); if (el) el.classList.toggle('aus', hiddenW.includes(w)); }
+  LAY = layout();
+}
+$('wlist').innerHTML = Object.entries(WNAMES).map(([w, n]) => `<div class="row">${n}<input type="checkbox" class="sw" data-ww="${w}"></div>`).join('');
+$('wlist').querySelectorAll('input').forEach(i => {
+  i.checked = !hiddenW.includes(i.dataset.ww);
+  i.onchange = () => {
+    hiddenW = hiddenW.filter(x => x !== i.dataset.ww); if (!i.checked) hiddenW.push(i.dataset.ww);
+    try { localStorage.setItem('orbHiddenW', JSON.stringify(hiddenW)); } catch (e) {}
+    applyWidgets(); i.checked ? SFX.on() : SFX.off();
+  };
+});
+setTimeout(applyWidgets, 0);
 document.querySelectorAll('.chip').forEach(b => b.onclick = () => {
   SFX.click(); const t = b.textContent;
   if (t.endsWith(': ')) { $('txt').value = t; $('txt').focus(); } else ask(t);
@@ -1351,7 +1379,7 @@ function frame(now) {
   ease('sleepVis', vm === 'schlaf' ? 1 : 0, dt * 1.6);
   ease('px', (mouse.x - .5) * 2, dt * 2); ease('py', (mouse.y - .5) * 2, dt * 2);
   waveBars.forEach((b, i) => { const v = vm === 'schlaf' ? .15 : .2 + (S.level * .75 + S.think * .35) * Math.abs(Math.sin(t * (5 + i * 1.7) + i)); b.style.transform = `scaleY(${Math.min(1, v).toFixed(2)})`; });
-  if (vm === 'idle' && now > nextPulse) { ripple(.25); nextPulse = now + 3200; }
+  if (CALM && false) { ripple(.25); nextPulse = now + 3200; }
 
   const bootE = 1 - Math.pow(1 - S.boot, 3), pop = S.boot < 1 ? 1 + Math.sin(S.boot * Math.PI) * .1 : 1;
   const Rb = Math.min(LAY.cw * .8, H) * .15;
@@ -1389,7 +1417,7 @@ function drawFx(t, dt, now, cx, cy, R, speaking) {
 
   // Boden: Spiegelung + perspektivisches Gitter mit Scan-Welle
   const fy = cy + R * 2.25;
-  if (q > 0 && fy < H) {
+  if (!CALM && q > 0 && fy < H) {   // Bodengitter: im ruhigen Design aus
     const g = fx.createRadialGradient(cx, fy, 0, cx, fy, R * 2.6);
     g.addColorStop(0, col(.22 * fade + .05)); g.addColorStop(.5, col2(.05 * fade)); g.addColorStop(1, col(0));
     fx.save(); fx.translate(cx, fy); fx.scale(1, .18); fx.translate(-cx, -fy); fx.fillStyle = g; fx.beginPath(); fx.arc(cx, fy, R * 2.6, 0, 7); fx.fill(); fx.restore();
@@ -1406,7 +1434,7 @@ function drawFx(t, dt, now, cx, cy, R, speaking) {
     }
   }
   // aufsteigende Bläschen
-  if (q > 0) for (const b of bubbles) {
+  if (!CALM && q > 0) for (const b of bubbles) {   // Bläschen: aus
     b.y -= b.sp * dt * (1 + S.energy); b.x += Math.sin(t * .8 + b.wob) * .25;
     if (b.y < -30) { Object.assign(b, newBubble(false)); if (fade > .5 && Math.random() < .12) SFX.pop(); }
     const a = (.05 + b.z * .12) * (.35 + .65 * fade);
@@ -1414,7 +1442,7 @@ function drawFx(t, dt, now, cx, cy, R, speaking) {
     fx.fillStyle = `rgba(255,255,255,${a * 1.4})`; fx.beginPath(); fx.arc(b.x - S.px * b.z * 14 - b.r * .35, b.y - b.r * .4, b.r * .22, 0, 7); fx.fill();
   }
   // Sternschnuppen
-  if (now > nextShoot && q > 0 && fade > .5) { shooting.push({ x:Math.random() * W * .8, y:Math.random() * H * .35, life:1, vx:520 + Math.random() * 300, vy:160 + Math.random() * 90, ci:Math.random() * 4 | 0 }); nextShoot = now + 5000 + Math.random() * 7000; SFX.shoot(); }
+  if (!CALM && now > nextShoot && q > 0 && fade > .5) { shooting.push({ x:Math.random() * W * .8, y:Math.random() * H * .35, life:1, vx:520 + Math.random() * 300, vy:160 + Math.random() * 90, ci:Math.random() * 4 | 0 }); nextShoot = now + 5000 + Math.random() * 7000; SFX.shoot(); }
   for (let i = shooting.length - 1; i >= 0; i--) {
     const s = shooting[i]; s.life -= dt * 1.2; s.x += s.vx * dt; s.y += s.vy * dt;
     if (s.life <= 0) { shooting.splice(i, 1); continue; }
@@ -1426,7 +1454,7 @@ function drawFx(t, dt, now, cx, cy, R, speaking) {
   if (fade > .02) {
     ring3d(cx, cy, R * 1.95, R * .5, -.32 + Math.sin(t * .2) * .05, (.35 + S.think * .5) * fade, t, 2, .5 + S.think * 1.5, 2);
     ring3d(cx, cy, R * 2.45, R * .42, .22 + Math.sin(t * .15) * .04, (.22 + S.think * .4) * fade, t, 3, -.32 - S.think, 3);
-    if (Q() > 0) ring3d(cx, cy, R * 3.0, R * .3, -.12 + Math.sin(t * .1) * .03, (.12 + S.think * .3) * fade, t, 4, .2 + S.think * .8, 1);
+    if (!CALM && Q() > 0) ring3d(cx, cy, R * 3.0, R * .3, -.12 + Math.sin(t * .1) * .03, (.12 + S.think * .3) * fade, t, 4, .2 + S.think * .8, 1);
   }
   // Wellenform-Ring
   const vis = Math.max(S.speakVis, S.listenVis) * fade;
@@ -1447,7 +1475,7 @@ function drawFx(t, dt, now, cx, cy, R, speaking) {
     }
     fx.shadowBlur = 0;
     // Lichtstrahlen beim Sprechen
-    if (S.speakVis > .1 && freq) for (let i = 0; i < 28; i++) {
+    if (!CALM && S.speakVis > .1 && freq) for (let i = 0; i < 28; i++) {
       const a = i / 28 * 6.283 + t * .2, v = freq[2 + (i * 3) % 50] / 255;
       if (v < .25) continue;
       fx.strokeStyle = lite(.18 * v * S.speakVis, .5); fx.lineWidth = 1;
