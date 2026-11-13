@@ -16,6 +16,7 @@ Voraussetzung für Antworten: [Claude Code](https://claude.com/claude-code) inst
 - **Apps & Webseiten öffnen**, Wetter, Termine, Spotify-Steuerung – ohne Token.
 - **iCloud-Kalender**: Termine eintragen, lesen und löschen (Einstellungen → iCloud-Kalender, app-spezifisches Passwort).
 - **Oberfläche** im Liquid-Glass-Stil mit Uhr, Gesprächsverlauf, System, Wetter, Termine, Spotify und Vorschlägen.
+- **Bild-Hologramme**: neue Bilder in `BilderORB Bilder` (oder per `bild_zeigen.ps1`) erscheinen sofort als Holo-Karte.
 - **Wissensbasis**: arbeitet im Ordner `Documents\Jarvis` und merkt sich dort alles.
 
 ## Aufbau

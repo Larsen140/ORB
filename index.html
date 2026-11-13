@@ -343,6 +343,31 @@
   @keyframes thScan { to { top:120%; } }
   @keyframes thBar { 0% { transform:translateX(-110%); } 100% { transform:translateX(360%); } }
   @keyframes spin { to { transform:rotate(360deg); } }
+  /* Bild-Hologramm: neu erstellte Bilder (Bilder/ORB Bilder) – Klick vergrößert, ✕ schließt */
+  #bildh { --hl:var(--c3); position:fixed; left:50%; bottom:300px; z-index:6; width:300px; padding:10px 10px 9px; border-radius:18px;
+    color:#e9f6ff; cursor:zoom-in; overflow:hidden; opacity:0; pointer-events:none;
+    background:linear-gradient(160deg, rgba(var(--hl),.16), rgba(10,14,30,.55));
+    border:1px solid rgba(var(--hl),.70); backdrop-filter:blur(6px);
+    box-shadow:0 0 30px rgba(var(--hl),.40), inset 0 0 22px rgba(var(--hl),.20);
+    transform:translateX(-50%) perspective(800px) rotateX(10deg); transition:opacity .5s, transform .6s var(--spring), width .6s var(--spring), bottom .6s var(--spring); }
+  #bildh.on { opacity:1; pointer-events:auto; animation:bildIn .8s var(--spring) backwards, bildGlitch .5s steps(2) 1, holoFlick 4.2s 1s steps(1) infinite; }
+  #bildh.gross { width:min(78vw, 980px); bottom:50%; cursor:zoom-out; transform:translate(-50%, 50%) perspective(800px) rotateX(0deg); }
+  #bildh img { display:block; width:100%; max-height:min(52vh, 420px); object-fit:contain; border-radius:11px;
+    filter:drop-shadow(-2px 0 rgba(255,60,110,.35)) drop-shadow(2px 0 rgba(60,190,255,.35)) drop-shadow(0 0 12px rgba(var(--hl),.45)); }
+  #bildh.gross img { max-height:76vh; }
+  #bildh::before { content:''; position:absolute; inset:0; pointer-events:none; z-index:1; opacity:.3;
+    background:repeating-linear-gradient(0deg, transparent 0 2px, rgba(var(--hl),.40) 2px 3px); }
+  #bildh::after { content:''; position:absolute; left:0; right:0; height:30%; top:-35%; pointer-events:none; z-index:1;
+    background:linear-gradient(transparent, rgba(var(--hl),.28), transparent); animation:thScan 2.6s linear infinite; }
+  #bildh .tt { display:flex; align-items:center; gap:8px; margin:8px 4px 0; font-size:11px; font-weight:700; letter-spacing:.14em; text-transform:uppercase;
+    text-shadow:0 0 10px rgba(var(--hl),.80); }
+  #bildh .tt i { width:8px; height:8px; border-radius:50%; flex:none; background:rgb(var(--hl)); box-shadow:0 0 10px rgb(var(--hl)); }
+  #bildh .tt span { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  #bildh .x { position:absolute; top:8px; right:10px; z-index:2; border:0; background:rgba(10,14,30,.5); color:inherit; border-radius:50%;
+    width:24px; height:24px; cursor:pointer; font-size:13px; opacity:.0; transition:opacity .2s; }
+  #bildh:hover .x { opacity:.85; }
+  @keyframes bildIn { from { opacity:0; transform:translateX(-50%) perspective(800px) rotateX(70deg) translateY(40px) scale(.6); filter:blur(8px); } }
+  @keyframes bildGlitch { 0% { clip-path:inset(0 0 62% 0); translate:-6px 0; } 50% { clip-path:inset(38% 0 0 0); translate:6px 0; } 100% { clip-path:none; translate:0 0; } }
   #holo.glitch { animation:holoGlitch .45s steps(2) 1; }
   #holo .ico { font-size:38px; line-height:1.1; filter:grayscale(1) brightness(1.8) drop-shadow(0 0 10px rgb(var(--hl))); }
   #holo .big { font-size:46px; font-weight:250; line-height:1.05; letter-spacing:-.01em; }
@@ -435,6 +460,7 @@
 <div id="hint" class="glass"></div>
 <div id="caption"></div>
 <div id="holo"><div class="ico"></div><div class="big"></div><div class="sub"></div></div>
+<div id="bildh" title="Klicken zum Vergrößern"><button class="x" title="Schließen">✕</button><img alt=""><div class="tt"><i></i><span></span></div></div>
 <div id="dock" class="glass rim">
   <button class="ic" id="kb" title="Tippen (T)"><svg viewBox="0 0 24 24"><path d="M20 5H4a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2zm-9 3h2v2h-2V8zm0 3h2v2h-2v-2zM8 8h2v2H8V8zm0 3h2v2H8v-2zM5 8h2v2H5V8zm0 3h2v2H5v-2zm11 5H8v-2h8v2zm0-3h-2v-2h2v2zm0-3h-2V8h2v2zm3 3h-2v-2h2v2zm0-3h-2V8h2v2z"/></svg></button>
   <button class="ic" id="mic" title="Halten zum Sprechen (Leertaste) · 2× klatschen · „Jarvis“"><svg viewBox="0 0 24 24"><path d="M12 15a3 3 0 0 0 3-3V6a3 3 0 0 0-6 0v6a3 3 0 0 0 3 3zm5-3a5 5 0 0 1-10 0H5a7 7 0 0 0 6 6.9V22h2v-3.1a7 7 0 0 0 6-6.9z"/></svg></button>
@@ -1301,7 +1327,7 @@ async function poll() {
   poll._busy = true;
   try {
     const aktiv = speakingNow() || listening || !!convoRec ? '1' : '0';
-    const st = await (await fetch('/state?aktiv=' + aktiv, { cache:'no-store' })).json(); lastOk = performance.now(); S.busy = !!st.busy; renderTasks(st.aufgaben);
+    const st = await (await fetch('/state?aktiv=' + aktiv, { cache:'no-store' })).json(); lastOk = performance.now(); S.busy = !!st.busy; renderTasks(st.aufgaben); if (st.bild) bildHolo(st.bild);
     if (!!st.anruf !== !!S.call) { S.call = !!st.anruf; if (S.call) { stopWake(); killConvoRec(); killBarge(); hint('Meeting erkannt – ich höre nicht zu', 3500); } else if (cfg.steuerung === 'wort') startWake(); }
     // neue ORB-Version läuft → Seite neu laden (sonst sieht man Änderungen erst nach Fenster-Neustart)
     if (st.version) { if (!poll._v) poll._v = st.version; else if (st.version !== poll._v) { location.replace(S.sleep ? '/#schlaf' : '/#wake'); location.reload(); return; } }
@@ -1337,6 +1363,29 @@ async function runDemo() {
 }
 let lastDemo = null;
 document.addEventListener('keydown', e => { if ((e.key === 'd' || e.key === 'D') && e.target.tagName !== 'INPUT') runDemo(); });
+/* ---------- Bild-Hologramm ---------- */
+let bildN = null, bildUrl = '', bildTimer = 0;
+function bildZu() { const el = $('bildh'); clearTimeout(bildTimer); if (!el.classList.contains('on')) return;
+  el.classList.remove('on', 'gross'); SFX.close(); }
+function bildWarte(ms) { clearTimeout(bildTimer); bildTimer = setTimeout(() => {
+  const el = $('bildh'); if (el.matches(':hover') || el.classList.contains('gross')) bildWarte(4000); else bildZu(); }, ms); }
+async function bildHolo(b) {
+  if (bildN === null) { bildN = b.n; return; }   // beim Start kein altes Bild zeigen
+  if (b.n === bildN) return; bildN = b.n;
+  try {
+    const r = await fetch('/bild?n=' + b.n, { cache:'no-store' }); if (!r.ok) return;
+    const url = URL.createObjectURL(await r.blob());
+    const el = $('bildh'), img = el.querySelector('img');
+    await new Promise(ok => { img.onload = img.onerror = ok; img.src = url; });
+    if (bildUrl) URL.revokeObjectURL(bildUrl); bildUrl = url;
+    el.querySelector('.tt span').textContent = b.name || 'Neues Bild';
+    el.classList.remove('on', 'gross'); void el.offsetWidth; el.classList.add('on');
+    SFX.holo(); ripple(.6); burst(24); bildWarte(14000);
+  } catch (e) {}
+}
+$('bildh').addEventListener('click', e => { const el = $('bildh');
+  if (e.target.classList.contains('x')) { bildZu(); return; }
+  el.classList.toggle('gross'); SFX.holo(); bildWarte(14000); });
 /* ---------- Aufgaben-Hologramme ---------- */
 const taskEls = {};
 function fmtZeit(s) { s = Math.max(0, s | 0); return s < 60 ? s + 's' : Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); }

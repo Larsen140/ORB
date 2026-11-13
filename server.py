@@ -68,7 +68,7 @@ DEFAULT_CFG = {
 }
 # Damit ORB immer dein Claude-Code-Login (Max-Abo) nutzt und nie einen API-Schlüssel
 CLAUDE_ENV_DROP = ("ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "ANTHROPIC_BASE_URL")
-VERSION = "50"
+VERSION = "51"
 ORB_UI = ("Deine Oberfläche (die Larsen gerade sieht): in der Mitte du als flüssige leuchtende Kugel mit Tropfen, "
           "Orbit-Ringen und Sternenhimmel; links eine Uhr und darunter der Gesprächsverlauf mit Eingabefeld; rechts "
           "Karten für System (CPU, RAM, Akku), Wetter mit Stundenvorschau, Aktivität (was du gerade tust) und Vorschläge; "
@@ -108,6 +108,64 @@ KALENDER_REGELN = (
     "Ende sonst +1 Stunde); löschen = erst liste, dann loeschen -Id \"<id aus der Liste>\". Zeiten sind Ortszeit.")
 
 
+# ---------- Bild-Hologramme: neue Bilder (z. B. von Claude erstellt) sofort in ORB einblenden ----------
+BILD_ORDNER = os.path.join(os.path.expanduser("~"), "Pictures", "ORB Bilder")
+BILD_ENDUNGEN = (".png", ".jpg", ".jpeg", ".webp", ".gif", ".bmp")
+BILD = {"n": 0, "pfad": "", "name": "", "zeit": 0.0}
+BILD_LOCK = threading.Lock()
+
+
+def bild_zeigen(pfad):
+    """Bild als Hologramm anzeigen lassen (die Seite holt es über /bild). Gibt True zurück, wenn es gültig ist."""
+    pfad = os.path.abspath(str(pfad or "").strip().strip('"'))
+    if not pfad.lower().endswith(BILD_ENDUNGEN) or not os.path.isfile(pfad):
+        return False
+    try:
+        if os.path.getsize(pfad) > 40 * 1024 * 1024:
+            return False
+    except OSError:
+        return False
+    with BILD_LOCK:
+        if pfad == BILD["pfad"] and time.time() - BILD["zeit"] < 8:
+            return True   # Skript und Ordner-Beobachtung melden dasselbe Bild nur einmal
+        BILD.update(n=BILD["n"] + 1, pfad=pfad, name=os.path.splitext(os.path.basename(pfad))[0], zeit=time.time())
+    return True
+
+
+def bild_wache():
+    """Beobachtet „Bilder/ORB Bilder“: jedes neue oder geänderte Bild erscheint als Hologramm."""
+    bekannt = {}
+    erster = True
+    while True:
+        try:
+            if os.path.isdir(BILD_ORDNER):
+                for e in os.scandir(BILD_ORDNER):
+                    if not e.is_file() or not e.name.lower().endswith(BILD_ENDUNGEN):
+                        continue
+                    st = e.stat()
+                    sig = (st.st_mtime, st.st_size)
+                    if not erster and bekannt.get(e.path) != sig and st.st_size > 0:
+                        time.sleep(.6)   # fertig schreiben lassen
+                        try:
+                            if os.path.getsize(e.path) == st.st_size:
+                                bild_zeigen(e.path)
+                            else:
+                                continue   # wird noch geschrieben – beim nächsten Durchlauf
+                        except OSError:
+                            continue
+                    bekannt[e.path] = sig
+            erster = False
+        except Exception:
+            pass
+        time.sleep(1.5)
+
+
+BILD_REGELN = (
+    "Bilder, die du für Larsen erstellst, speicherst du als PNG in \"%USERPROFILE%\\Pictures\\ORB Bilder\" – ORB blendet "
+    "sie dann automatisch als Hologramm ein. Liegt ein Bild woanders, zeigst du es mit: powershell -NoProfile "
+    "-ExecutionPolicy Bypass -File \"$env:LOCALAPPDATA\\ORB\\app\\bild_zeigen.ps1\" \"<Pfad zum Bild>\".")
+
+
 def system_prompt(cfg):
     """Persönlichkeit aus der Wissensbasis + Sprechregeln."""
     persona = ""
@@ -122,7 +180,7 @@ def system_prompt(cfg):
         kal = ""
     return ((persona + "\n\n" if persona else "") + ORB_UI + "\n\n"
             + (KURZ_REGELN if cfg.get("laenge") == "kurz" else LANG_REGELN) + "\n\n" + AUFGABEN_REGELN + "\n\n"
-            + MAIL_REGELN + kal)
+            + MAIL_REGELN + "\n\n" + BILD_REGELN + kal)
 
 
 KURZ_PROMPT = ("Du sprichst gerade über ORB, eine Sprachoberfläche; deine Antwort wird laut vorgelesen. "
@@ -1370,11 +1428,21 @@ class Handler(BaseHTTPRequestHandler):
                 st = read_state()
             st["busy"] = BRAIN.busy
             st["aufgaben"] = tasks_list()   # Hintergrund-Aufgaben + Entwickler (je ein Hologramm)
+            st["bild"] = {"n": BILD["n"], "name": BILD["name"]}   # Bild-Hologramm
             st["anruf"] = in_call()   # während Meet/Teams/Zoom nicht zuhören
             st["version"] = VERSION   # Fenster lädt sich neu, wenn eine neue Version läuft
             for i, p in enumerate(st.get("parts") or []):   # Stimme für alle Stücke vorbereiten
                 ensure((st.get("aid"), i), p)
             self.send(200, st)
+        elif u.path == "/bild":   # aktuelles Bild-Hologramm ausliefern
+            pfad = BILD["pfad"]
+            try:
+                with open(pfad, "rb") as f:
+                    data = f.read()
+            except OSError:
+                return self.send(404, b"", "text/plain")
+            ext = os.path.splitext(pfad)[1].lower().lstrip(".")
+            self.send(200, data, "image/" + {"jpg": "jpeg"}.get(ext, ext))
         elif u.path == "/tts":
             st = read_state()
             aid = q.get("aid", "")
@@ -1509,6 +1577,8 @@ class Handler(BaseHTTPRequestHandler):
                 self.send(200, {"ok": task_cancel(str(b.get("id", "")))})
             else:
                 self.send(400, {"ok": False})
+        elif u.path == "/bild":   # bild_zeigen.ps1: Bild sofort als Hologramm einblenden
+            self.send(200, {"ok": bild_zeigen(b.get("pfad"))})
         elif u.path == "/announce":  # z. B. update.ps1: „Update fertig“ laut sagen
             text = str(b.get("text", "")).strip()
             if text:
@@ -1580,6 +1650,8 @@ def make_server():
     write_token()
     threading.Thread(target=load_apps, daemon=True).start()  # App-Liste vorab laden
     threading.Thread(target=idle_reaper, daemon=True).start()
+    if not os.environ.get("ORB_PORT"):
+        threading.Thread(target=bild_wache, daemon=True).start()   # neue Bilder als Hologramm
     return srv
 
 
