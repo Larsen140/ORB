@@ -68,7 +68,7 @@ DEFAULT_CFG = {
 }
 # Damit ORB immer dein Claude-Code-Login (Max-Abo) nutzt und nie einen API-Schlüssel
 CLAUDE_ENV_DROP = ("ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "ANTHROPIC_BASE_URL")
-VERSION = "57"
+VERSION = "58"
 ORB_UI = ("Deine Oberfläche (die Larsen gerade sieht): in der Mitte du als flüssige leuchtende Kugel mit Tropfen, "
           "Orbit-Ringen und Sternenhimmel; links eine Uhr und darunter der Gesprächsverlauf mit Eingabefeld; rechts "
           "Karten für System (CPU, RAM, Akku), Wetter mit Stundenvorschau, Aktivität (was du gerade tust) und Vorschläge; "
@@ -166,6 +166,182 @@ BILD_REGELN = (
     "-ExecutionPolicy Bypass -File \"$env:LOCALAPPDATA\\ORB\\app\\bild_zeigen.ps1\" \"<Pfad zum Bild>\".")
 
 
+# ---------- Web-Hologramme: echte, bedienbare Webseite im Hologramm-Fenster ----------
+# Erlaubt die Seite das Einbetten, läuft sie direkt im Hologramm (iframe). Verbietet sie es (X-Frame-Options /
+# frame-ancestors), öffnet ORB eine echte Webansicht (Edge-App-Fenster) genau über dem Hologramm.
+WEB = {"n": 0, "url": "", "titel": "", "modus": "", "proc": None, "hwnd": 0}
+WEB_LOCK = threading.Lock()
+WEB_PROFIL = os.path.join(os.environ.get("LOCALAPPDATA", os.path.expanduser("~")), "ORB", "webansicht")
+
+
+def web_pruefen(url):
+    """Lädt die Seite kurz an: (einbettbar, Ziel-URL nach Weiterleitungen, Seitentitel)."""
+    req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                                               "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0 Safari/537.36",
+                                               "Accept-Language": "de-DE,de;q=0.9"})
+    try:
+        with urllib.request.urlopen(req, timeout=6) as r:
+            ziel, h = r.geturl(), r.headers
+            html = r.read(200000).decode("utf-8", "ignore")
+    except Exception as e:
+        print("Webansicht prüfen:", e)
+        return False, url, ""
+    m = re.search(r"<title[^>]*>(.*?)</title>", html, re.I | re.S)
+    titel = re.sub(r"\s+", " ", m.group(1)).strip()[:80] if m else ""
+    try:
+        import html as html_mod
+        titel = html_mod.unescape(titel)
+    except Exception:
+        pass
+    if (h.get("X-Frame-Options") or "").strip().lower() in ("deny", "sameorigin"):
+        return False, ziel, titel
+    for csp in h.get_all("Content-Security-Policy") or []:
+        fa = re.search(r"frame-ancestors([^;]*)", csp, re.I)
+        if fa and "*" not in fa.group(1).split():
+            return False, ziel, titel
+    # Seiten, die sich per Skript gegen Einbetten wehren (z. B. Wix: bleiben im iframe schwarz) → echte Webansicht
+    if re.search(r"(?:window\.)?(?:self|top)\s*[!=]==?\s*(?:window\.)?(?:top|self)\b|top\.location|parent\.location"
+                 r"|static\.wixstatic\.com|wix-thunderbolt", html, re.I):
+        return False, ziel, titel
+    return True, ziel, titel
+
+
+def web_zeigen(url, titel=""):
+    """Webseite als bedienbares Hologramm anzeigen. Gibt (ok, Antwort-Daten) zurück."""
+    url = str(url or "").strip().strip('"')
+    if url and not re.match(r"^https?://", url, re.I):
+        url = "https://" + url
+    if not re.match(r"^https?://[^\s/]+\.[^\s]+", url, re.I):
+        return False, {"fehler": "Keine gültige Adresse"}
+    einbettbar, ziel, t = web_pruefen(url)
+    web_schliessen_fenster()
+    with WEB_LOCK:
+        WEB.update(n=WEB["n"] + 1, url=ziel or url, titel=str(titel or t or urlparse(url).hostname or url)[:80],
+                   modus="iframe" if einbettbar else "fenster", hwnd=0)
+    return True, {"modus": WEB["modus"], "url": WEB["url"], "titel": WEB["titel"]}
+
+
+def web_lebt():
+    p = WEB["proc"]
+    return bool(p and p.poll() is None)
+
+
+def web_schliessen_fenster():
+    """Webansicht-Fenster beenden (alle Browser-Prozesse des eigenen Profils)."""
+    p, WEB["proc"], WEB["hwnd"] = WEB["proc"], None, 0
+    try:
+        import psutil
+        for q in psutil.process_iter(["name", "cmdline"]):
+            if (q.info["name"] or "").lower() in ("msedge.exe", "chrome.exe") and \
+                    any("ORB\\webansicht" in (c or "") for c in q.info["cmdline"] or []):
+                try:
+                    q.kill()
+                except Exception:
+                    pass
+    except Exception:
+        if p and p.poll() is None:
+            subprocess.run(["taskkill", "/T", "/F", "/PID", str(p.pid)], capture_output=True, creationflags=0x08000000)
+
+
+def _fenster_von(pids, titel=None):
+    """Sichtbare Browser-Fenster der gegebenen Prozesse (bzw. mit genau diesem Titel)."""
+    import ctypes
+    from ctypes import wintypes
+    u = ctypes.windll.user32
+    found = []
+
+    @ctypes.WINFUNCTYPE(ctypes.c_bool, ctypes.c_void_p, ctypes.c_void_p)
+    def cb(h, _):
+        c = ctypes.create_unicode_buffer(64)
+        u.GetClassNameW(h, c, 64)
+        if c.value.startswith("Chrome_WidgetWin"):
+            if titel is not None:
+                n = u.GetWindowTextLengthW(h)
+                b = ctypes.create_unicode_buffer(n + 1)
+                u.GetWindowTextW(h, b, n + 1)
+                if b.value == titel:
+                    found.append(h)
+            elif u.IsWindowVisible(h) and u.GetWindowTextLengthW(h) > 0:
+                pid = wintypes.DWORD()
+                u.GetWindowThreadProcessId(h, ctypes.byref(pid))
+                if pid.value in pids:
+                    found.append(h)
+        return True
+
+    u.EnumWindows(cb, 0)
+    return found
+
+
+def _web_platzieren(x, y, w, h):
+    """Webansicht-Fenster über das Hologramm legen und an ORB hängen (bleibt über ORB, verschwindet mit ORB)."""
+    import ctypes
+    u = ctypes.windll.user32
+    u.SetWindowLongPtrW.argtypes = [ctypes.c_void_p, ctypes.c_int, ctypes.c_void_p]
+    try:
+        u.SetThreadDpiAwarenessContext(ctypes.c_void_p(-4))   # echte Bildschirmpixel
+    except Exception:
+        pass
+    if not WEB["hwnd"] or not u.IsWindow(ctypes.c_void_p(WEB["hwnd"])):
+        try:
+            import psutil
+            pids = {q.pid for q in psutil.process_iter(["name", "cmdline"])
+                    if any("ORB\\webansicht" in (c or "") for c in q.info["cmdline"] or [])}
+        except Exception:
+            pids = {WEB["proc"].pid} if WEB["proc"] else set()
+        hs = _fenster_von(pids)
+        if not hs:
+            return False
+        WEB["hwnd"] = hs[0]
+        orb = _fenster_von(set(), "ORB")
+        if orb:
+            u.SetWindowLongPtrW(hs[0], -8, orb[0])   # Besitzer = ORB-Fenster: bleibt darüber, verschwindet mit ihm
+    hw = ctypes.c_void_p(WEB["hwnd"])
+    u.ShowWindow(hw, 9 if u.IsIconic(hw) else 5)
+    u.SetWindowPos(hw, None, int(x), int(y), int(w), int(h), 0x0040)   # SWP_SHOWWINDOW
+    u.SetForegroundWindow(hw)
+    return True
+
+
+def web_fenster(n, rect):
+    """Webansicht starten bzw. neu ausrichten. rect = [x, y, b, h] in Bildschirmpixeln (von der Oberfläche)."""
+    if n != WEB["n"] or WEB["modus"] != "fenster":
+        return False
+    x, y, w, h = (int(float(v)) for v in rect)
+    if not web_lebt():
+        browser = next((p for p in (
+            os.path.join(os.environ.get("ProgramFiles(x86)", r"C:\Program Files (x86)"), r"Microsoft\Edge\Application\msedge.exe"),
+            os.path.join(os.environ.get("ProgramFiles", r"C:\Program Files"), r"Microsoft\Edge\Application\msedge.exe"),
+            os.path.join(os.environ.get("ProgramFiles", r"C:\Program Files"), r"Google\Chrome\Application\chrome.exe"))
+            if os.path.exists(p)), None)
+        if not browser:
+            return False
+        WEB["proc"] = subprocess.Popen([browser, "--app=" + WEB["url"], "--user-data-dir=" + WEB_PROFIL,
+                                        "--no-first-run", "--no-default-browser-check", "--disable-features=Translate",
+                                        "--window-position=%d,%d" % (x, y), "--window-size=%d,%d" % (w, h)])
+        WEB["hwnd"] = 0
+    for _ in range(60):   # warten, bis das Fenster da ist
+        try:
+            if _web_platzieren(x, y, w, h):
+                return True
+        except Exception as e:
+            print("Webansicht platzieren:", e)
+            return False
+        time.sleep(.15)
+    return web_lebt()
+
+
+def web_schliessen():
+    with WEB_LOCK:
+        WEB["modus"] = ""
+    web_schliessen_fenster()
+
+
+WEB_REGELN = (
+    "Webseiten zeigst du Larsen nicht als Screenshot, sondern als echte, bedienbare Webseite im Hologramm: "
+    "powershell -NoProfile -ExecutionPolicy Bypass -File \"$env:LOCALAPPDATA\\ORB\\app\\web_zeigen.ps1\" \"<URL>\" "
+    "(optional -Titel \"…\"). Larsen kann darin klicken, scrollen und tippen.")
+
+
 def system_prompt(cfg):
     """Persönlichkeit aus der Wissensbasis + Sprechregeln."""
     persona = ""
@@ -180,7 +356,7 @@ def system_prompt(cfg):
         kal = ""
     return ((persona + "\n\n" if persona else "") + ORB_UI + "\n\n"
             + (KURZ_REGELN if cfg.get("laenge") == "kurz" else LANG_REGELN) + "\n\n" + AUFGABEN_REGELN + "\n\n"
-            + MAIL_REGELN + "\n\n" + BILD_REGELN + kal)
+            + MAIL_REGELN + "\n\n" + BILD_REGELN + "\n\n" + WEB_REGELN + kal)
 
 
 KURZ_PROMPT = ("Du sprichst gerade über ORB, eine Sprachoberfläche; deine Antwort wird laut vorgelesen. "
@@ -701,14 +877,30 @@ GOLD_RE = re.compile(r"\b(gold|goldpreis|goldkurs|xau(?:\s*/?\s*usd)?)\b", re.I)
 GOLD = {"n": 0, "preis": None, "zeit": 0.0, "lock": threading.Lock()}   # Gold-Hologramm auf Zuruf
 
 
+def gold_quelle():
+    """XAU/USD live: Swissquote-Kursfeed (Geld/Brief, ändert sich jede Sekunde), sonst gold-api.com."""
+    try:
+        req = urllib.request.Request("https://forex-data-feed.swissquote.com/public-quotes/bboquotes/instrument/XAU/USD",
+                                     headers={"User-Agent": "Mozilla/5.0 (ORB)"})
+        with urllib.request.urlopen(req, timeout=3) as r:
+            feeds = json.loads(r.read().decode("utf-8"))
+        # immer dieselbe Plattform nehmen, sonst springt der Kurs zwischen den Anbietern hin und her
+        f = next((x for x in feeds if (x.get("topo") or {}).get("platform") == "SwissquoteLtd"), feeds[0])
+        q = f["spreadProfilePrices"][0]
+        return round((float(q["bid"]) + float(q["ask"])) / 2, 2)
+    except Exception as e:
+        print("Goldkurs (Swissquote):", e)
+    req = urllib.request.Request("https://api.gold-api.com/price/XAU", headers={"User-Agent": "ORB"})
+    with urllib.request.urlopen(req, timeout=6) as r:
+        return float(json.loads(r.read().decode("utf-8"))["price"])
+
+
 def gold_preis():
-    """XAU/USD-Spotpreis (gold-api.com, ohne Schlüssel), höchstens alle 2 s neu abgefragt."""
+    """XAU/USD-Spotpreis, höchstens etwa einmal pro Sekunde neu abgefragt (Hologramm tickt sekündlich)."""
     with GOLD["lock"]:
-        if GOLD["preis"] is not None and time.time() - GOLD["zeit"] < 2:
+        if GOLD["preis"] is not None and time.time() - GOLD["zeit"] < .8:
             return GOLD["preis"]
-        req = urllib.request.Request("https://api.gold-api.com/price/XAU", headers={"User-Agent": "ORB"})
-        with urllib.request.urlopen(req, timeout=6) as r:
-            GOLD["preis"] = float(json.loads(r.read().decode("utf-8"))["price"])
+        GOLD["preis"] = gold_quelle()
         GOLD["zeit"] = time.time()
         return GOLD["preis"]
 
@@ -1484,6 +1676,8 @@ class Handler(BaseHTTPRequestHandler):
             st["aufgaben"] = tasks_list()   # Hintergrund-Aufgaben + Entwickler (je ein Hologramm)
             st["bild"] = {"n": BILD["n"], "name": BILD["name"]}   # Bild-Hologramm
             st["gold"] = GOLD["n"]   # Gold-Hologramm auf Zuruf
+            st["web"] = {"n": WEB["n"], "url": WEB["url"], "titel": WEB["titel"], "modus": WEB["modus"],
+                         "lebt": web_lebt()}   # Web-Hologramm
             st["anruf"] = in_call()   # während Meet/Teams/Zoom nicht zuhören
             st["version"] = VERSION   # Fenster lädt sich neu, wenn eine neue Version läuft
             for i, p in enumerate(st.get("parts") or []):   # Stimme für alle Stücke vorbereiten
@@ -1639,6 +1833,26 @@ class Handler(BaseHTTPRequestHandler):
                 self.send(400, {"ok": False})
         elif u.path == "/bild":   # bild_zeigen.ps1: Bild sofort als Hologramm einblenden
             self.send(200, {"ok": bild_zeigen(b.get("pfad"))})
+        elif u.path == "/web":   # web_zeigen.ps1: Webseite als bedienbares Hologramm
+            ok, d = web_zeigen(b.get("url"), b.get("titel"))
+            self.send(200, dict(d, ok=ok))
+        elif u.path == "/web/fenster":   # Oberfläche: echte Webansicht über dem Hologramm öffnen/ausrichten
+            try:
+                ok = web_fenster(int(b.get("n", -1)), b.get("rect") or [])
+            except Exception as e:
+                print("Webansicht:", e)
+                ok = False
+            self.send(200, {"ok": ok})
+        elif u.path == "/web/zu":
+            if int(b.get("n", -1)) == WEB["n"]:
+                web_schliessen()
+            self.send(200, {"ok": True})
+        elif u.path == "/web/browser":   # im normalen Browser öffnen
+            url = WEB["url"]
+            if url:
+                launch(url)
+            web_schliessen()
+            self.send(200, {"ok": bool(url)})
         elif u.path == "/announce":  # z. B. update.ps1: „Update fertig“ laut sagen
             text = str(b.get("text", "")).strip()
             if text:
@@ -1650,6 +1864,7 @@ class Handler(BaseHTTPRequestHandler):
             log_close("Fenster %s: %s" % ("ausgeblendet" if keep else "geschlossen", b.get("grund") or "unbekannt"))
             if not BRAIN.busy and not keep:
                 BRAIN.kill()
+            web_schliessen_fenster()   # Webansicht verschwindet mit ORB
             if ON_HIDE[0]:
                 threading.Thread(target=ON_HIDE[0], kwargs={"keep": keep}, daemon=True).start()
         elif u.path == "/show":  # Fenster öffnen bzw. nach vorne holen (z. B. zweiter Doppelklick auf ORB.exe)

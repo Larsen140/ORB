@@ -429,11 +429,22 @@
   #goldh .gk i { width:8px; height:8px; border-radius:50%; background:rgb(var(--hl)); box-shadow:0 0 10px rgb(var(--hl)); animation:goldPuls 1.6s ease-in-out infinite; }
   #goldh .gk b { font-weight:600; opacity:.6; letter-spacing:.1em; }
   @keyframes goldPuls { 50% { opacity:.35; } }
-  #goldh .gp { display:flex; align-items:baseline; gap:8px; margin:6px 0 2px; font-size:34px; font-weight:700; font-variant-numeric:tabular-nums; letter-spacing:-.01em;
+  #goldh .gp { display:flex; align-items:baseline; gap:6px; margin:6px 0 2px; font-size:34px; font-weight:700; font-variant-numeric:tabular-nums; letter-spacing:-.01em;
     color:rgb(var(--tk)); text-shadow:0 0 18px rgba(var(--tk),.55); transition:color .5s, text-shadow .5s; }
   #goldh .gp small { font-size:15px; opacity:.7; font-weight:600; }
-  #goldh .gp em { font-style:normal; font-size:15px; }
+  #goldh .gp em { font-style:normal; }
   #goldh.tick .gp { animation:goldTick .7s ease-out; }
+  /* jeder Kurs-Tick blinkt kurz grün (rauf) bzw. rot (runter) */
+  #goldh > .gf { position:absolute; inset:0; z-index:0; pointer-events:none; opacity:0; border-radius:inherit; }
+  #goldh.hoch > .gf { --f:var(--up); animation:goldBlink .75s ease-out; }
+  #goldh.runter > .gf { --f:var(--dn); animation:goldBlink .75s ease-out; }
+  @keyframes goldBlink { 0% { opacity:1; background:radial-gradient(120% 90% at 30% 35%, rgba(var(--f),.34), rgba(var(--f),.06) 70%);
+    box-shadow:inset 0 0 0 1px rgba(var(--f),.9), inset 0 0 26px rgba(var(--f),.4); } 100% { opacity:0; } }
+  #goldh .gp em { margin-left:auto; align-self:center; white-space:nowrap; font-size:11.5px; font-weight:700; padding:2px 6px; border-radius:9px; letter-spacing:.02em; }
+  #goldh.hoch .gp em { color:rgb(var(--up)); animation:goldPill .75s ease-out; --f:var(--up); }
+  #goldh.runter .gp em { color:rgb(var(--dn)); animation:goldPill .75s ease-out; --f:var(--dn); }
+  @keyframes goldPill { 0% { background:rgba(var(--f),.35); box-shadow:0 0 14px rgba(var(--f),.6); } 100% { background:transparent; box-shadow:none; } }
+  #goldh svg .zug { transform:translateX(0); }
   @keyframes goldTick { 0% { filter:brightness(1.8); } 100% { filter:none; } }
   #goldh .gd { font-size:12.5px; font-variant-numeric:tabular-nums; color:rgba(255,246,224,.7); }
   #goldh .gd span.up { color:rgb(var(--up)); } #goldh .gd span.dn { color:rgb(var(--dn)); }
@@ -448,6 +459,42 @@
     width:24px; height:24px; cursor:pointer; font-size:12px; opacity:.75; display:grid; place-items:center;
     box-shadow:inset 0 0 0 1px rgba(var(--hl),.45); transition:opacity .2s, transform .3s var(--spring), background .2s; }
   #goldh .x:hover { opacity:1; transform:scale(1.12); background:rgba(var(--hl),.3); }
+  /* Web-Hologramm: echte, bedienbare Webseite (iframe – oder echte Webansicht darüber, wenn die Seite Einbetten verbietet) */
+  #webh { --hl:var(--c3); position:fixed; left:var(--mid,50%); top:50%; z-index:55; width:min(calc(100vw - 80px), 1240px); height:min(calc(100vh - 150px), 880px);
+    display:flex; flex-direction:column; gap:7px; padding:8px 8px 8px; border-radius:20px; color:#f2f9ff; overflow:hidden;
+    opacity:0; visibility:hidden; pointer-events:none; transform:translate(-50%, -50%);
+    background:linear-gradient(160deg, rgba(var(--hl),.16), rgba(8,12,26,.82) 60%);
+    border:1px solid rgba(var(--hl),.62); backdrop-filter:blur(16px) saturate(1.3); -webkit-backdrop-filter:blur(16px) saturate(1.3);
+    box-shadow:0 0 0 100vmax rgba(2,4,12,.5), 0 24px 70px rgba(0,0,0,.6), 0 0 40px rgba(var(--hl),.35), inset 0 1px 0 rgba(255,255,255,.14), inset 0 0 24px rgba(var(--hl),.14); }
+  #webh.on { opacity:1; visibility:visible; pointer-events:auto; animation:holoAuf .8s cubic-bezier(.2,.9,.25,1) backwards; }
+  #webh.zu { animation:holoAb .4s cubic-bezier(.5,0,.75,0) forwards; pointer-events:none; }
+  #webh::after { content:''; position:absolute; left:0; right:0; height:30%; top:-35%; pointer-events:none; z-index:3;
+    background:linear-gradient(180deg, transparent, rgba(var(--hl),.22), transparent); }
+  #webh.on::after { animation:holoSweep 1.4s var(--ease) 1; }
+  #webh .wk { position:relative; display:flex; align-items:center; gap:9px; padding:3px 4px 2px 8px; font-size:11px; font-weight:700; letter-spacing:.14em;
+    text-transform:uppercase; text-shadow:0 0 10px rgba(var(--hl),.8); flex:none; }
+  #webh .wk::before { content:''; position:absolute; inset:-8px -8px -3px; pointer-events:none; opacity:.14;
+    background:repeating-linear-gradient(0deg, rgba(var(--hl),.9) 0 1px, transparent 1px 3px); animation:holoScan 2.2s linear infinite; }
+  #webh .wk i { width:8px; height:8px; border-radius:50%; flex:none; background:rgb(var(--hl)); box-shadow:0 0 10px rgb(var(--hl)); }
+  #webh.laedt .wk i { animation:goldPuls .7s ease-in-out infinite; }
+  #webh .wk span { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  #webh .wk small { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:10.5px; font-weight:600; opacity:.55; letter-spacing:.06em; text-transform:none; }
+  #webh .wk button { position:relative; z-index:1; height:28px; min-width:28px; padding:0 10px; border:1px solid rgba(var(--hl),.35); border-radius:14px; cursor:pointer;
+    background:rgba(10,14,30,.5); color:inherit; font:inherit; font-size:10.5px; letter-spacing:.1em; opacity:.85; transition:transform .25s var(--spring), background .25s, opacity .25s; }
+  #webh .wk button:hover { opacity:1; transform:scale(1.06); background:rgba(var(--hl),.3); }
+  #webh .wk .x { padding:0; width:28px; font-size:13px; }
+  #webh .wb { position:relative; flex:1; min-height:0; border-radius:13px; overflow:hidden; background:rgba(4,6,14,.6);
+    box-shadow:0 0 0 1px rgba(var(--hl),.35), 0 0 18px rgba(var(--hl),.25); }
+  #webh .wb::before { content:''; position:absolute; left:0; right:0; top:0; height:2px; z-index:2; pointer-events:none; opacity:0;
+    background:linear-gradient(90deg, transparent, rgb(var(--hl)), transparent); background-size:40% 100%; background-repeat:no-repeat; }
+  #webh.laedt .wb::before { opacity:1; animation:webLaden 1.1s linear infinite; }
+  @keyframes webLaden { 0% { background-position:-40% 0; } 100% { background-position:140% 0; } }
+  #webh iframe { display:block; width:100%; height:100%; border:0; background:#fff; }
+  #webh .wf { position:absolute; inset:0; display:none; flex-direction:column; align-items:center; justify-content:center; gap:14px; text-align:center;
+    font-size:13px; letter-spacing:.06em; color:rgba(242,249,255,.75); }
+  #webh.fenster iframe { display:none; } #webh.fenster .wf { display:flex; }
+  #webh .wf button { padding:9px 18px; border-radius:18px; border:1px solid rgba(var(--hl),.6); background:rgba(var(--hl),.2); color:inherit; font:inherit;
+    font-weight:700; letter-spacing:.1em; cursor:pointer; box-shadow:0 0 18px rgba(var(--hl),.3); }
   #holo.glitch { animation:holoGlitch .45s steps(2) 1; }
   #holo .ico { font-size:38px; line-height:1.1; filter:grayscale(1) brightness(1.8) drop-shadow(0 0 10px rgb(var(--hl))); }
   #holo .big { font-size:46px; font-weight:250; line-height:1.05; letter-spacing:-.01em; }
@@ -541,11 +588,12 @@
 <div id="caption"></div>
 <div id="holo"><div class="ico"></div><div class="big"></div><div class="sub"></div></div>
 <div id="bildh" title="Klicken zum Vergrößern"><button class="x" title="Schließen">✕</button><img alt=""><div class="tt"><i></i><span></span></div></div>
-<div id="goldh"><button class="x" title="Schließen">✕</button><div class="gk"><i></i>XAU/USD <b>· Live</b></div>
+<div id="goldh"><div class="gf"></div><button class="x" title="Schließen">✕</button><div class="gk"><i></i>XAU/USD <b>· Live</b></div>
   <div class="gp"><small>$</small><span>–</span><em></em></div><div class="gd">Lade Kurs …</div>
   <svg viewBox="0 0 240 54" preserveAspectRatio="none"><defs><linearGradient id="goldVerlauf" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="rgb(255,196,70)" stop-opacity=".35"/><stop offset="1" stop-color="rgb(255,196,70)" stop-opacity="0"/></linearGradient></defs>
-    <line class="ba" x1="0" x2="240" y1="27" y2="27"/><path class="ar"/><path class="ln"/><circle r="3" cx="-10" cy="27"/></svg>
+    <line class="ba" x1="0" x2="240" y1="27" y2="27"/><g class="zug"><path class="ar"/><path class="ln"/><circle r="3" cx="-10" cy="27"/></g></svg>
   <div class="gz"><i></i></div></div>
+<div id="webh"><div class="wk"><i></i><span>Webseite</span><small></small><button class="neu" title="Neu laden">⟳</button><button class="br" title="Im normalen Browser öffnen">Im Browser ↗</button><button class="x" title="Schließen">✕</button></div><div class="wb"><iframe sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox allow-modals allow-downloads allow-presentation" allow="fullscreen; clipboard-write; geolocation" referrerpolicy="no-referrer-when-downgrade"></iframe><div class="wf"><div>Diese Seite läuft in der echten Webansicht über dem Hologramm.</div><button class="vor">Nach vorne holen</button></div></div></div>
 <div id="dock" class="glass rim">
   <button class="ic" id="kb" title="Tippen (T)"><svg viewBox="0 0 24 24"><path d="M20 5H4a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2zm-9 3h2v2h-2V8zm0 3h2v2h-2v-2zM8 8h2v2H8V8zm0 3h2v2H8v-2zM5 8h2v2H5V8zm0 3h2v2H5v-2zm11 5H8v-2h8v2zm0-3h-2v-2h2v2zm0-3h-2V8h2v2zm3 3h-2v-2h2v2zm0-3h-2V8h2v2z"/></svg></button>
   <button class="ic" id="mic" title="Halten zum Sprechen (Leertaste) · 2× klatschen · „Jarvis“"><svg viewBox="0 0 24 24"><path d="M12 15a3 3 0 0 0 3-3V6a3 3 0 0 0-6 0v6a3 3 0 0 0 3 3zm5-3a5 5 0 0 1-10 0H5a7 7 0 0 0 6 6.9V22h2v-3.1a7 7 0 0 0 6-6.9z"/></svg></button>
@@ -1522,7 +1570,7 @@ async function poll() {
   poll._busy = true;
   try {
     const aktiv = speakingNow() || listening || !!convoRec ? '1' : '0';
-    const st = await (await fetch('/state?aktiv=' + aktiv, { cache:'no-store' })).json(); lastOk = performance.now(); S.busy = !!st.busy; renderTasks(st.aufgaben); if (st.bild) bildHolo(st.bild); if (st.gold !== undefined) goldHolo(st.gold);
+    const st = await (await fetch('/state?aktiv=' + aktiv, { cache:'no-store' })).json(); lastOk = performance.now(); S.busy = !!st.busy; renderTasks(st.aufgaben); if (st.bild) bildHolo(st.bild); if (st.gold !== undefined) goldHolo(st.gold); if (st.web) webHolo(st.web);
     if (!!st.anruf !== !!S.call) { S.call = !!st.anruf; if (S.call) { stopWake(); killConvoRec(); killBarge(); hint('Meeting erkannt – ich höre nicht zu', 3500); } else if (cfg.steuerung === 'wort') startWake(); }
     // neue ORB-Version läuft → Seite neu laden (sonst sieht man Änderungen erst nach Fenster-Neustart)
     if (st.version) { if (!poll._v) poll._v = st.version; else if (st.version !== poll._v) { location.replace(S.sleep ? '/#schlaf' : '/#wake'); location.reload(); return; } }
@@ -1586,7 +1634,7 @@ $('bildh').addEventListener('click', e => { const el = $('bildh');
 document.addEventListener('pointerdown', e => { const el = $('bildh');
   if (el.classList.contains('gross') && !el.contains(e.target)) { el.classList.remove('gross'); holoPlatz._k = ''; SFX.close(); bildWarte(8000); } }, true);
 /* ---------- Gold-Hologramm (XAU/USD live auf Zuruf) ---------- */
-const GOLD_MS = 45000, GOLD_TAKT = 3000;
+const GOLD_MS = 45000, GOLD_TAKT = 1000, GOLD_PLAETZE = 60;   // jede Sekunde ein Tick, Kurve zeigt die letzte Minute
 let goldN = null, goldTimer = 0, goldEnde = 0, goldStart = null, goldWerte = [];
 const goldZahl = v => v.toLocaleString('de-DE', { minimumFractionDigits:2, maximumFractionDigits:2 });
 function goldZu() { const el = $('goldh'); clearTimeout(goldTimer); goldEnde = 0;
@@ -1598,34 +1646,39 @@ function goldMalen(neu) {
   const vor = w.length > 1 ? w[w.length - 2] : p, d = p - goldStart, pz = goldStart ? d / goldStart * 100 : 0;
   el.style.setProperty('--tk', p > vor ? 'var(--up)' : p < vor ? 'var(--dn)' : d > 0 ? 'var(--up)' : d < 0 ? 'var(--dn)' : 'var(--hl)');
   el.querySelector('.gp span').textContent = goldZahl(p);
-  el.querySelector('.gp em').textContent = p > vor ? '▲' : p < vor ? '▼' : '';
+  if (neu) el.querySelector('.gp em').textContent = (p > vor ? '▲ +' : '▼ −') + goldZahl(Math.abs(p - vor));
   const kl = d > 0 ? 'up' : d < 0 ? 'dn' : '';
   el.querySelector('.gd').innerHTML = `<span class="${kl}">${d >= 0 ? '+' : '−'}${goldZahl(Math.abs(d))} (${pz >= 0 ? '+' : '−'}${Math.abs(pz).toLocaleString('de-DE', { minimumFractionDigits:2, maximumFractionDigits:2 })} %)</span> seit Öffnen`;
-  // Mini-Kurve: Startwert als gestrichelte Linie, Kurve dazu skaliert
-  const lo = Math.min(...w, goldStart), hi = Math.max(...w, goldStart), sp = Math.max(hi - lo, p * .00004);
-  const y = v => 50 - (v - (lo + hi) / 2 + sp / 2) / sp * 46, n = Math.max(w.length - 1, 1);
-  const pts = w.map((v, i) => [w.length === 1 ? 240 : i / n * 240, y(v)]);
-  if (pts.length === 1) pts.unshift([0, pts[0][1]]);
+  // Mini-Kurve: feste Zeitschlitze (1 Punkt pro Sekunde), neuester rechts – die Kurve wandert laufend nach links
+  const lo = Math.min(...w, goldStart), hi = Math.max(...w, goldStart), sp = Math.max(hi - lo, p * .00015);   // ruhige Skala: Cent-Zappeln wird nicht zum Ausschlag
+  const y = v => 50 - (v - (lo + hi) / 2 + sp / 2) / sp * 46, dx = 240 / (GOLD_PLAETZE - 1);
+  const pts = w.map((v, i) => [240 - (w.length - 1 - i) * dx, y(v)]);
+  if (pts.length === 1) pts.unshift([240 - dx, pts[0][1]]);
   const lin = 'M' + pts.map(q => q[0].toFixed(1) + ' ' + q[1].toFixed(1)).join(' L');
   el.querySelector('.ln').setAttribute('d', lin);
-  el.querySelector('.ar').setAttribute('d', lin + ' L240 54 L0 54 Z');
+  el.querySelector('.ar').setAttribute('d', lin + ` L240 54 L${pts[0][0].toFixed(1)} 54 Z`);
   const b = el.querySelector('.ba'); b.setAttribute('y1', y(goldStart)); b.setAttribute('y2', y(goldStart));
   const c = el.querySelector('circle'), z = pts[pts.length - 1]; c.setAttribute('cx', z[0]); c.setAttribute('cy', z[1]);
-  if (neu) { el.classList.remove('tick'); void el.offsetWidth; el.classList.add('tick'); }
+  if (w.length > 1) {   // weich nachziehen: um einen Schlitz versetzt starten und in einer Sekunde einschieben
+    const g = el.querySelector('.zug'); g.style.transition = 'none'; g.style.transform = `translateX(${dx}px)`; void g.getBoundingClientRect();
+    g.style.transition = `transform ${GOLD_TAKT - 50}ms linear`; g.style.transform = 'translateX(0)';
+  }
+  if (neu) { el.classList.remove('tick', 'hoch', 'runter'); void el.offsetWidth; el.classList.add('tick', p > vor ? 'hoch' : 'runter'); }
 }
 async function goldHolen() {
   clearTimeout(goldTimer); if (!goldEnde) return;
   if (performance.now() >= goldEnde) { if ($('goldh').matches(':hover')) goldEnde = performance.now() + 8000; else return goldZu(); }
+  const t0 = performance.now();
   try {
     const j = await (await fetch('/gold', { cache:'no-store' })).json();
     if (goldEnde && typeof j.preis === 'number') {
       if (goldStart === null) goldStart = j.preis;
-      const neu = goldWerte[goldWerte.length - 1] !== j.preis;
-      if (neu || goldWerte.length < 2) { goldWerte.push(j.preis); if (goldWerte.length > 40) goldWerte.shift(); }
-      goldMalen(neu && goldWerte.length > 1);
+      const neu = goldWerte.length > 0 && goldWerte[goldWerte.length - 1] !== j.preis;
+      goldWerte.push(j.preis); if (goldWerte.length > GOLD_PLAETZE) goldWerte.shift();   // jede Sekunde ein Punkt
+      goldMalen(neu);
     } else if (goldEnde && goldStart === null) $('goldh').querySelector('.gd').textContent = 'Kurs gerade nicht erreichbar';
   } catch (e) {}
-  if (goldEnde) goldTimer = setTimeout(goldHolen, GOLD_TAKT);
+  if (goldEnde) goldTimer = setTimeout(goldHolen, Math.max(150, GOLD_TAKT - (performance.now() - t0)));
 }
 function goldHolo(n) {
   if (goldN === null) { goldN = n; return; }   // beim Start nicht von selbst öffnen
@@ -1645,6 +1698,50 @@ function goldHolo(n) {
   goldHolen();
 }
 $('goldh').querySelector('.x').addEventListener('click', goldZu);
+/* ---------- Web-Hologramm: echte Webseite zum Klicken, Scrollen und Tippen ---------- */
+let webN = null, webLebte = false, webModus = '';
+const webOffen = () => { const el = $('webh'); return el.classList.contains('on') && !el.classList.contains('zu'); };
+function webZu(melden = true) { const el = $('webh'); if (!webOffen()) return;
+  if (melden) fetch('/web/zu', { method:'POST', body:JSON.stringify({ n:webN }) }).catch(() => {});
+  el.classList.add('zu'); SFX.close(); webModus = '';
+  clearTimeout(webZu._t); webZu._t = setTimeout(() => { el.classList.remove('on', 'zu', 'fenster', 'laedt'); el.querySelector('iframe').src = 'about:blank'; }, 420); }
+function webRect() {   // Bildschirm-Pixel der Inhaltsfläche – dort liegt die echte Webansicht
+  const r = $('webh').querySelector('.wb').getBoundingClientRect(), z = devicePixelRatio || 1;
+  const rand = Math.max(0, (outerWidth - innerWidth) / 2), oben = Math.max(0, outerHeight - innerHeight - rand);
+  return [(screenX + rand + r.left) * z, (screenY + oben + r.top) * z, r.width * z, r.height * z].map(Math.round);
+}
+function webFenster() { if (webModus !== 'fenster' || !webOffen()) return;
+  const el = $('webh'); el.classList.add('laedt');
+  fetch('/web/fenster', { method:'POST', body:JSON.stringify({ n:webN, rect:webRect() }) })
+    .then(r => r.json()).then(j => { el.classList.remove('laedt'); if (!j.ok) hint('Webansicht ließ sich nicht öffnen', 3000); }).catch(() => el.classList.remove('laedt')); }
+function webHolo(w) {
+  if (webN === null) { webN = w.n; return; }   // beim Start keine alte Seite zeigen
+  if (w.n !== webN) {
+    webN = w.n; webModus = w.modus; webLebte = false;
+    const el = $('webh'), f = el.querySelector('iframe');
+    let host = ''; try { host = new URL(w.url).hostname.replace(/^www\./, ''); } catch (e) {}
+    el.querySelector('.wk span').textContent = w.titel || host || 'Webseite';
+    el.querySelector('.wk small').textContent = host;
+    clearTimeout(webZu._t); el.classList.remove('on', 'zu', 'fenster', 'laedt'); void el.offsetWidth;
+    el.classList.add('on'); SFX.holo(); ripple(.6); burst(24);
+    if (w.modus === 'fenster') { el.classList.add('fenster'); f.src = 'about:blank'; setTimeout(webFenster, 850); }   // nach der Auf-Animation
+    else { el.classList.add('laedt'); f.src = w.url; }
+    return;
+  }
+  if (!webOffen()) return;
+  if (!w.modus) return webZu(false);   // anderswo geschlossen (z. B. im Browser geöffnet)
+  if (webModus === 'fenster') { if (w.lebt) webLebte = true; else if (webLebte) webZu(); }   // Webansicht-Fenster wurde geschlossen
+}
+{ const el = $('webh');
+  el.querySelector('iframe').addEventListener('load', () => el.classList.remove('laedt'));
+  el.querySelector('.x').addEventListener('click', () => webZu());
+  el.querySelector('.br').addEventListener('click', () => { fetch('/web/browser', { method:'POST', body:'{}' }).catch(() => {}); webZu(false); });
+  el.querySelector('.neu').addEventListener('click', () => {
+    if (webModus === 'fenster') { webFenster(); return; }
+    const f = el.querySelector('iframe'), u = f.src; el.classList.add('laedt'); f.src = 'about:blank'; setTimeout(() => { f.src = u; }, 60); });
+  el.querySelector('.vor').addEventListener('click', webFenster);
+  let rt = 0; addEventListener('resize', () => { clearTimeout(rt); rt = setTimeout(webFenster, 400); });
+}
 /* ---------- Platz für Hologramme: nichts über Kugel, Widgets, Untertitel oder Dock ---------- */
 function holoPlatz(cx, cy, R) {
   if (cx === undefined) { const a = holoPlatz._a; if (!a) return; [cx, cy, R] = a; } else holoPlatz._a = [cx, cy, R];

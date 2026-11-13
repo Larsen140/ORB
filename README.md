@@ -17,6 +17,8 @@ Voraussetzung für Antworten: [Claude Code](https://claude.com/claude-code) inst
 - **iCloud-Kalender**: Termine eintragen, lesen und löschen (Einstellungen → iCloud-Kalender, app-spezifisches Passwort).
 - **Oberfläche** im Liquid-Glass-Stil mit Uhr, Gesprächsverlauf, System, Wetter, Termine, Spotify und Vorschlägen.
 - **Bild-Hologramme**: neue Bilder in `Bilder/ORB Bilder` (oder per `bild_zeigen.ps1`) erscheinen sofort als Holo-Karte.
+- **Web-Hologramme**: echte Webseiten zum Klicken, Scrollen und Tippen direkt im Hologramm (`web_zeigen.ps1`).
+- **Gold live** („Jarvis, Gold“): XAU/USD jede Sekunde, mit Farbblitz pro Tick und mitlaufender Kurve.
 - **Wissensbasis**: arbeitet im Ordner `Documents\Jarvis` und merkt sich dort alles.
 
 ## Aufbau
@@ -29,6 +31,7 @@ Voraussetzung für Antworten: [Claude Code](https://claude.com/claude-code) inst
 | `hook.py` | Claude-Code-Hooks → zeigt in ORB an, was Claude gerade tut |
 | `index.html` | Oberfläche (WebGL-Kugel, Effekte, Sounds, Einstellungen) |
 | `fortschritt.ps1` | Entwickler meldet seinen Fortschritt (Prozent + Schritt) – ORB zeigt ihn als Balken im Entwickler-Hologramm |
+| `web_zeigen.ps1` | zeigt eine Webseite als echte, bedienbare Seite im Hologramm (sonst echte Webansicht darüber) |
 | `whatsapp.ps1` | WhatsApp-Nachricht (Text/Bild) in Sekunden vorbereiten, Abschicken erst nach Bestätigung |
 | `check.py` | prüft Code und Oberfläche vor jedem Update |
 | `update.ps1` | prüfen → hochladen → ORB aktualisiert sich → Kontrolle (bei Fehler automatisch zurück) |
