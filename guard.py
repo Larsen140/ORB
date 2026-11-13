@@ -1,28 +1,43 @@
-"""Sperre für ORBs eigenes Gehirn (Claude-Hook in Documents\\Jarvis\\.claude\\settings.json).
-Blockiert Befehle, die ORB kaputt machen können: selbst eine exe bauen, ORB.exe überschreiben/umbenennen,
-ORB von Hand beenden/starten. ORB soll stattdessen update.ps1 benutzen."""
+"""Sperre für ORBs Gesprächs-Gehirn (Claude-Hook in Documents\\Jarvis\\.claude\\settings.json).
+ORBs Gehirn soll den Programmcode nicht selbst ändern, bauen, kopieren oder ORB beenden – das hat ORB schon
+mehrfach kaputt gemacht. Änderungswünsche gehen stattdessen an den Entwickler: entwickler.ps1."""
 import json
 import re
 import sys
 
+HINWEIS = ("Änderungen am ORB-Programm macht nicht das Gesprächs-Gehirn selbst. Gib den Wunsch an den Entwickler weiter: "
+           "powershell -NoProfile -ExecutionPolicy Bypass -File C:\\Users\\larse\\Orb\\entwickler.ps1 \"<Larsens Wunsch, "
+           "möglichst genau>\" – und sag Larsen kurz, dass es beim Entwickler ist.")
 try:
     data = json.loads(sys.stdin.buffer.read().decode("utf-8", "ignore").lstrip("\ufeff") or "{}")
 except Exception:
     sys.exit(0)
-cmd = str((data.get("tool_input") or {}).get("command", ""))
-if not cmd or "update.ps1" in cmd.lower():
+tool, inp = data.get("tool_name", ""), data.get("tool_input") or {}
+
+
+def block(was):
+    sys.stderr.write("GESPERRT (%s). %s" % (was, HINWEIS))
+    sys.exit(2)
+
+
+ORB_PFAD = re.compile(r"[\\/]orb[\\/]|[\\/]ORB[\\/]app[\\/]", re.I)
+if tool in ("Edit", "Write", "MultiEdit", "NotebookEdit"):
+    if ORB_PFAD.search(str(inp.get("file_path", "") or inp.get("notebook_path", ""))):
+        block("ORB-Programmdateien ändern")
+    sys.exit(0)
+
+cmd = str(inp.get("command", ""))
+if not cmd or re.search(r"entwickler\.ps1", cmd, re.I):
     sys.exit(0)
 VERBOTEN = [
     (r"pyinstaller", "selbst eine exe bauen"),
-    (r"orb(_alt[\w]*)?\.exe['\"]?\s*(-destination|\s)|copy-item[^\n]*orb\.exe|rename-item[^\n]*orb\.exe|move-item[^\n]*orb\.exe", "ORB.exe kopieren/umbenennen"),
-    (r"stop-process[^\n]*\borb\b|taskkill[^\n]*orb\.exe|/quit", "ORB von Hand beenden"),
+    (r"(copy-item|rename-item|move-item|remove-item)[^\n]*orb(_alt\w*)?\.exe", "ORB.exe kopieren/umbenennen"),
+    (r"stop-process[^\n]*\borb\b|taskkill[^\n]*orb\.exe|8766/quit", "ORB von Hand beenden"),
+    (r"(set-content|add-content|out-file|writealltext|copy-item|move-item|remove-item|-replace)[^\n]*[\\/]orb[\\/]", "ORB-Programmdateien ändern"),
+    (r"update\.ps1", "selbst veröffentlichen"),
+    (r"(remove-item|rmdir|rd |del )[^\n]*documents[\\/]jarvis[\\/]?['\"]?(\s|$|-)", "ganze Wissensbasis löschen"),
 ]
-for pattern, what in VERBOTEN:
+for pattern, was in VERBOTEN:
     if re.search(pattern, cmd, re.I):
-        sys.stderr.write(
-            "GESPERRT (%s). ORB darf sich nicht selbst bauen, kopieren oder beenden – das hat ihn schon mehrfach kaputt gemacht. "
-            "Nach Code-Änderungen in C:\\Users\\larse\\Orb IMMER nur ausführen: "
-            "powershell -NoProfile -ExecutionPolicy Bypass -File C:\\Users\\larse\\Orb\\update.ps1 "
-            "(prüft, lädt zu GitHub hoch, ORB aktualisiert sich dann selbst)." % what)
-        sys.exit(2)
+        block(was)
 sys.exit(0)

@@ -268,6 +268,30 @@ def announce_update():
             server.write_answer("Update installiert, Version %s." % server.VERSION, heard="")
 
 
+def backup_jarvis():
+    """Wissensbasis (Documents/Jarvis) täglich sichern – die letzten 30 Tage bleiben erhalten."""
+    import zipfile
+    src = os.path.join(os.path.expanduser("~"), "Documents", "Jarvis")
+    dst = os.path.join(os.environ.get("LOCALAPPDATA", os.path.expanduser("~")), "ORB", "Sicherungen")
+    while True:
+        try:
+            if os.path.isdir(src) and os.listdir(src):
+                os.makedirs(dst, exist_ok=True)
+                ziel = os.path.join(dst, "Jarvis_%s.zip" % time.strftime("%Y-%m-%d"))
+                if not os.path.exists(ziel):
+                    with zipfile.ZipFile(ziel, "w", zipfile.ZIP_DEFLATED) as z:
+                        for root, _dirs, files in os.walk(src):
+                            for f in files:
+                                full = os.path.join(root, f)
+                                z.write(full, os.path.relpath(full, src))
+                    import glob
+                    for alt in sorted(glob.glob(os.path.join(dst, "Jarvis_*.zip")))[:-30]:
+                        os.remove(alt)
+        except Exception as e:
+            print("Jarvis-Sicherung:", e)
+        time.sleep(6 * 3600)
+
+
 def main():
     srv = server.make_server()
     if not srv and RESTART:
@@ -312,6 +336,7 @@ def main():
     threading.Thread(target=clap_loop, daemon=True).start()
     threading.Thread(target=update_loop, daemon=True).start()
     threading.Thread(target=announce_update, daemon=True).start()
+    threading.Thread(target=backup_jarvis, daemon=True).start()
     if not BG and not RESTART:
         show()
     while True:  # bleibt im Hintergrund, bis „ORB beenden“ gewählt wird
