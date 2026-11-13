@@ -1,0 +1,13 @@
+# Private Daten – niemals hochladen
+config.json
+state.json
+*.tmp
+*.log
+Sicherungen/
+Hörproben/
+
+# Baureste
+__pycache__/
+build/
+dist/
+*.spec
