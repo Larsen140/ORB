@@ -196,6 +196,25 @@ def github_head():
     return None
 
 
+def apply_update(sha=None):
+    """Genau diesen GitHub-Stand laden (vorher sichern) und neu starten – ohne auf GitHubs verzögerte API zu warten."""
+    launcher = sys.modules.get("__main__")
+    if not hasattr(launcher, "install_code"):
+        return restart(update=True)
+    sha = sha or github_head()
+    if sha and sha != launcher.local_sha():
+        for _ in range(10):   # direkt nach dem Hochladen kann GitHub den Stand ein paar Sekunden noch nicht ausliefern
+            try:
+                launcher.install_code(sha)
+                break
+            except Exception as e:
+                print("Update-Download:", e)
+                time.sleep(2)
+        else:
+            return
+    restart(update=False)
+
+
 def update_loop():
     """Jede Minute auf GitHub nachsehen und ein Update SOFORT einspielen – nur nicht mitten im Sprechen oder Arbeiten."""
     launcher = sys.modules.get("__main__")
@@ -211,7 +230,7 @@ def update_loop():
             ruhig = (not server.BRAIN.busy and st.get("mode") not in ("denkt", "auftrag", "wartet")
                      and time.time() - float(st.get("time", 0)) > 12)   # gerade nichts gesagt/getan
             if ruhig:
-                restart(update=True)
+                apply_update(sha)
         except Exception as e:
             print("Update-Prüfung:", e)
 
@@ -272,7 +291,7 @@ def main():
         pass
     server.ON_SHOW[0] = show
     server.ON_HIDE[0] = hide_window
-    server.ON_UPDATE[0] = lambda: restart(update=True)
+    server.ON_UPDATE[0] = apply_update
     threading.Thread(target=srv.serve_forever, daemon=True).start()
     cfg = server.load_cfg()
     server.set_autostart(bool(cfg.get("autostart", True)))

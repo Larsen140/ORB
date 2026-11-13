@@ -67,7 +67,8 @@ try {
             Copy-Item "$work\dist\ORB.exe" $inst -Force
             Start-Process $inst -ArgumentList '--neustart','--update'
         } else {
-            Invoke-WebRequest http://127.0.0.1:8766/selfupdate -Method Post -Body '{}' -UseBasicParsing -TimeoutSec 5 | Out-Null
+            $sha = (Git rev-parse HEAD).Trim()
+            Invoke-WebRequest http://127.0.0.1:8766/selfupdate -Method Post -Body (@{ sha = $sha } | ConvertTo-Json) -ContentType 'application/json' -UseBasicParsing -TimeoutSec 5 | Out-Null
         }
     }
     $ok = $false
