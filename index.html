@@ -403,6 +403,19 @@
   .th .stop { position:absolute !important; top:6px; right:30px; z-index:2; border:0; background:none; color:inherit; opacity:0; cursor:pointer; font-size:11px; transition:opacity .2s; }
   .th.laeuft:not(.dev):hover .stop { opacity:.7; }
   .th .tt { padding-right:18px; }
+  /* Mini-Hologramm Entwickler */
+  .th.devmini { width:236px; padding:9px 12px 9px; border-radius:14px; }
+  .devmini .tt { font-size:10px; }
+  .devmini .ring { width:11px; height:11px; }
+  .devmini .dr { margin-top:7px; } .devmini .dr + .dr { padding-top:7px; border-top:1px solid color-mix(in srgb, var(--hl) 22%, transparent); }
+  .devmini .da { font-size:12px; line-height:1.3; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .devmini .ds { font-size:10.5px; opacity:.72; margin-top:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .devmini .pw { margin-top:5px; }
+  .devmini .bar { height:4px; border-radius:3px; }
+  .devmini .bar i { animation:none; border-radius:3px; transition:width .8s cubic-bezier(.2,.8,.2,1); background:linear-gradient(90deg, rgb(var(--c2)), var(--hl)); }
+  .devmini .dr.fertig .bar i { background:#5dffb0; box-shadow:0 0 8px #5dffb0; } .devmini .dr.fertig .pz, .devmini .dr.fertig .de { color:#5dffb0; text-shadow:0 0 8px #5dffb0; }
+  .devmini .dr.fehler .bar i, .devmini .dr.abgebrochen .bar i { background:#ff6b6b; }
+  .devmini .de { font-size:10px; letter-spacing:.04em; opacity:.8; margin-top:3px; font-variant-numeric:tabular-nums; }
   .th.ziehen { transition:none; }
   .th.wisch { opacity:0 !important; transition:opacity .35s, transform .35s; }
   .karte.weg { opacity:0; transform:scale(.92) rotateX(20deg); transition:opacity .45s, transform .45s; }
@@ -2099,7 +2112,9 @@ function fmtZeit(s) { s = Math.max(0, s | 0); return s < 60 ? s + 's' : Math.flo
 function renderTasks(list) {
   const box = $('tasks'); if (!box) return;
   const seen = new Set();
+  const devs = [];
   for (const t of list || []) {
+    if (t.art === 'entwickler') { devs.push(t); continue; }   // Entwickler → gemeinsames Mini-Hologramm
     seen.add(t.id);
     let el = taskEls[t.id];
     if (!el) {
@@ -2138,6 +2153,49 @@ function renderTasks(list) {
     if (t.status !== 'laeuft' && t.jetzt - t.ende > 45) { el._weg = true; el.classList.add('weg'); }
   }
   for (const id of Object.keys(taskEls)) if (!seen.has(id)) { const el = taskEls[id]; el.classList.add('weg'); setTimeout(() => el.remove(), 600); delete taskEls[id]; }
+  renderDevMini(box, devs);
+}
+/* Mini-Hologramm für laufende Entwickler-Aufträge: alle untereinander, live, schließt sich nach dem Fertig selbst */
+const devMini = { el:null, rows:{}, zu:new Set() };
+function renderDevMini(box, devs) {
+  const uhr = s => new Date(s * 1000).toLocaleTimeString('de-DE', { hour:'2-digit', minute:'2-digit' });
+  const key = t => t.id + ':' + Math.round(t.start || 0);
+  // sichtbar: laufende sowie gerade beendete (Fertig kurz zeigen, dann weg); mit X geschlossene bleiben zu
+  const zeigen = devs.filter(t => !devMini.zu.has(key(t)) && (t.status === 'laeuft' || t.jetzt - t.ende < (t.status === 'fertig' ? 7 : 10)));
+  let m = devMini.el;
+  if (!zeigen.length) {
+    if (m && !m._weg) { m._weg = true; m.classList.add('weg'); setTimeout(() => { if (m._weg) { m.remove(); if (devMini.el === m) { devMini.el = null; devMini.rows = {}; } } }, 450); }
+    return;
+  }
+  if (!m || m._weg) {
+    if (m) m.remove();
+    m = devMini.el = document.createElement('div'); devMini.rows = {};
+    m.className = 'th dev devmini';
+    m.innerHTML = '<div class="tt"><span class="ring"></span><span class="nm">⚙ Entwickler</span></div><div class="dl"></div><button class="x" title="Mini-Hologramm schließen">✕</button>';
+    m.querySelector('.x').onclick = e => { e.stopPropagation(); (m._keys || []).forEach(k => devMini.zu.add(k)); SFX.close(); m._weg = true;
+      m.classList.add('weg'); setTimeout(() => { m.remove(); if (devMini.el === m) { devMini.el = null; devMini.rows = {}; } }, 450); };
+    box.prepend(m); SFX.holo(); ripple(.4);
+  }
+  m._keys = zeigen.map(key);
+  m.classList.toggle('fertig', zeigen.every(t => t.status === 'fertig'));
+  const dl = m.querySelector('.dl'), da = new Set();
+  for (const t of zeigen) {
+    const k = key(t); da.add(k);
+    let r = devMini.rows[k];
+    if (!r) { r = devMini.rows[k] = document.createElement('div'); r.className = 'dr';
+      r.innerHTML = '<div class="da"></div><div class="ds"></div><div class="pw"><div class="bar"><i></i></div><b class="pz"></b></div><div class="de"></div>'; dl.appendChild(r); }
+    if (r._status && r._status !== t.status && t.status === 'fertig') { SFX.done(); burst(24); }
+    r._status = t.status; r.className = 'dr ' + t.status;
+    const pz = t.status === 'fertig' ? 100 : (typeof t.prozent === 'number' ? t.prozent : 0);
+    r.querySelector('.da').textContent = (/projekt/.test(t.id) ? 'Projekt: ' : '') + (t.auftrag || t.titel || 'Auftrag');
+    r.querySelector('.ds').textContent = t.status === 'laeuft' ? (t.phase || t.schritt || 'Arbeitet …') : t.status === 'fertig' ? 'Fertig' : (t.ergebnis || 'Abgebrochen');
+    r.querySelector('.bar i').style.width = pz + '%';
+    r.querySelector('.pz').textContent = t.status === 'laeuft' ? pz + ' %' : t.status === 'fertig' ? '✓' : '✕';
+    r.querySelector('.de').textContent = t.status === 'laeuft'
+      ? (t.fertig_ca ? 'noch ~' + Math.max(1, Math.round((t.fertig_ca - t.jetzt) / 60)) + ' min · fertig ca. ' + uhr(t.fertig_ca) : 'läuft seit ' + fmtZeit(t.laeuft_seit))
+      : t.status === 'fertig' ? 'Fertig um ' + uhr(t.ende || t.jetzt) : 'Beendet um ' + uhr(t.ende || t.jetzt);
+  }
+  for (const k of Object.keys(devMini.rows)) if (!da.has(k)) { devMini.rows[k].remove(); delete devMini.rows[k]; }
 }
 /* geschlossene Hologramme bleiben zu (auch nach Neustart) – in den Einstellungen wieder einschaltbar */
 let holoGeschlossen = {};
