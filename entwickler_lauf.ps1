@@ -75,8 +75,8 @@ Regeln:
 New-Item -ItemType Directory -Force $ordner | Out-Null
 $env:ORB_RUN = '1'; $env:ORB_BG = '1'   # Antworten des Entwicklers nicht als ORB-Gespräch vorlesen
 foreach ($k in 'ANTHROPIC_API_KEY','ANTHROPIC_AUTH_TOKEN','ANTHROPIC_BASE_URL') { Remove-Item "Env:$k" -ErrorAction SilentlyContinue }
-$claude = (Get-Command claude -ErrorAction SilentlyContinue).Source
-if (-not $claude) { $claude = "$env:USERPROFILE\.local\bin\claude.exe" }
+$claude = "$env:USERPROFILE\.local\bin\claude.exe"   # immer Larsens Claude Code (nicht die WinGet-Version)
+if (-not (Test-Path $claude)) { $claude = (Get-Command claude -ErrorAction SilentlyContinue).Source }
 Set-Location $ordner
 "=== $(Get-Date -Format 'dd.MM.yyyy HH:mm') Auftrag: $auftrag" | Add-Content $log -Encoding UTF8
 $t0 = Get-Date

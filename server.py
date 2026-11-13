@@ -68,7 +68,7 @@ DEFAULT_CFG = {
 }
 # Damit ORB immer dein Claude-Code-Login (Max-Abo) nutzt und nie einen API-Schlüssel
 CLAUDE_ENV_DROP = ("ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "ANTHROPIC_BASE_URL")
-VERSION = "70"
+VERSION = "71"
 ORB_UI = ("Deine Oberfläche (die Larsen gerade sieht): in der Mitte du als flüssige leuchtende Kugel mit Tropfen, "
           "Orbit-Ringen und Sternenhimmel; links eine Uhr und darunter der Gesprächsverlauf mit Eingabefeld; rechts "
           "Karten für System (CPU, RAM, Akku), Wetter mit Stundenvorschau, Aktivität (was du gerade tust) und Vorschläge; "
@@ -977,7 +977,9 @@ def try_local(text):
 
 # ---------- Gespräch mit Claude ----------
 def find_claude():
-    return shutil.which("claude") or os.path.join(os.path.expanduser("~"), ".local", "bin", "claude.exe")
+    """Immer Larsens Claude Code unter %USERPROFILE%/.local/bin – nicht eine andere installierte Version (z. B. WinGet)."""
+    eigen = os.path.join(os.path.expanduser("~"), ".local", "bin", "claude.exe")
+    return eigen if os.path.isfile(eigen) else (shutil.which("claude") or eigen)
 
 
 class Brain:
