@@ -631,6 +631,7 @@
     <div class="row col"><div class="lbl">Schnips-Empfindlichkeit<span class="v" id="v_sempf"></span></div><input type="range" id="s_sempf" min="1" max="10" step="1"></div>
     <div class="row col"><button class="btn" id="snaptest">Schnipsen testen</button><p class="note" id="snap_test" style="margin:6px 0 0">Startet einen 15-Sekunden-Test – ORB verschwindet dabei nicht.</p></div>
     <div class="row">Dauerhaft zuhören bis „Stopp“<input type="checkbox" class="sw" id="s_dauer"></div>
+    <div class="row col"><div class="lbl">Sprechpause bis Satzende<span class="v" id="v_pause"></span></div><input type="range" id="s_pause" min="1" max="4" step="0.1"></div>
     <div class="row">Mit „Jarvis“ unterbrechen<input type="checkbox" class="sw" id="s_unterbrechen"></div>
     <div class="row">Nur auf „Jarvis“ reagieren<input type="checkbox" class="sw" id="s_nurjarvis"></div>
     <div class="row">Bei Musik nur auf „Jarvis“ hören<input type="checkbox" class="sw" id="s_musik"></div>
@@ -714,7 +715,7 @@ const PAL = () => [BASE, BASE2, BASE3, BASE4];
 const pcol = (i, a, k = 0) => `rgba(${rgb(mix(PAL()[i % 4], [255,255,255], k))},${a})`;
 let cfg = { farbe:'rot', effekte:'mittel', untertitel:true, lautstaerke:160, sfx:true, sfxlaut:60, ambient:false,
   steuerung:'wort', schnipsen:true, wakeword:'Jarvis', stimme:'', tempo:'+15%', hoehe:'+0Hz', laenge:'kurz', rechte:'auto', tempo_claude:'low', ordner:'',
-  schlaf_schliessen:true, bildschirm:false, klatschen:true, dauerzuhoeren:true, unterbrechen:true, nur_jarvis:true, musik_schutz:true, ducking:true, empfindlichkeit:6, schnips_empf:6, begruessung:true, ort:'', name:'', schlafen:5, vollbild:true, autostart:true };
+  schlaf_schliessen:true, bildschirm:false, klatschen:true, dauerzuhoeren:true, unterbrechen:true, nur_jarvis:true, musik_schutz:true, ducking:true, empfindlichkeit:6, schnips_empf:6, satzpause:2, begruessung:true, ort:'', name:'', schlafen:5, vollbild:true, autostart:true };
 const S = { mode:'idle', seq:-1, busy:false, energy:.12, holo:0, think:0, speakVis:0, listenVis:0, level:0, warn:0, boot:0, sleep:false, sleepVis:0, px:0, py:0 };
 const mix = (a, b, t) => a.map((v, i) => Math.round(v + (b[i] - v) * t));
 const rgb = c => `${c[0]},${c[1]},${c[2]}`;
@@ -1446,11 +1447,12 @@ function convoResult(e) {
 
 /* ---------- Satzpuffer: erst nach einer echten Sprechpause abschicken ---------- */
 // Die Erkennung schließt Teilstücke schon bei kurzen Atempausen ab – die werden hier gesammelt.
-const PAUSE_MS = 1200, PAUSE_LANG_MS = 2700;
-const HAENGT = /(?<![a-zäöüß])(und|oder|aber|sondern|weil|dass|ob|wenn|als|der|die|den|dem|des|ein|eine[nmrs]?|mein(e[nmrs]?)?|dein(e[nmrs]?)?|unser(e[nmrs]?)?|mit|von|vom|zum|zur|für|im|am|beim|bei|über|unter|bis|gegen|ohne|ähm?|äh|ehm|hm+|also)[\s,.!?…]*$/i;
+// Sprechpause bis zum Satzende ist einstellbar (Sekunden); hängende Sätze bekommen deutlich mehr Zeit.
+const PAUSE_MS = () => Math.round(Math.min(4, Math.max(1, +cfg.satzpause || 2)) * 1000), PAUSE_LANG_MS = () => PAUSE_MS() + 2000, HALTE_MS = 4000;
+const HAENGT = /(?<![a-zäöüß])(und|oder|aber|sondern|weil|dass|ob|wenn|als|der|die|den|dem|des|ein|eine[nmrs]?|mein(e[nmrs]?)?|dein(e[nmrs]?)?|unser(e[nmrs]?)?|mit|von|vom|zum|zur|für|im|am|beim|bei|über|unter|bis|gegen|ohne|damit|nämlich|irgendwie|ähm?|äh|ehm|hm+|also|(ich|du|wir|man) (kann|kannst|können|könnte|könntest|will|willst|wollen|möchte|möchtest|würde|würdest|muss|musst|müssen|soll|sollst|darf|wollte|brauche|brauchst|hätte|hab|habe|hast|bin|bist))[\s,.!?…]*$/i;
 const FUELLWORT = /^(äh|ähm|ehm|hm+|mhm|also|so|na)$/i;
-const sb = { t:'', conf:[], timer:0, t0:0, name:false, lang:false, cut:false };
-function sbReset() { clearTimeout(sb.timer); sb.t = ''; sb.conf = []; sb.t0 = 0; sb.name = false; sb.lang = false; sb.cut = false; }
+const sb = { t:'', conf:[], timer:0, t0:0, name:false, lang:false, cut:false, halt:false };
+function sbReset() { clearTimeout(sb.timer); sb.t = ''; sb.conf = []; sb.t0 = 0; sb.name = false; sb.lang = false; sb.cut = false; sb.halt = false; }
 function sbFinal(t, conf) {
   const named = NAME_RE().test(t);
   if (!sb.t) {
@@ -1463,7 +1465,7 @@ function sbFinal(t, conf) {
   sbAdd(t, conf);
 }
 function sbAdd(t, conf) {
-  sb.t = (sb.t + ' ' + t).trim(); if (conf > 0) sb.conf.push(conf);
+  sb.t = (sb.t + ' ' + t).trim(); if (conf > 0) sb.conf.push(conf); sb.halt = false;   // Fortsetzung → angehängt, Satz neu bewerten
   convoLastSpeech = performance.now(); liveMsg(sb.t); sbWait();
 }
 function sbWait() {
@@ -1472,10 +1474,15 @@ function sbWait() {
   const rest = sb.t.replace(NAME_RE(), '').replace(/[\s,.!?:;]+/g, '');
   // Satz hängt („… und“, „spiel den“) oder nur „Jarvis“ gesagt → länger auf den Rest warten
   sb.lang = HAENGT.test(sb.t) || rest.length <= 2;
-  sb.timer = setTimeout(sbFlush, sb.lang ? PAUSE_LANG_MS : PAUSE_MS);
+  sb.timer = setTimeout(sbFlush, sb.halt ? HALTE_MS : sb.lang ? PAUSE_LANG_MS() : PAUSE_MS());
 }
 function sbFlush() {
   clearTimeout(sb.timer);
+  // Satzfragment („ich kann“, „… weil“) nicht abschicken, sondern noch einmal auf die Fortsetzung warten
+  const kern = sb.t.replace(NAME_RE(), ' ').replace(/[.!?,…]+/g, ' ').trim();
+  if (!sb.halt && convoRec && kern.replace(/\s+/g, '').length > 2 && HAENGT.test(kern)) {
+    sb.halt = true; liveMsg(sb.t + ' …'); sb.timer = setTimeout(sbFlush, HALTE_MS); return;
+  }
   const t = sb.t, cut = sb.cut, named = sb.name || NAME_RE().test(t), conf = sb.conf.length ? sb.conf.reduce((a, b) => a + b, 0) / sb.conf.length : 0;
   const pk = sb.t0 ? pegelSeit(sb.t0) : 0;
   sbReset();
@@ -1492,6 +1499,8 @@ function handleConvo(t, info = {}) {
     if (vorne || info.cut) t = t.slice(m.index + m[0].length).replace(/^[\s,.!?:;]+/, '');   // „Jarvis, …“ → nur die Frage (beim Unterbrechen: eigene Stimme davor weg)
     if (t.replace(/[.!?,\s]+/g, '').length <= 2) { liveMsg(null); followUntil = performance.now() + FOLLOW_MS; SFX.listenOn(); ripple(.6); hint('Ich höre …', FOLLOW_MS); return; }
   } else if (!info.named && pegelN >= 3 && info.pk > 0 && info.pk < pegelNah * .3) { liveMsg(null); return; }   // viel leiser als Larsen → Hintergrund
+  if (fragRest.t && performance.now() < fragRest.bis && !t.toLowerCase().startsWith(fragRest.t.toLowerCase())) t = fragRest.t + ' ' + t;   // Fortsetzung des abgebrochenen Satzes anhängen
+  fragRest.t = '';
   const kern = t.replace(/[.!?,…]+/g, ' ').trim(), worte = kern.split(/\s+/).filter(Boolean);
   if (!worte.length || worte.every(w => FUELLWORT.test(w))) { liveMsg(null); return; }   // nur „äh“, „hm“
   // abgeschnitten oder sehr unsicher erkannt → nachfragen statt Unsinn abschicken
@@ -1499,7 +1508,9 @@ function handleConvo(t, info = {}) {
   followUntil = 0; killConvoRec(); askGap = performance.now() + 1800; ask(t);
   if (!cfg.dauerzuhoeren) stopConvo(true);   // ohne Dauerzuhören: eine Frage, dann wieder nur auf „Jarvis“
 }
+let fragRest = { t:'', bis:0 };
 function nachfragen(t) {
+  fragRest = { t, bis: performance.now() + FOLLOW_MS * 1.5 };
   liveMsg(null); SFX.listenOn(); ripple(.6);
   addMsg('me', t + ' …');
   const satz = 'Ich habe nur „' + t + '“ verstanden – sag es bitte noch mal.';
@@ -2534,12 +2545,12 @@ function syncSettingsUI() {
   const set = (id, v) => { const el = $(id); if (el && document.activeElement !== el) el.value = v; };
   set('s_stimme', cfg.stimme); set('s_tempo', parseInt(cfg.tempo) || 0); set('s_hoehe', parseInt(cfg.hoehe) || 0);
   set('s_laut', cfg.lautstaerke); set('s_sfxl', cfg.sfxlaut); set('s_ordner', cfg.ordner); set('s_wake', cfg.wakeword);
-  set('s_empf', cfg.empfindlichkeit); set('s_sempf', cfg.schnips_empf); set('s_schlaf', String(cfg.schlafen)); set('s_name', cfg.name); set('s_ort', cfg.ort);
+  set('s_empf', cfg.empfindlichkeit); set('s_sempf', cfg.schnips_empf); set('s_pause', +cfg.satzpause || 2); set('s_schlaf', String(cfg.schlafen)); set('s_name', cfg.name); set('s_ort', cfg.ort);
   for (const [id, key] of Object.entries(CHK)) $(id).checked = !!cfg[key];
   $('s_jarvis').checked = cfg.steuerung === 'wort';
   $('s_voice').checked = voiceOn;
   $('v_tempo').textContent = cfg.tempo; $('v_hoehe').textContent = cfg.hoehe; $('v_laut').textContent = cfg.lautstaerke + ' %';
-  $('v_sfxl').textContent = cfg.sfxlaut + ' %'; $('v_empf').textContent = cfg.empfindlichkeit; $('v_sempf').textContent = cfg.schnips_empf;
+  $('v_sfxl').textContent = cfg.sfxlaut + ' %'; $('v_empf').textContent = cfg.empfindlichkeit; $('v_sempf').textContent = cfg.schnips_empf; $('v_pause').textContent = (+cfg.satzpause || 2).toFixed(1).replace('.', ',') + ' s';
   document.querySelectorAll('#set input[type=range]').forEach(fillRange);
   for (const [id, key] of Object.entries(segs)) $(id).querySelectorAll('button').forEach(b => b.classList.toggle('on', b.dataset.v === cfg[key]));
   document.querySelectorAll('.swc').forEach(el => el.classList.toggle('on', el.dataset.k === cfg.farbe));
@@ -2549,6 +2560,7 @@ $('s_voice').onchange = e => setVoice(e.target.checked);
 $('s_jarvis').onchange = e => { saveCfg({ steuerung:e.target.checked ? 'wort' : 'taste' }); e.target.checked ? SFX.on() : SFX.off(); };
 $('s_empf').oninput = e => saveCfg({ empfindlichkeit:+e.target.value });
 $('s_sempf').oninput = e => saveCfg({ schnips_empf:+e.target.value });
+$('s_pause').oninput = e => saveCfg({ satzpause:+e.target.value });
 $('snaptest').onclick = () => {
   snapTest = performance.now() + 15000; ensureMic().then(startClap).catch(() => {});
   const el = $('snap_test'); el.className = 'note'; el.textContent = 'Jetzt schnipsen … (15 Sekunden)';
