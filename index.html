@@ -506,6 +506,8 @@ const lite = (a, k = .55) => `rgba(${rgb(mix(cur(), [255,255,255], k))},${a})`;
 const Q = () => ({ hoch:2, mittel:1, niedrig:0 }[cfg.effekte] ?? 1);
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;' }[c]));
 const hhmm = d => d.toLocaleTimeString('de-DE', { hour:'2-digit', minute:'2-digit' });
+let autoSleepCheck = false;
+['pointerdown', 'keydown', 'wheel'].forEach(ev => addEventListener(ev, () => { lastAct = performance.now(); }, { capture:true, passive:true }));   // Benutzen hält wach
 let lastAct = performance.now(), listenAfterSpeech = false, wasSpeaking = false;
 
 function applyCfg() {
@@ -858,7 +860,7 @@ function startClap() {
   micSrc.connect(clapTimer); clapTimer.connect(mute); mute.connect(ac.destination);
   clapTimer.onaudioprocess = e => { clapBuf = e.inputBuffer.getChannelData(0); clapTick(); };
 }
-let fBuf = null, snapT = 0, clapPk = [];
+let fBuf = null, snapT = 0, snapRms = 0, clapPk = [], slowRms = 1;   // slowRms: Lautstärke der letzten ~1–2 s
 // Schnipsen klingt hell (Energie um 2–5 kHz), Klatschen voll (viel Energie unter 1,5 kHz)
 function snapRatio() {
   const pw = f => { const w = 2 * Math.cos(2 * Math.PI * f / ac.sampleRate); let a = 0, b = 0;
@@ -871,16 +873,16 @@ function snapRatio() {
 function onSnap() {
   if (S.sleep) return;
   SFX.close(); ripple(.8); hint('Bis gleich · zweimal klatschen holt mich zurück', 2500);
-  goSleep(true); toBack(1200);
+  goSleep(true, 'Schnipsen erkannt'); toBack(1200, 'Schnipsen erkannt');
 }
 // In den Hintergrund: mit „Jarvis“ nur ausblenden (Seite hört weiter zu), sonst Fenster schließen (spart ~800 MB)
 let verborgen = false;
-function toBack(ms) {
+function toBack(ms, grund = 'unbekannt') {
   clearTimeout(hideTimer);
   hideTimer = setTimeout(() => {
     if (!S.sleep) return;
     const keep = cfg.steuerung === 'wort'; verborgen = keep;
-    fetch('/hide', { method:'POST', headers:{ 'Content-Type':'application/json' }, body:JSON.stringify({ keep }) }).catch(() => {});
+    fetch('/hide', { method:'POST', headers:{ 'Content-Type':'application/json' }, body:JSON.stringify({ keep, grund }) }).catch(() => {});
   }, ms);
 }
 function clapTick() {
@@ -890,18 +892,22 @@ function clapTick() {
   const rms = Math.sqrt(s / clapBuf.length), now = performance.now();
   const hist = clapTick.h || (clapTick.h = []); const pre = hist.length >= 14 ? hist.slice(-14, -2).reduce((a, b) => a + b, 0) / 12 : 1;   // ~30–150 ms vorher
   hist.push(rms); if (hist.length > 16) hist.shift();
+  const slow = slowRms; slowRms = slowRms * .99 + rms * .01;
+  // Nach einem Schnipser muss es still bleiben – Hämmern, Gespräche, Klicken gehen weiter → kein Schnipser
+  if (snapT && now - snapT > 150 && rms > snapRms * .25) snapT = 0;
   const ownSpeak = speakingNow() || now < lastSfx + 500;   // eigene Stimme/Sounds
   const own = ownSpeak || listening || convoRec;
   const mouse = now - lastMouse < 400;   // Klickgeräusch der Maus ist kein Klatschen
   if (cand) {
     if (now - cand.t >= 75) {
       const knall = rms < cand.rms * (cand.snap ? .5 : .35);
-      if (knall && cand.snap && !ownSpeak && !mouse && cfg.schnipsen && !S.sleep) {
-        // Schnipser: kurz warten – kommt kein zweiter Knall, verschwindet ORB
-        const t = cand.t; snapT = t; claps = [];
+      if (knall && cand.snap && cand.ruhig && !ownSpeak && !mouse && cfg.schnipsen && !S.sleep && !S.busy) {
+        // Schnipser: kurz warten – bleibt es still und kommt kein zweiter Knall, verschwindet ORB
+        const t = cand.t; snapT = t; snapRms = cand.rms; claps = [];
         setTimeout(() => { if (snapT !== t || lastClap > t + 50) return;
-          // nicht beim Tippen oder Klicken (klingt ähnlich hell)
-          fetch('/mouse').then(r => r.json()).then(j => { if (!(j.eingabe < .6) && !(j.ago < .6)) onSnap(); }).catch(() => onSnap()); }, 900);
+          snapT = 0;
+          // nicht beim Tippen oder Klicken (klingt ähnlich hell); im Zweifel bleibt ORB da
+          fetch('/mouse').then(r => r.json()).then(j => { if (j.eingabe > 1.5 && j.ago > 1.5) onSnap(); }).catch(() => {}); }, 900);
       }
       else if (knall && !cand.snap && !own && !mouse && cfg.klatschen) { snapT = 0; clapPk.push([cand.t, cand.pk]); checkSysMouse(cand.t); }
       else if (!knall) claps = [];   // Dauergeräusch statt Knall
@@ -917,8 +923,9 @@ function clapTick() {
       const snapHf = 2 - 2 * Math.cos(2 * Math.PI * 5500 / ac.sampleRate);   // Schwerpunkt über ~5,5 kHz
       if (window.ORB_DEBUG) console.log('Knall', 'pk', pk.toFixed(3), 'hf', hf.toFixed(2), 'crest', (pk / rms).toFixed(1));
       const still = pre < rms * .3;   // davor (30–150 ms) war es deutlich leiser – bei Sprache fast nie
-      if (hf > snapHf && pk > Math.max(thr * 1.5, .02) && pk / rms < 16 && pre < rms * .4) cand = { t:now, rms, pk, snap:true };
-      else if (hf < hfMax && pk / rms < 18 && still) cand = { t:now, rms, pk, snap:snapRatio() > 1.4 };
+      const ruhig = slow < rms * .08 && pre < rms * .25;   // Schnipsen nur aus echter Stille (nicht bei Gesprächen/Werkzeug)
+      if (hf > snapHf && pk > Math.max(thr * 1.5, .02) && pk / rms < 16 && pre < rms * .4) cand = { t:now, rms, pk, snap:true, ruhig };
+      else if (hf < hfMax && pk / rms < 18 && still) cand = { t:now, rms, pk, snap:snapRatio() > 1.4, ruhig };
     }
   }
   floorRms = rms < floorRms ? rms : floorRms * .995 + Math.min(rms, .2) * .005;   // Stille sofort übernehmen
@@ -949,17 +956,17 @@ function onDoubleClap() {
 const startListening = () => cfg.dauerzuhoeren ? startConvo() : listenOnce();
 
 /* ---------- Schlafen & Aufwachen ---------- */
-function goSleep(silent) {
+function goSleep(silent, grund = 'unbekannt') {
   if (S.sleep) return;
   S.sleep = true; document.body.classList.add('sleeping');
   stopAudio(); stopWake(); stopConvo(true); killBarge(); if (listening && rec) { pttEnd = false; rec.abort(); }
   if (!silent) SFX.sleep();
-  caption(''); fetch('/sleep', { method:'POST' }).catch(() => {});
+  caption(''); fetch('/sleep', { method:'POST', headers:{ 'Content-Type':'application/json' }, body:JSON.stringify({ grund }) }).catch(() => {});
   hint(cfg.klatschen ? 'Schlafmodus · zweimal klatschen' + (cfg.steuerung === 'wort' ? ' oder „' + (cfg.wakeword || 'Jarvis') + '“' : '') : cfg.steuerung === 'wort' ? 'Schlafmodus · „' + (cfg.wakeword || 'Jarvis') + '“ weckt mich' : 'Schlafmodus · Leertaste', 4000);
   if (cfg.steuerung === 'wort') setTimeout(startWake, 500);   // Aktivierungswort weckt auch aus dem Schlaf
   // Fenster nach kurzer Zeit wegräumen – im Hintergrund wird weiter auf Klatschen (und „Jarvis“) gelauscht
   clearTimeout(hideTimer);
-  if (cfg.schlaf_schliessen && (cfg.klatschen || cfg.steuerung === 'wort')) toBack(45000);
+  if (cfg.schlaf_schliessen && (cfg.klatschen || cfg.steuerung === 'wort')) toBack(45000, 'eingeschlafen (' + grund + ')');
 }
 let hideTimer;
 function wake(frage) {
@@ -983,7 +990,7 @@ async function startup() {
   const leise = location.hash === '#schlaf';   // unsichtbar gestartet (Autostart mit „Jarvis“)
   if (location.hash) window.history.replaceState(null, '', location.pathname);
   await ensureMic(); startClap();
-  if (leise) { verborgen = true; goSleep(true); return; }
+  if (leise) { verborgen = true; goSleep(true, 'unsichtbar gestartet (Autostart/Update)'); return; }
   S.sleep = true; wake();   // Fenster offen = wach. Schlafen = Fenster zu (Klatschen weckt über den Hintergrund-Lauscher)
 }
 
@@ -1002,15 +1009,15 @@ async function ask(text) {
   // „Schließ dich komplett“ → ORB ganz beenden (auch der Hintergrund-Lauscher ist dann aus)
   if (/^((orb|jarvis),?\s*)?(schlie(ß|ss)e? dich (komplett|ganz|vollständig)|beende dich( komplett| ganz)?|(komplett|ganz) (beenden|schlie(ß|ss)en)|mach dich (komplett|ganz) aus)$/i.test(t0)) {
     addMsg('me', text); SFX.sleep(); hint('ORB wird komplett beendet', 2000);
-    setTimeout(() => { fetch('/quit', { method:'POST' }).catch(() => {}); setTimeout(() => window.close(), 300); }, 900);
+    setTimeout(() => { fetch('/quit', { method:'POST', headers:{ 'Content-Type':'application/json' }, body:JSON.stringify({ grund:'Sprachbefehl „' + t0 + '“' }) }).catch(() => {}); setTimeout(() => window.close(), 300); }, 900);
     return;
   }
   // „Schließ dich“ → nur das Fenster zu, ORB wartet im Hintergrund weiter auf Klatschen
   if (/^((orb|jarvis),?\s*)?(schlie(ß|ss)e? dich|geh in den hintergrund|versteck dich|minimier(e)? dich|fenster zu)$/i.test(t0)) {
-    addMsg('me', text); goSleep(true); SFX.sleep(); toBack(700);
+    addMsg('me', text); goSleep(true, 'Sprachbefehl „' + t0 + '“'); SFX.sleep(); toBack(700, 'Sprachbefehl „' + t0 + '“');
     return;
   }
-  if (/^((orb|jarvis),?\s*)?(schlaf|geh schlafen|gute nacht|ruhemodus|schlafmodus)\b/i.test(text)) { addMsg('me', text); return goSleep(); }
+  if (/^((orb|jarvis),?\s*)?(schlaf|geh schlafen|gute nacht|ruhemodus|schlafmodus)\b/i.test(text)) { addMsg('me', text); return goSleep(false, 'Sprachbefehl „' + t0 + '“'); }
   if (STOP_RE.test(text.replace(/[.!?,]+$/g, ''))) { stopAudio(); return convo ? stopConvo() : hint('Okay'); }
   liveMsg(null); addMsg('me', text); stopAudio(); SFX.send(); ripple(1.1); caption('');
   try {
@@ -1534,7 +1541,14 @@ function frame(now) {
   }
   if (bargeWanted()) bargeListen(); else if (bargeRec) killBarge();
   if (speaking || listening || S.busy || convo) lastAct = now;
-  if (!S.sleep && cfg.klatschen && +cfg.schlafen > 0 && now - lastAct > cfg.schlafen * 60000) goSleep();
+  if (!S.sleep && cfg.klatschen && +cfg.schlafen > 0 && now - lastAct > cfg.schlafen * 60000 && !autoSleepCheck) {
+    // nur einschlafen, wenn wirklich niemand ORB benutzt: Fenster im Vordergrund + Eingaben am PC = Larsen ist da
+    autoSleepCheck = true;
+    fetch('/mouse').then(r => r.json()).then(j => {
+      if (!document.hidden && document.hasFocus() && j.eingabe < 120) lastAct = performance.now();
+      else if (!S.sleep && performance.now() - lastAct > cfg.schlafen * 60000) goSleep(false, 'automatisch nach ' + cfg.schlafen + ' Min. Ruhe');
+    }).catch(() => { lastAct = performance.now(); }).finally(() => { autoSleepCheck = false; });
+  }
 
   let lv = 0;
   if (speaking && audioOk() && ac.currentTime < endTime) {
@@ -1863,9 +1877,9 @@ $('up_btn').onclick = async () => {
   } catch (e) { st.textContent = 'Fehler'; st.className = 'err'; }
   b.disabled = false; b.textContent = '↻ Nach Updates suchen';
 };
-$('schlafjetzt').onclick = () => { toggleSettings(false); goSleep(); };
+$('schlafjetzt').onclick = () => { toggleSettings(false); goSleep(false, 'Knopf „Jetzt schlafen“'); };
 $('resetLayout').onclick = () => { try { localStorage.removeItem('orbLayout'); } catch (e) {} location.reload(); };
-$('beenden').onclick = async () => { SFX.sleep(); await fetch('/quit', { method:'POST' }).catch(() => {}); setTimeout(() => window.close(), 300); };
+$('beenden').onclick = async () => { SFX.sleep(); await fetch('/quit', { method:'POST', headers:{ 'Content-Type':'application/json' }, body:JSON.stringify({ grund:'Knopf „ORB ganz beenden“' }) }).catch(() => {}); setTimeout(() => window.close(), 300); };
 $('probe').onclick = async () => {
   initAudio(); if (!audioOk()) return;
   $('probe').textContent = '… lade';

@@ -155,6 +155,21 @@ def hide_window(keep=False):
         print("Fenster schließen:", e)
     server.LAST_POLL[0] = 0
     _win["opened"] = 0
+    _win["closed"] = time.time()
+
+
+def window_watch():
+    """Fragt das Fenster plötzlich nicht mehr nach (ohne dass ORB es geschlossen hat), Grund protokollieren."""
+    gemeldet = False
+    while True:
+        time.sleep(3)
+        lp = server.LAST_POLL[0]
+        if lp and time.time() - lp > 12 and lp > _win.get("closed", 0) + 3:
+            if not gemeldet:
+                server.log_close("Fenster meldet sich nicht mehr (abgestürzt oder von Hand geschlossen)")
+                gemeldet = True
+        else:
+            gemeldet = False
 
 
 def snap_ratio(x, sr):
@@ -275,7 +290,7 @@ def restart(update=False):
     else:
         subprocess.Popen([sys.executable, os.path.abspath(__file__), "--neustart"], creationflags=0x00000008 | 0x00000200)
     server.BRAIN.kill()
-    os._exit(0)
+    server.clean_exit("Neustart" + (" für Update" if update else " (Update eingespielt)"))
 
 
 def github_head():
@@ -432,6 +447,7 @@ def main():
     threading.Thread(target=update_loop, daemon=True).start()
     threading.Thread(target=announce_update, daemon=True).start()
     threading.Thread(target=backup_jarvis, daemon=True).start()
+    threading.Thread(target=window_watch, daemon=True).start()
     if not BG and not RESTART:
         show()
     elif BG and cfg.get("steuerung", "wort") == "wort":

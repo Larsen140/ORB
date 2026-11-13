@@ -68,7 +68,7 @@ DEFAULT_CFG = {
 }
 # Damit ORB immer dein Claude-Code-Login (Max-Abo) nutzt und nie einen API-Schlüssel
 CLAUDE_ENV_DROP = ("ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "ANTHROPIC_BASE_URL")
-VERSION = "44"
+VERSION = "45"
 ORB_UI = ("Deine Oberfläche (die Larsen gerade sieht): in der Mitte du als flüssige leuchtende Kugel mit Tropfen, "
           "Orbit-Ringen und Sternenhimmel; links eine Uhr und darunter der Gesprächsverlauf mit Eingabefeld; rechts "
           "Karten für System (CPU, RAM, Akku), Wetter mit Stundenvorschau, Aktivität (was du gerade tust) und Vorschläge; "
@@ -126,6 +126,58 @@ ON_UPDATE = [None]  # neuesten Stand von GitHub holen und neu starten
 ON_CHECK = [None]   # liefert den neueren GitHub-Stand (sha) oder None, wenn ORB aktuell ist
 
 _mouse = {"t": 0.0, "on": False}
+CLOSE_LOG = os.path.join(HOME, "schliessen.log")   # warum ORB sich geschlossen/ausgeblendet hat (Grund + Uhrzeit)
+RUN_MARK = os.path.join(HOME, "laeuft.txt")        # fehlt beim sauberen Beenden – liegt er beim Start noch da, war es ein Absturz
+
+
+def log_close(grund):
+    """Grund fürs Schließen/Ausblenden mit Uhrzeit protokollieren (Datei bleibt klein)."""
+    if os.environ.get("ORB_PORT"):
+        return   # Test-Server
+    try:
+        os.makedirs(HOME, exist_ok=True)
+        if os.path.exists(CLOSE_LOG) and os.path.getsize(CLOSE_LOG) > 200000:
+            with open(CLOSE_LOG, encoding="utf-8", errors="ignore") as f:
+                rest = f.readlines()[-500:]
+            with open(CLOSE_LOG, "w", encoding="utf-8") as f:
+                f.writelines(rest)
+        with open(CLOSE_LOG, "a", encoding="utf-8") as f:
+            f.write("%s  %s\n" % (time.strftime("%Y-%m-%d %H:%M:%S"), str(grund)[:300]))
+    except Exception:
+        pass
+
+
+def mark_running(on=True):
+    try:
+        if on:
+            with open(RUN_MARK, "w") as f:
+                f.write(str(os.getpid()))
+        elif os.path.exists(RUN_MARK):
+            os.remove(RUN_MARK)
+    except Exception:
+        pass
+
+
+def clean_exit(grund):
+    """Gewolltes Beenden: protokollieren, Markierung entfernen, Prozess sofort beenden."""
+    log_close(grund)
+    mark_running(False)
+    os._exit(0)
+
+
+def _install_crash_log():
+    """Unbehandelte Fehler (auch in Threads) ins Protokoll schreiben."""
+    alt = sys.excepthook
+
+    def hook(t, v, tb):
+        log_close("Absturz: %s: %s" % (t.__name__, v))
+        alt(t, v, tb)
+    sys.excepthook = hook
+    if hasattr(threading, "excepthook"):
+        def thook(a):
+            if a.exc_type is not SystemExit:
+                log_close("Fehler im Hintergrund (%s): %s: %s" % (getattr(a.thread, "name", "?"), a.exc_type.__name__, a.exc_value))
+        threading.excepthook = thook
 
 
 _call = {"t": 0.0, "v": False}
@@ -1108,6 +1160,7 @@ class Handler(BaseHTTPRequestHandler):
             threading.Thread(target=BRAIN.start, daemon=True).start()
             self.send(200, {"ok": True})
         elif u.path == "/sleep":
+            log_close("Schlaf: " + str(b.get("grund") or "unbekannt"))
             if not BRAIN.busy:
                 BRAIN.kill()  # im Schlaf keinen Speicher belegen
             self.send(200, {"ok": True})
@@ -1142,6 +1195,7 @@ class Handler(BaseHTTPRequestHandler):
         elif u.path == "/hide":
             self.send(200, {"ok": True})
             keep = bool(b.get("keep"))   # nur ausblenden: Seite hört weiter auf „Jarvis“
+            log_close("Fenster %s: %s" % ("ausgeblendet" if keep else "geschlossen", b.get("grund") or "unbekannt"))
             if not BRAIN.busy and not keep:
                 BRAIN.kill()
             if ON_HIDE[0]:
@@ -1150,10 +1204,11 @@ class Handler(BaseHTTPRequestHandler):
             if ON_SHOW[0]:
                 threading.Thread(target=ON_SHOW[0], kwargs={"wake": bool(b.get("wake"))}, daemon=True).start()
             self.send(200, {"ok": True})
-        elif u.path == "/quit":  # neue ORB-Version übernimmt
+        elif u.path == "/quit":  # neue ORB-Version übernimmt bzw. „ORB ganz beenden“
             self.send(200, {"ok": True})
             BRAIN.kill()
-            threading.Thread(target=lambda: (time.sleep(.3), os._exit(0)), daemon=True).start()
+            grund = "Beendet: " + str(b.get("grund") or "neue ORB-Instanz übernimmt")
+            threading.Thread(target=lambda: (time.sleep(.3), clean_exit(grund)), daemon=True).start()
         elif u.path == "/new":
             BRAIN.stopped, BRAIN.busy = True, False
             BRAIN.kill()
@@ -1191,6 +1246,15 @@ def make_server():
     except OSError:
         return None
     srv.daemon_threads = True
+    _install_crash_log()
+    if os.environ.get("ORB_PORT"):
+        pass   # Test-Server (check.py) – echtes Protokoll nicht anfassen
+    elif os.path.exists(RUN_MARK):
+        log_close("Gestartet – vorher unerwartet beendet (Absturz, Abmelden oder PC aus)")
+    else:
+        log_close("Gestartet")
+    if not os.environ.get("ORB_PORT"):
+        mark_running(True)
     write_token()
     threading.Thread(target=load_apps, daemon=True).start()  # App-Liste vorab laden
     threading.Thread(target=idle_reaper, daemon=True).start()
