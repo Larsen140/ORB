@@ -59,7 +59,7 @@ DEFAULT_CFG = {
     "stimme": "de-DE-FlorianMultilingualNeural", "tempo": "+12%", "hoehe": "+0Hz", "lautstaerke": 90,
     "farbe": "rot", "effekte": "mittel", "untertitel": True,
     "sfx": True, "sfxlaut": 60, "ambient": False,
-    "steuerung": "wort", "wakeword": "Jarvis", "schnipsen": True, "unterbrechen": True, "nur_jarvis": True,
+    "steuerung": "wort", "wakeword": "Jarvis", "schnipsen": True, "unterbrechen": True, "nur_jarvis": True, "musik_schutz": True, "ducking": True,
     "tts_anbieter": "edge",
     "klatschen": True, "dauerzuhoeren": True, "empfindlichkeit": 6, "schnips_empf": 6, "begruessung": True, "ort": "", "name": "",
     "schlafen": 5, "vollbild": True, "autostart": True, "schlaf_schliessen": True, "bildschirm": False,
@@ -68,7 +68,7 @@ DEFAULT_CFG = {
 }
 # Damit ORB immer dein Claude-Code-Login (Max-Abo) nutzt und nie einen API-Schlüssel
 CLAUDE_ENV_DROP = ("ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "ANTHROPIC_BASE_URL")
-VERSION = "49"
+VERSION = "50"
 ORB_UI = ("Deine Oberfläche (die Larsen gerade sieht): in der Mitte du als flüssige leuchtende Kugel mit Tropfen, "
           "Orbit-Ringen und Sternenhimmel; links eine Uhr und darunter der Gesprächsverlauf mit Eingabefeld; rechts "
           "Karten für System (CPU, RAM, Akku), Wetter mit Stundenvorschau, Aktivität (was du gerade tust) und Vorschläge; "
@@ -990,6 +990,184 @@ def spotify_now():
     return {"laeuft": True, "spielt": True, "kuenstler": kuenstler, "titel": titel}
 
 
+# ---------- Musik erkennen und leiser stellen (Windows-Core-Audio über ctypes, ohne Zusatzpakete) ----------
+_AUDIO_LOCK = threading.Lock()
+_MUSIK = {"t": 0.0, "an": False, "laut_t": 0.0, "quelle": ""}
+_DUCK = {"vol": {}, "t": 0.0}
+_EIGENE = {"t": 0.0, "pids": set()}
+_PNAMEN = {}
+
+
+def _guid(s):
+    import ctypes
+    import uuid
+    g = (ctypes.c_ubyte * 16)()
+    ctypes.memmove(g, uuid.UUID(s).bytes_le, 16)
+    return g
+
+
+def _vcall(p, idx, argtypes, *args):
+    import ctypes
+    vt = ctypes.cast(p, ctypes.POINTER(ctypes.POINTER(ctypes.c_void_p))).contents
+    return ctypes.WINFUNCTYPE(ctypes.c_long, ctypes.c_void_p, *argtypes)(vt[idx])(p, *args)
+
+
+def _audio_sessions(fn):
+    """Ruft fn(pid, aktiv, pegel, volume) für jede Audio-Sitzung am Standard-Ausgang auf (Systemklänge ausgenommen)."""
+    import ctypes
+    from ctypes import POINTER, byref, c_float, c_int, c_ulong, c_void_p
+    ole = ctypes.windll.ole32
+    ole.CoInitializeEx(None, 0)
+    ole.CoCreateInstance.argtypes = [c_void_p, c_void_p, c_ulong, c_void_p, POINTER(c_void_p)]
+    g = {k: _guid(v) for k, v in {
+        "clsid": "BCDE0395-E52F-467C-8E3D-C4579291692E", "enum": "A95664D2-9614-4F35-A746-DE8DB63617E6",
+        "mgr": "77AA99A0-1BD6-484F-8BC7-2C654C9A9B6F", "ctl2": "BFB7FF88-7239-4FC9-8FA2-07C950BE9C6D",
+        "vol": "87CE5498-68D6-44E5-9215-6DA47EF883D8", "met": "C02216F6-8C67-4B5B-9D00-D008E73E0064"}.items()}
+    A = lambda k: ctypes.addressof(g[k])  # noqa: E731
+    PP = [c_void_p, POINTER(c_void_p)]
+    frei = []
+    try:
+        en, dev, mgr, sen = c_void_p(), c_void_p(), c_void_p(), c_void_p()
+        if ole.CoCreateInstance(A("clsid"), None, 23, A("enum"), byref(en)):
+            return
+        frei.append(en)
+        if _vcall(en, 4, [c_int, c_int, POINTER(c_void_p)], 0, 1, byref(dev)):   # Lautsprecher, Multimedia
+            return
+        frei.append(dev)
+        if _vcall(dev, 3, [c_void_p, c_ulong, c_void_p, POINTER(c_void_p)], A("mgr"), 23, None, byref(mgr)):
+            return
+        frei.append(mgr)
+        if _vcall(mgr, 5, [POINTER(c_void_p)], byref(sen)):
+            return
+        frei.append(sen)
+        n = c_int()
+        _vcall(sen, 3, [POINTER(c_int)], byref(n))
+        for i in range(n.value):
+            ctl, c2, vol, met = c_void_p(), c_void_p(), c_void_p(), c_void_p()
+            try:
+                if _vcall(sen, 4, [c_int, POINTER(c_void_p)], i, byref(ctl)) or not ctl.value:
+                    continue
+                if _vcall(ctl, 0, PP, A("ctl2"), byref(c2)) or not c2.value:
+                    continue
+                if _vcall(c2, 15, []) == 0:   # Systemklänge
+                    continue
+                pid, st, pk = c_ulong(), c_int(), c_float()
+                _vcall(c2, 14, [POINTER(c_ulong)], byref(pid))
+                _vcall(ctl, 3, [POINTER(c_int)], byref(st))
+                if not _vcall(ctl, 0, PP, A("met"), byref(met)) and met.value:
+                    _vcall(met, 3, [POINTER(c_float)], byref(pk))
+                _vcall(ctl, 0, PP, A("vol"), byref(vol))
+                fn(pid.value, st.value == 1, pk.value, vol if vol.value else None)
+            finally:
+                for p in (met, vol, c2, ctl):
+                    if p.value:
+                        _vcall(p, 2, [])
+    finally:
+        for p in reversed(frei):
+            if p.value:
+                _vcall(p, 2, [])
+
+
+def _eigene_pids():
+    """ORB selbst und sein Fenster (Edge mit ORB-Profil) – deren Ton ist keine Musik."""
+    now = time.time()
+    if now - _EIGENE["t"] > 30:
+        pids = {os.getpid()}
+        try:
+            import psutil
+            for p in psutil.process_iter(["pid", "name", "cmdline"]):
+                if (p.info["name"] or "").lower() == "msedge.exe" and any("ORB\fenster" in (c or "") for c in p.info["cmdline"] or []):
+                    pids.add(p.info["pid"])
+        except Exception:
+            pass
+        _EIGENE.update(t=now, pids=pids)
+    return _EIGENE["pids"]
+
+
+def _pname(pid):
+    if pid not in _PNAMEN:
+        try:
+            import psutil
+            _PNAMEN[pid] = psutil.Process(pid).name().lower()
+        except Exception:
+            _PNAMEN[pid] = ""
+    return _PNAMEN[pid]
+
+
+def musik_status():
+    """Spielt gerade Musik/Ton (Spotify oder ein anderes Programm)? Kurz zwischengespeichert."""
+    now = time.time()
+    with _AUDIO_LOCK:
+        if now - _MUSIK["t"] < 1.5:
+            return {"an": _MUSIK["an"], "quelle": _MUSIK["quelle"], "leiser": bool(_DUCK["vol"])}
+        _MUSIK["t"] = now
+        quelle = ""
+        try:
+            if spotify_now().get("spielt"):
+                quelle = "spotify.exe"
+        except Exception:
+            pass
+        eigene, laut = _eigene_pids(), []
+
+        def f(pid, aktiv, pk, vol):
+            if aktiv and pid and pid not in eigene and pk > (.004 if pid in _DUCK["vol"] else .015):
+                laut.append(_pname(pid))
+        try:
+            _audio_sessions(f)
+        except Exception:
+            pass
+        if laut:
+            _MUSIK["laut_t"], quelle = now, quelle or laut[0]
+        an = bool(quelle) or now - _MUSIK["laut_t"] < 4   # kurze Pausen zwischen Songs überbrücken
+        _MUSIK.update(an=an, quelle=quelle or _MUSIK["quelle"] if an else "")
+        return {"an": an, "quelle": _MUSIK["quelle"], "leiser": bool(_DUCK["vol"])}
+
+
+def duck(an):
+    """Musik leiser stellen, während ORB zuhört/antwortet (an=True), danach wieder auf die alte Lautstärke."""
+    import ctypes
+    with _AUDIO_LOCK:
+        if an:
+            _DUCK["t"] = time.time()
+            if _DUCK["vol"]:
+                return True
+            eigene, alt = _eigene_pids(), {}
+
+            def f(pid, aktiv, pk, vol):
+                if vol and pid and pid not in eigene and (aktiv or _pname(pid) == "spotify.exe"):
+                    v = ctypes.c_float()
+                    if not _vcall(vol, 4, [ctypes.POINTER(ctypes.c_float)], ctypes.byref(v)):
+                        alt[pid] = v.value
+                        _vcall(vol, 3, [ctypes.c_float, ctypes.c_void_p], v.value * .25, None)
+            try:
+                _audio_sessions(f)
+            except Exception:
+                pass
+            _DUCK["vol"] = alt
+            if alt:
+                threading.Thread(target=_duck_wache, daemon=True).start()
+            return bool(alt)
+        alt, _DUCK["vol"] = _DUCK["vol"], {}
+
+        def g(pid, aktiv, pk, vol):
+            if vol and pid in alt:
+                _vcall(vol, 3, [ctypes.c_float, ctypes.c_void_p], alt[pid], None)
+        try:
+            if alt:
+                _audio_sessions(g)
+        except Exception:
+            pass
+        return True
+
+
+def _duck_wache():
+    """Sicherheitsnetz: meldet sich die Oberfläche nicht mehr, wird die Musik nach 30 s wieder laut."""
+    while _DUCK["vol"]:
+        time.sleep(2)
+        if _DUCK["vol"] and time.time() - _DUCK["t"] > 30:
+            duck(False)
+
+
 MEDIA_KEYS = {"play": 0xB3, "next": 0xB0, "prev": 0xB1}
 
 
@@ -1244,6 +1422,11 @@ class Handler(BaseHTTPRequestHandler):
                 self.send(200, spotify_now())
             except Exception:
                 self.send(200, {"laeuft": False})
+        elif u.path == "/musik":
+            try:
+                self.send(200, musik_status())
+            except Exception:
+                self.send(200, {"an": False})
         else:
             self.send(404, b"", "text/plain")
 
@@ -1262,6 +1445,8 @@ class Handler(BaseHTTPRequestHandler):
             self.send(200, {"ok": stop()})
         elif u.path == "/media":
             self.send(200, {"ok": media_key(str(b.get("cmd", "")))})
+        elif u.path == "/duck":
+            self.send(200, {"ok": duck(bool(b.get("an")))})
         elif u.path == "/config":
             self.send(200, {"config": save_cfg(b)})
         elif u.path == "/icloud":  # Einstellungen: verbinden / trennen

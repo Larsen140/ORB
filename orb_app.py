@@ -219,6 +219,11 @@ def clap_loop():
                         cfg_t = now
                         # Empfindlichkeit 1..10 -> Schwelle 0.31..0.04 (leises Laptop-Mikro)
                         thr_base = .0006 * (11 - float(server.load_cfg().get("empfindlichkeit", 6)))   # leise Laptop-Mikros: Klatscher kommen nur mit ~0,003–0,01 an
+                        try:   # läuft Musik, zählen nur deutliche Knalle (Beats sind kein Klatschen)
+                            if server.load_cfg().get("musik_schutz", True) and server.musik_status().get("an"):
+                                thr_base *= 2.5
+                        except Exception:
+                            pass
                     pk = max(max(x), -min(x)) / 32768.0
                     rms = math.sqrt(sum(v * v for v in x) / len(x)) / 32768.0
                     pre = sum(hist[-6:-1]) / 5 if len(hist) >= 6 else 1.0   # Lautstärke 25–150 ms vorher

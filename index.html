@@ -453,6 +453,8 @@
     <div class="row">Dauerhaft zuhören bis „Stopp“<input type="checkbox" class="sw" id="s_dauer"></div>
     <div class="row">Mit „Jarvis“ unterbrechen<input type="checkbox" class="sw" id="s_unterbrechen"></div>
     <div class="row">Nur auf „Jarvis“ reagieren<input type="checkbox" class="sw" id="s_nurjarvis"></div>
+    <div class="row">Bei Musik nur auf „Jarvis“ hören<input type="checkbox" class="sw" id="s_musik"></div>
+    <div class="row">Musik leiser, während ich antworte<input type="checkbox" class="sw" id="s_duck"></div>
     <div class="row">Mit Wetter begrüßen<input type="checkbox" class="sw" id="s_gruss"></div>
     <div class="row">Einschlafen nach<select id="s_schlaf"><option value="0">nie</option><option value="2">2 Min.</option><option value="5">5 Min.</option><option value="10">10 Min.</option><option value="30">30 Min.</option></select></div>
     <div class="row">Dein Name<input type="text" id="s_name" placeholder="optional"></div>
@@ -530,7 +532,7 @@ const PAL = () => [BASE, BASE2, BASE3, BASE4];
 const pcol = (i, a, k = 0) => `rgba(${rgb(mix(PAL()[i % 4], [255,255,255], k))},${a})`;
 let cfg = { farbe:'rot', effekte:'mittel', untertitel:true, lautstaerke:90, sfx:true, sfxlaut:60, ambient:false,
   steuerung:'wort', schnipsen:true, wakeword:'Jarvis', stimme:'', tempo:'+15%', hoehe:'+0Hz', laenge:'kurz', rechte:'auto', tempo_claude:'low', ordner:'',
-  schlaf_schliessen:true, bildschirm:false, klatschen:true, dauerzuhoeren:true, unterbrechen:true, nur_jarvis:true, empfindlichkeit:6, schnips_empf:6, begruessung:true, ort:'', name:'', schlafen:5, vollbild:true, autostart:true };
+  schlaf_schliessen:true, bildschirm:false, klatschen:true, dauerzuhoeren:true, unterbrechen:true, nur_jarvis:true, musik_schutz:true, ducking:true, empfindlichkeit:6, schnips_empf:6, begruessung:true, ort:'', name:'', schlafen:5, vollbild:true, autostart:true };
 const S = { mode:'idle', seq:-1, busy:false, energy:.12, holo:0, think:0, speakVis:0, listenVis:0, level:0, warn:0, boot:0, sleep:false, sleepVis:0, px:0, py:0 };
 const mix = (a, b, t) => a.map((v, i) => Math.round(v + (b[i] - v) * t));
 const rgb = c => `${c[0]},${c[1]},${c[2]}`;
@@ -963,7 +965,8 @@ function clapTick() {
     }
   }
   else if (!ownSpeak && !mouse && now - lastClap > 140) {
-    const base = .0006 * (11 - (+cfg.empfindlichkeit || 6)), thr = Math.max(base, floorRms * 40);
+    const mf = musikAn() ? 2.5 : 1;   // läuft Musik: nur deutliche Knalle zählen
+    const base = .0006 * (11 - (+cfg.empfindlichkeit || 6)) * mf, thr = Math.max(base, floorRms * 40);
     if (pk > thr && rms > Math.max(floorRms * 10, base * .2)) {
       // Klatschen ist breitbandig, ein Mausklick fast nur hohes Klicken: Anteil hoher Frequenzen prüfen
       let d = 0; for (let i = 1; i < clapBuf.length; i++) { const q = clapBuf[i] - clapBuf[i - 1]; d += q * q; }
@@ -973,7 +976,7 @@ function clapTick() {
       const still = pre < rms * .3;   // davor (30–150 ms) war es deutlich leiser – bei Sprache fast nie
       // Schnipsen nur, wenn es sich deutlich vom Raumgeräusch der letzten Sekunde abhebt (nicht bei Gesprächen/Werkzeug)
       const ruhig = slow < rms * (.05 + .035 * sEmpf) && pre < rms * .4;
-      if (hf > snapHf && pk > Math.max(floorRms * 60, .034 - .003 * sEmpf) && pk / rms < 16 && pre < rms * .4) cand = { t:now, rms, pk, snap:true, ruhig };
+      if (hf > snapHf && pk > Math.max(floorRms * 60, (.034 - .003 * sEmpf) * mf) && pk / rms < 16 && pre < rms * .4) cand = { t:now, rms, pk, snap:true, ruhig };
       else if (hf < hfMax && pk / rms < 18 && still) cand = { t:now, rms, pk, snap:snapRatio() > 1.4, ruhig };
     }
   }
@@ -1108,7 +1111,27 @@ function pttDown() { if (S.sleep) return wake(); startPTT(); }
 /* ---------- Dauerhaft zuhören ---------- */
 let convo = false, convoRec = null, convoLastStart = 0, convoLastSpeech = 0, askGap = 0, followUntil = 0;
 // „Nur auf Jarvis reagieren“: ohne Namen nur kurz nach einer Antwort (Nachfrage-Fenster) annehmen
-const FOLLOW_MS = 8000, followOpen = () => !cfg.nur_jarvis || performance.now() < followUntil;
+const FOLLOW_MS = 8000, followOpen = () => (!cfg.nur_jarvis && !musikAn()) || performance.now() < followUntil;
+
+/* ---------- Musik: Songtexte sind keine Sprache ---------- */
+let musik = false, ducked = false, duckT = 0;
+const musikAn = () => musik && cfg.musik_schutz !== false;   // dann zählt nur, was mit „Jarvis“ beginnt
+function duckMusik(an) {
+  if (an) { if (!musikAn() || cfg.ducking === false) return; duckT = performance.now(); }
+  else if (!ducked) return;
+  ducked = an;
+  fetch('/duck', { method:'POST', headers:{ 'Content-Type':'application/json' }, body:JSON.stringify({ an }), keepalive:true }).catch(() => {});
+}
+async function pollMusik() {
+  try { const j = await (await fetch('/musik', { cache:'no-store' })).json(); musik = !!j.an; } catch (e) {}
+  if (!ducked) return;
+  const now = performance.now();
+  const dran = speakingNow() || S.busy || listening || now < armedUntil || now < followUntil || (convoRec && liveEl);
+  if (!dran && now - duckT > 3000) duckMusik(false);   // Antwort fertig → Musik wieder normal laut
+  else if (dran && now - duckT > 10000) duckMusik(true);   // Server hält die Absenkung nur 30 s ohne Meldung
+}
+setInterval(pollMusik, 2000); pollMusik();
+addEventListener('pagehide', () => duckMusik(false));
 function startConvo() {
   if (S.sleep || !SR) return;
   convo = true; convoLastSpeech = performance.now(); lastAct = performance.now(); followUntil = performance.now() + FOLLOW_MS;
@@ -1132,19 +1155,21 @@ function convoListen() {
       const x = e.results[i];
       if (x.isFinal) { const t = x[0].transcript.trim(); if (t) return handleConvo(t); } else interim += x[0].transcript;
     }
-    if (interim.trim() && (followOpen() || NAME_RE().test(interim))) { liveMsg(interim.trim()); convoLastSpeech = performance.now(); }
+    if (interim.trim() && (followOpen() || NAME_RE().test(interim))) { liveMsg(interim.trim()); convoLastSpeech = performance.now(); if (NAME_RE().test(interim)) duckMusik(true); }
   };
   r.onerror = e => { if (e.error === 'not-allowed' || e.error === 'service-not-allowed') { hint('Mikrofon blockiert', 5000); stopConvo(true); } };
   r.onend = () => { if (convoRec === r) convoRec = null; };
   convoRec = r; try { r.start(); } catch (e) { convoRec = null; }
 }
 function handleConvo(t) {
+  if (musikAn() && !followOpen() && !NAME_RE().test(t)) { liveMsg(null); return; }   // Songtext, nicht Larsen
   convoLastSpeech = performance.now();
   if (STOP_RE.test(t.replace(/[.!?,]+$/g, '').trim())) { liveMsg(null); return stopConvo(); }
-  if (cfg.nur_jarvis) {
+  if (cfg.nur_jarvis || musikAn()) {
     const m = t.match(NAME_RE());
     if (!m && !followOpen()) { liveMsg(null); return; }   // Hintergrundgespräch, Fernseher … ignorieren
     if (m) {
+      duckMusik(true);
       const vorne = !t.slice(0, m.index).replace(/[\s,.!?:;]+/g, '').length;
       if (vorne) t = t.slice(m.index + m[0].length).replace(/^[\s,.!?:;]+/, '');   // „Jarvis, …“ → nur die Frage
       if (t.replace(/[.!?,\s]+/g, '').length <= 2) { liveMsg(null); followUntil = performance.now() + FOLLOW_MS; SFX.listenOn(); ripple(.6); hint('Ich höre …', FOLLOW_MS); return; }
@@ -1167,7 +1192,7 @@ function bargeListen() {
       // eigene Stimme ignorieren, falls ORB den Namen gerade selbst sagt
       if (cfg.unterbrechen && NAME_RE().test(t) && !NAME_RE().test(curSay)) return interrupt();
       // „Stopp“ während ORB spricht oder arbeitet: sofort still und Zuhören beenden
-      if (e.results[i].isFinal && STOP_RE.test(t) && !STOP_WORT.test(curSay)) {
+      if (e.results[i].isFinal && STOP_RE.test(t) && !STOP_WORT.test(curSay) && (!musikAn() || NAME_RE().test(t))) {
         killBarge(); stopAudio(); caption(''); if (S.busy) fetch('/stop', { method:'POST' }).catch(() => {});
         return convo ? stopConvo() : hint('Okay', 1500);
       }
@@ -1177,7 +1202,7 @@ function bargeListen() {
   bargeRec = r; try { r.start(); } catch (e) { bargeRec = null; }
 }
 function interrupt() {
-  killBarge(); stopAudio(); caption('');
+  killBarge(); stopAudio(); caption(''); duckMusik(true);
   if (S.busy) fetch('/stop', { method:'POST' }).catch(() => {});
   SFX.barge(); ripple(1.2); burst(24); hint('Ja?', 1500);
   askGap = performance.now() + 400; convo = true; convoLastSpeech = performance.now(); followUntil = performance.now() + FOLLOW_MS;
@@ -1194,7 +1219,7 @@ function startWake() {
       let t = r[0].transcript;
       for (let k = 1; k < r.length; k++) if (!NAME_RE().test(t) && NAME_RE().test(r[k].transcript)) t = r[k].transcript;
       if (r.isFinal) { wakeRec._sig = false; onWake(t); }
-      else if (!wakeRec._sig && NAME_RE().test(t) && !S.sleep) { wakeRec._sig = true; SFX.listenOn(); ripple(.6); hint('Ich höre …', 3000); }   // sofortige Rückmeldung
+      else if (!wakeRec._sig && NAME_RE().test(t) && !S.sleep) { wakeRec._sig = true; duckMusik(true); SFX.listenOn(); ripple(.6); hint('Ich höre …', 3000); }   // sofortige Rückmeldung
     }
   };
   wakeRec.onend = () => { const was = wakeRec; wakeRec = null; if (was && !was._stopped && cfg.steuerung === 'wort') setTimeout(startWake, 300); };
@@ -1204,7 +1229,7 @@ function stopWake() { if (wakeRec) { wakeRec._stopped = true; try { wakeRec.abor
 function onWake(t) {
   const low = t.toLowerCase(), m = low.match(NAME_RE());
   const rest = m ? t.slice(m.index + m[0].length).replace(/^[\s,.!?:;]+/, '') : '';
-  if (S.sleep) { if (m) wake(rest.length > 2 ? rest : ''); return; }   // aus Schlaf/Hintergrund: aufwachen und die Frage annehmen
+  if (S.sleep) { if (m) { duckMusik(true); wake(rest.length > 2 ? rest : ''); } return; }   // aus Schlaf/Hintergrund: aufwachen und die Frage annehmen
   if (speakingNow()) return;   // während er arbeitet darf man ihn trotzdem ansprechen (läuft dann parallel)
   if (performance.now() < armedUntil) { armedUntil = 0; return ask(t); }
   if (!m) return;
@@ -1626,7 +1651,7 @@ function frame(now) {
   if (wasSpeaking && !speaking) { if (!S.busy) caption(''); if (listenAfterSpeech) { listenAfterSpeech = false; setTimeout(startListening, 250); } }
   wasSpeaking = speaking;
   if (convo) {
-    if (speaking || S.busy) followUntil = now + FOLLOW_MS;   // Nachfrage-Fenster läuft ab Ende der Antwort
+    if ((speaking || S.busy) && !musikAn()) followUntil = now + FOLLOW_MS;   // Nachfrage-Fenster läuft ab Ende der Antwort (bei Musik nur mit „Jarvis“)
     if (!convoRec && convoCanListen()) convoListen();
     if (convoRec && !convoCanListen()) killConvoRec();
     if (now - convoLastSpeech > 120000 && !S.busy && !speaking) stopConvo();
@@ -1903,7 +1928,7 @@ document.querySelectorAll('.swc').forEach(el => el.onclick = () => { saveCfg({ f
 const segs = { seg_eff:'tempo_claude', seg_len:'laenge', seg_rechte:'rechte', seg_fx:'effekte' };
 for (const [id, key] of Object.entries(segs)) $(id).querySelectorAll('button').forEach(b => b.onclick = () => { saveCfg({ [key]:b.dataset.v }); SFX.click(); });
 function fillRange(el) { el.style.setProperty('--p', (el.value - el.min) / (el.max - el.min) * 100 + '%'); }
-const CHK = { s_klatsch:'klatschen', s_schnipsen:'schnipsen', s_dauer:'dauerzuhoeren', s_unterbrechen:'unterbrechen', s_nurjarvis:'nur_jarvis', s_gruss:'begruessung', s_voll:'vollbild', s_auto:'autostart', s_schliessen:'schlaf_schliessen', s_screen:'bildschirm', s_unter:'untertitel', s_sfx:'sfx', s_amb:'ambient' };
+const CHK = { s_klatsch:'klatschen', s_schnipsen:'schnipsen', s_dauer:'dauerzuhoeren', s_unterbrechen:'unterbrechen', s_nurjarvis:'nur_jarvis', s_musik:'musik_schutz', s_duck:'ducking', s_gruss:'begruessung', s_voll:'vollbild', s_auto:'autostart', s_schliessen:'schlaf_schliessen', s_screen:'bildschirm', s_unter:'untertitel', s_sfx:'sfx', s_amb:'ambient' };
 function syncSettingsUI() {
   const set = (id, v) => { const el = $(id); if (el && document.activeElement !== el) el.value = v; };
   set('s_stimme', cfg.stimme); set('s_tempo', parseInt(cfg.tempo) || 0); set('s_hoehe', parseInt(cfg.hoehe) || 0);
