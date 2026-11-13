@@ -3,6 +3,8 @@ Zugangsdaten (Apple-ID + app-spezifisches Passwort) liegen in der Windows-Anmeld
 nie in Dateien oder im Repo."""
 import base64
 import datetime
+import os
+import re
 import threading
 import time
 import urllib.error
@@ -17,6 +19,24 @@ D, C = "{DAV:}", "{urn:ietf:params:xml:ns:caldav}"
 _lock = threading.Lock()
 _cals = {"user": None, "liste": None}          # gefundene Kalender (pro Sitzung)
 _cache = {"t": 0.0, "termine": None}           # Widget-Cache
+LOG = os.path.join(os.environ.get("LOCALAPPDATA", os.path.expanduser("~")), "ORB", "icloud.log")
+
+
+def _log(text):
+    """Fehler ins Log – nie Zugangsdaten (nur Status, Host, Pfad)."""
+    try:
+        os.makedirs(os.path.dirname(LOG), exist_ok=True)
+        if os.path.exists(LOG) and os.path.getsize(LOG) > 200_000:
+            os.replace(LOG, LOG + ".alt")
+        with open(LOG, "a", encoding="utf-8") as f:
+            f.write("%s  %s\n" % (datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"), text))
+    except Exception:
+        pass
+    print("iCloud:", text)
+
+
+class ICloudFehler(Exception):
+    """Verständliche Meldung für die Einstellungen."""
 
 
 # ---------- Windows-Anmeldeinformationsverwaltung ----------
@@ -123,20 +143,38 @@ def _xml(data):
 
 
 # ---------- CalDAV ----------
+class _KeinRedirect(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, *a, **k):
+        return None  # Weiterleitungen behandelt _req selbst (urllib folgt bei PROPFIND/REPORT nicht)
+
+
+_opener = urllib.request.build_opener(_KeinRedirect)
+
+
 def _req(method, url, body=None, depth=None, auth=None, extra=None):
     user, pw = auth or zugang() or ("", "")
-    h = {"Authorization": "Basic " + base64.b64encode(("%s:%s" % (user, pw)).encode()).decode(),
-         "User-Agent": "ORB"}
+    h = {"Authorization": "Basic " + base64.b64encode(("%s:%s" % (user, pw)).encode("utf-8")).decode(),
+         "User-Agent": "ORB/1.0 (CalDAV)"}
     if body is not None:
         h["Content-Type"] = "text/calendar; charset=utf-8" if method == "PUT" else "application/xml; charset=utf-8"
     if depth is not None:
         h["Depth"] = str(depth)
     h.update(extra or {})
-    r = urllib.request.Request(url, data=body.encode("utf-8") if isinstance(body, str) else body, headers=h, method=method)
-    with urllib.request.urlopen(r, timeout=12) as resp:
-        return resp.read()
-
-
+    data = body.encode("utf-8") if isinstance(body, str) else body
+    for _ in range(6):
+        r = urllib.request.Request(url, data=data, headers=h, method=method)
+        try:
+            with _opener.open(r, timeout=15) as resp:
+                return resp.read()
+        except urllib.error.HTTPError as e:
+            ziel = e.headers.get("Location") if e.code in (301, 302, 303, 307, 308) else None
+            if not ziel:
+                raise
+            neu = urllib.parse.urljoin(url, ziel)
+            if not neu.startswith("https://") or not urllib.parse.urlparse(neu).hostname.endswith(".icloud.com"):
+                raise  # Zugangsdaten nur an iCloud schicken
+            url = neu
+    raise ICloudFehler("Zu viele Weiterleitungen von iCloud")
 def _propfind(url, props, depth, auth=None):
     body = ('<?xml version="1.0" encoding="utf-8"?><d:propfind xmlns:d="DAV:" '
             'xmlns:c="urn:ietf:params:xml:ns:caldav"><d:prop>%s</d:prop></d:propfind>' % props)
@@ -152,8 +190,16 @@ def _kalender(auth=None):
         return _cals["liste"]
     x = _propfind(BASE, "<d:current-user-principal/>", 0, a)
     href = x.wtext(D + "current-user-principal", D + "href")
-    x = _propfind(urllib.parse.urljoin(BASE, href), "<c:calendar-home-set/>", 0, a)
-    home = urllib.parse.urljoin(BASE, x.wtext(C + "calendar-home-set", D + "href"))
+    if not href:
+        raise ICloudFehler("iCloud hat kein Benutzerkonto geliefert – Apple-ID prüfen")
+    principal = urllib.parse.urljoin(BASE, href)
+    x = _propfind(principal, "<c:calendar-home-set/>", 0, a)
+    home_href = x.wtext(C + "calendar-home-set", D + "href")
+    if not home_href:
+        raise ICloudFehler("iCloud hat keinen Kalenderordner geliefert – ist der Kalender in iCloud aktiviert?")
+    home = urllib.parse.urljoin(principal, home_href)   # meist https://pXX-caldav.icloud.com/…
+    if not home.endswith("/"):
+        home += "/"
     x = _propfind(home, "<d:displayname/><d:resourcetype/><c:supported-calendar-component-set/>", 1, a)
     liste = []
     for r in x.kinder(D + "response"):
@@ -281,8 +327,11 @@ def termine_widget():
             res = [{"datum": e["start"][:10], "zeit": "" if e["ganztag"] else e["start"][11:16], "text": e["titel"]}
                    for e in liste() if e["ganztag"] or e["ende"] >= jetzt.strftime("%Y-%m-%dT%H:%M")][:6]
             _cache.update(t=time.time(), termine=res)
+        except urllib.error.HTTPError as e:
+            _log("Termine laden: HTTP %d" % e.code)
+            _cache["t"] = time.time() - 40
         except Exception as e:
-            print("iCloud-Termine:", e)
+            _log("Termine laden: %s %s" % (type(e).__name__, str(e)[:150]))
             _cache["t"] = time.time() - 40   # in 20 s erneut versuchen, bis dahin alter Stand
         return _cache["termine"] or []
 
@@ -329,21 +378,53 @@ def loeschen(href):
     return True
 
 
+def _passwort(pw):
+    """App-spezifisches Passwort normalisieren: Leerzeichen weg, Gedankenstriche zu '-', Bindestriche behalten."""
+    pw = re.sub(r"[\s ​﻿]", "", str(pw))
+    pw = re.sub(r"[‐-―−]", "-", pw)
+    if re.fullmatch(r"[A-Za-z]{16}", pw):  # ohne Bindestriche eingetippt
+        pw = "-".join(pw[i:i + 4] for i in range(0, 16, 4))
+    return pw.lower() if re.fullmatch(r"[A-Za-z]{4}(-[A-Za-z]{4}){3}", pw) else pw
+
+
 def verbinden(user, pw):
     """Zugang testen und bei Erfolg sicher speichern. Gibt die Kalendernamen zurück."""
-    user, pw = str(user).strip(), str(pw).strip().replace(" ", "")
+    user, pw = re.sub(r"\s", "", str(user)), _passwort(pw)
     if not user or not pw:
         raise ValueError("Apple-ID und app-spezifisches Passwort eingeben")
+    if "@" not in user and not user.lstrip("+").isdigit():
+        raise ValueError("Apple-ID bitte als E-Mail-Adresse eingeben")
     _cals.update(user=None, liste=None)
     try:
         kals = _kalender((user, pw))
     except urllib.error.HTTPError as e:
         _cals.update(user=None, liste=None)
-        raise ValueError("Anmeldung abgelehnt – app-spezifisches Passwort prüfen" if e.code in (401, 403)
-                         else "iCloud antwortet mit Fehler %d" % e.code)
-    except Exception:
+        ort = urllib.parse.urlparse(e.url or "").hostname or "?"
+        _log("Verbinden fehlgeschlagen: HTTP %d bei %s" % (e.code, ort))
+        if e.code == 401:
+            raise ValueError("Anmeldung abgelehnt – Apple-ID oder app-spezifisches Passwort falsch "
+                             "(Format xxxx-xxxx-xxxx-xxxx, nicht das normale Apple-Passwort)")
+        if e.code == 403:
+            raise ValueError("Zugriff verweigert – iCloud-Kalender auf dem iPhone aktiviert?")
+        raise ValueError("iCloud antwortet mit Fehler %d – später erneut versuchen" % e.code)
+    except ICloudFehler as e:
         _cals.update(user=None, liste=None)
-        raise ValueError("iCloud nicht erreichbar")
+        _log("Verbinden fehlgeschlagen: %s" % e)
+        raise ValueError(str(e))
+    except urllib.error.URLError as e:
+        _cals.update(user=None, liste=None)
+        _log("Verbinden fehlgeschlagen: Netzwerk – %s" % type(e.reason).__name__ + " " + str(e.reason)[:150])
+        if "CERTIFICATE" in str(e.reason).upper():
+            raise ValueError("Sichere Verbindung zu iCloud fehlgeschlagen (Zertifikat)")
+        raise ValueError("iCloud nicht erreichbar – Internetverbindung prüfen")
+    except Exception as e:
+        _cals.update(user=None, liste=None)
+        _log("Verbinden fehlgeschlagen: %s %s" % (type(e).__name__, str(e)[:150]))
+        raise ValueError("iCloud-Verbindung fehlgeschlagen (%s)" % type(e).__name__)
+    if not kals:
+        _log("Verbunden, aber keine Terminkalender gefunden")
+        raise ValueError("Angemeldet, aber keine Kalender gefunden – iCloud-Kalender auf dem iPhone aktivieren")
     _speichern(user, pw)
     _cache.update(t=0.0, termine=None)
+    _log("Verbunden, %d Kalender" % len(kals))
     return [k["name"] for k in kals]
