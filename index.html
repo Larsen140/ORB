@@ -336,8 +336,16 @@
   .th .bar { margin-top:8px; height:2px; border-radius:2px; background:color-mix(in srgb, var(--hl) 20%, transparent); overflow:hidden; }
   .th .bar i { display:block; height:100%; width:30%; background:var(--hl); box-shadow:0 0 8px var(--hl); animation:thBar 1.6s ease-in-out infinite; }
   .th.fertig .bar i, .th.fehler .bar i, .th.abgebrochen .bar i { width:100%; animation:none; }
-  .th .x { position:absolute; top:6px; right:8px; border:0; background:none; color:inherit; opacity:.0; cursor:pointer; font-size:14px; transition:opacity .2s; }
-  .th:hover .x { opacity:.7; }
+  .th { touch-action:pan-y; user-select:none; }
+  .th .x { position:absolute; top:6px; right:6px; z-index:2; width:20px; height:20px; border-radius:50%; border:0; display:grid; place-items:center;
+    background:color-mix(in srgb, var(--hl) 14%, transparent); color:inherit; opacity:.45; cursor:pointer; font-size:11px; line-height:1;
+    box-shadow:inset 0 0 0 1px color-mix(in srgb, var(--hl) 40%, transparent); transition:opacity .2s, transform .3s var(--spring), background .2s; }
+  .th .x:hover { opacity:1; transform:scale(1.15); background:color-mix(in srgb, var(--hl) 30%, transparent); }
+  .th .stop { position:absolute; top:6px; right:30px; z-index:2; border:0; background:none; color:inherit; opacity:0; cursor:pointer; font-size:11px; transition:opacity .2s; }
+  .th.laeuft:not(.dev):hover .stop { opacity:.7; }
+  .th .tt { padding-right:18px; }
+  .th.ziehen { animation:none; transition:none; }
+  .th.wisch { opacity:0 !important; transition:opacity .35s, transform .35s; }
   .th.weg { opacity:0; transform:perspective(700px) rotateX(30deg) translateY(20px) scale(.9); }
   @keyframes thIn { from { opacity:0; transform:perspective(700px) rotateX(70deg) translateY(40px) scale(.6); filter:blur(6px); } }
   @keyframes thScan { to { top:120%; } }
@@ -522,6 +530,8 @@
     <div class="row col"><div class="lbl">Effekt-Lautstärke<span class="v" id="v_sfxl"></span></div><input type="range" id="s_sfxl" min="0" max="100" step="5"></div>
     <div class="row">Ambient-Brummen<input type="checkbox" class="sw" id="s_amb"></div>
   </div></div>
+  <div class="grp"><h4>Geschlossene Hologramme</h4><div class="card" id="hlist"></div>
+  <p class="note">Hologramme unten mit ✕ oder per Wischen schließen – sie bleiben zu, bis du sie hier wieder einschaltest.</p></div>
   <div class="grp"><h4>Widgets anzeigen</h4><div class="card" id="wlist"></div>
   <p class="note">„Aktivität“ erscheint von selbst, solange ORB arbeitet. Verschieben: Widget am Titel greifen.</p></div>
   <div class="grp"><h4>Updates</h4><div class="card">
@@ -1397,13 +1407,17 @@ function renderTasks(list) {
     let el = taskEls[t.id];
     if (!el) {
       el = taskEls[t.id] = document.createElement('div');
-      el.innerHTML = '<div class="tt"><span class="ring"></span><span class="nm"></span><span class="zt"></span></div><div class="st"></div><div class="bar"><i></i></div><button class="x" title="Abbrechen / ausblenden">✕</button>';
-      el.querySelector('.x').onclick = () => {
-        if (el._status === 'laeuft' && el._art !== 'entwickler') fetch('/aufgabe', { method:'POST', headers:{ 'Content-Type':'application/json' }, body:JSON.stringify({ aktion:'abbrechen', id:t.id }) }).catch(() => {});
-        else { el._weg = true; el.classList.add('weg'); SFX.close(); }
-      };
-      box.appendChild(el); SFX.holo(); ripple(.5);
+      el.innerHTML = '<div class="tt"><span class="ring"></span><span class="nm"></span><span class="zt"></span></div><div class="st"></div><div class="bar"><i></i></div><button class="stop" title="Aufgabe abbrechen">■</button><button class="x" title="Hologramm schließen">✕</button>';
+      el.querySelector('.stop').onclick = e => { e.stopPropagation();
+        fetch('/aufgabe', { method:'POST', headers:{ 'Content-Type':'application/json' }, body:JSON.stringify({ aktion:'abbrechen', id:t.id }) }).catch(() => {}); };
+      el.querySelector('.x').onclick = e => { e.stopPropagation(); holoZu(t.id, el); };
+      wischbar(el, () => holoZu(t.id, el));
+      box.appendChild(el);
+      if (!holoGeschlossen[t.id]) { SFX.holo(); ripple(.5); }
     }
+    el._titel = t.titel;
+    el.style.display = holoGeschlossen[t.id] ? 'none' : '';
+    if (holoGeschlossen[t.id]) { if (holoGeschlossen[t.id] !== t.titel) { holoGeschlossen[t.id] = t.titel; holoSpeichern(); } continue; }
     if (el._weg) continue;
     if (el._status && el._status !== t.status) { if (t.status === 'fertig') { SFX.done(); burst(30); } else if (t.status !== 'laeuft') SFX.close(); else SFX.holo(); }
     el._status = t.status; el._art = t.art;
@@ -1416,6 +1430,44 @@ function renderTasks(list) {
   }
   for (const id of Object.keys(taskEls)) if (!seen.has(id)) { const el = taskEls[id]; el.classList.add('weg'); setTimeout(() => el.remove(), 600); delete taskEls[id]; }
 }
+/* geschlossene Hologramme bleiben zu (auch nach Neustart) – in den Einstellungen wieder einschaltbar */
+let holoGeschlossen = {};
+try { holoGeschlossen = JSON.parse(localStorage.getItem('orbHoloZu') || '{}') || {}; } catch (e) {}
+function holoSpeichern() { try { localStorage.setItem('orbHoloZu', JSON.stringify(holoGeschlossen)); } catch (e) {} renderHoloListe(); }
+function holoZu(id, el) {
+  holoGeschlossen[id] = el._titel || 'Hologramm'; holoSpeichern(); SFX.close();
+  el.classList.add('weg'); setTimeout(() => { if (holoGeschlossen[id]) el.style.display = 'none'; el.classList.remove('weg', 'wisch'); el.style.transform = ''; }, 450);
+}
+function wischbar(el, zu) {
+  let x0 = null, dx = 0, pid = null;
+  el.addEventListener('pointerdown', e => { if (e.target.closest('button')) return; x0 = e.clientX; dx = 0; pid = e.pointerId; });
+  el.addEventListener('pointermove', e => {
+    if (x0 === null || e.pointerId !== pid) return; dx = e.clientX - x0;
+    if (Math.abs(dx) > 6) { if (!el.classList.contains('ziehen')) { el.classList.add('ziehen'); try { el.setPointerCapture(pid); } catch (er) {} }
+      el.style.transform = `perspective(700px) rotateX(10deg) translateX(${dx}px) rotate(${dx / 30}deg)`; el.style.opacity = Math.max(.15, 1 - Math.abs(dx) / 220); }
+  });
+  const ende = () => {
+    if (x0 === null) return; x0 = null; el.classList.remove('ziehen'); el.style.opacity = '';
+    if (Math.abs(dx) > 90) { el.classList.add('wisch'); el.style.transform = `perspective(700px) rotateX(10deg) translateX(${dx > 0 ? 400 : -400}px) rotate(${dx > 0 ? 12 : -12}deg)`; zu(); }
+    else el.style.transform = '';
+  };
+  el.addEventListener('pointerup', ende); el.addEventListener('pointercancel', ende);
+}
+function renderHoloListe() {
+  const box = $('hlist'); if (!box) return;
+  const ids = Object.keys(holoGeschlossen);
+  box.innerHTML = ids.length ? ids.map(id => `<div class="row"></div>`).join('') : '<div class="row" style="opacity:.6">Keine – alle Hologramme sichtbar</div>';
+  if (!ids.length) return;
+  box.querySelectorAll('.row').forEach((r, i) => {
+    const id = ids[i], inp = document.createElement('input');
+    r.textContent = holoGeschlossen[id]; inp.type = 'checkbox'; inp.className = 'sw'; inp.checked = false;
+    inp.onchange = () => { if (!inp.checked) return; delete holoGeschlossen[id]; SFX.on();
+      const el = taskEls[id]; if (el) { el.style.display = ''; el._weg = false; el.classList.remove('weg'); }
+      setTimeout(holoSpeichern, 350); };
+    r.appendChild(inp);
+  });
+}
+renderHoloListe();
 const tasksRunning = () => Object.values(taskEls).some(el => el._status === 'laeuft');
 
 function onState(st, first) {
