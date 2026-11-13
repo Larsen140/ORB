@@ -1331,7 +1331,8 @@ addEventListener('keydown', () => { lastMouse = performance.now(); }, true);   /
 ['pointerdown', 'mousedown', 'pointerup', 'mouseup'].forEach(ev => addEventListener(ev, () => { lastMouse = performance.now(); }, true));
 function checkSysMouse(t) {   // auch Klicks außerhalb des Fensters (systemweit) ausschließen
   lastClap = t;
-  fetch('/mouse').then(r => r.json()).then(j => { if (!(j.ago < .5)) registerClap(t); }).catch(() => registerClap(t));
+  // Tastatur und Maus (systemweit): Tippen klickt hell wie Klatschen – dann zählt der Knall nicht
+  fetch('/mouse').then(r => r.json()).then(j => { if (j.ago < .5 || j.eingabe < .8) { claps = []; return; } registerClap(t); }).catch(() => registerClap(t));
 }
 function registerClap(t) {
   if (t - lastMouse < 400) return;
