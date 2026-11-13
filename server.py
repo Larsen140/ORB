@@ -68,7 +68,7 @@ DEFAULT_CFG = {
 }
 # Damit ORB immer dein Claude-Code-Login (Max-Abo) nutzt und nie einen API-Schlüssel
 CLAUDE_ENV_DROP = ("ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "ANTHROPIC_BASE_URL")
-VERSION = "38"
+VERSION = "39"
 ORB_UI = ("Deine Oberfläche (die Larsen gerade sieht): in der Mitte du als flüssige leuchtende Kugel mit Tropfen, "
           "Orbit-Ringen und Sternenhimmel; links eine Uhr und darunter der Gesprächsverlauf mit Eingabefeld; rechts "
           "Karten für System (CPU, RAM, Akku), Wetter mit Stundenvorschau, Aktivität (was du gerade tust) und Vorschläge; "
@@ -119,6 +119,20 @@ ON_UPDATE = [None]  # neuesten Stand von GitHub holen und neu starten
 ON_CHECK = [None]   # liefert den neueren GitHub-Stand (sha) oder None, wenn ORB aktuell ist
 
 _mouse = {"t": 0.0, "on": False}
+
+
+def input_ago():
+    """Sekunden seit der letzten Tastatur- oder Mauseingabe (systemweit) – Tippen klickt ähnlich hell wie Schnipsen."""
+    try:
+        import ctypes
+
+        class LII(ctypes.Structure):
+            _fields_ = [("cbSize", ctypes.c_uint), ("dwTime", ctypes.c_uint)]
+        li = LII(); li.cbSize = ctypes.sizeof(LII)
+        ctypes.windll.user32.GetLastInputInfo(ctypes.byref(li))
+        return ((ctypes.windll.kernel32.GetTickCount() - li.dwTime) & 0xFFFFFFFF) / 1000.0
+    except Exception:
+        return 99.0
 
 
 def mouse_ago():
@@ -951,7 +965,7 @@ class Handler(BaseHTTPRequestHandler):
         elif u.path == "/version":
             self.send(200, {"version": VERSION})
         elif u.path == "/mouse":
-            self.send(200, {"ago": round(mouse_ago(), 3)})
+            self.send(200, {"ago": round(mouse_ago(), 3), "eingabe": round(input_ago(), 3)})
         elif u.path == "/sys":
             try:
                 import psutil

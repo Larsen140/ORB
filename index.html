@@ -893,11 +893,13 @@ function clapTick() {
   const mouse = now - lastMouse < 400;   // Klickgeräusch der Maus ist kein Klatschen
   if (cand) {
     if (now - cand.t >= 75) {
-      const knall = rms < cand.rms * .35;
+      const knall = rms < cand.rms * (cand.snap ? .5 : .35);
       if (knall && cand.snap && !ownSpeak && !mouse && cfg.schnipsen && !S.sleep) {
         // Schnipser: kurz warten – kommt kein zweiter Knall, verschwindet ORB
         const t = cand.t; snapT = t; claps = [];
-        setTimeout(() => { if (snapT === t && lastClap <= t + 50) onSnap(); }, 900);
+        setTimeout(() => { if (snapT !== t || lastClap > t + 50) return;
+          // nicht beim Tippen oder Klicken (klingt ähnlich hell)
+          fetch('/mouse').then(r => r.json()).then(j => { if (!(j.eingabe < .6) && !(j.ago < .6)) onSnap(); }).catch(() => onSnap()); }, 900);
       }
       else if (knall && !cand.snap && !own && !mouse && cfg.klatschen) { snapT = 0; checkSysMouse(cand.t); }
       else if (!knall) claps = [];   // Dauergeräusch statt Knall
@@ -910,12 +912,16 @@ function clapTick() {
       // Klatschen ist breitbandig, ein Mausklick fast nur hohes Klicken: Anteil hoher Frequenzen prüfen
       let d = 0; for (let i = 1; i < clapBuf.length; i++) { const q = clapBuf[i] - clapBuf[i - 1]; d += q * q; }
       const hf = d / (s || 1), hfMax = 2 - 2 * Math.cos(2 * Math.PI * 4800 / ac.sampleRate);
-      if (hf < hfMax && pk / rms < 18) { const r = snapRatio(); cand = { t:now, rms, snap:r > 1.4 }; if (window.ORB_DEBUG) console.log('Knall', r.toFixed(2)); }
+      const snapHf = 2 - 2 * Math.cos(2 * Math.PI * 7000 / ac.sampleRate);   // Schwerpunkt über ~7 kHz
+      if (window.ORB_DEBUG) console.log('Knall', 'pk', pk.toFixed(3), 'hf', hf.toFixed(2), 'crest', (pk / rms).toFixed(1));
+      if (hf > snapHf && pk > Math.max(thr * 2, .04) && pk / rms < 14) cand = { t:now, rms, snap:true };
+      else if (hf < hfMax && pk / rms < 18) cand = { t:now, rms, snap:snapRatio() > 1.4 };
     }
   }
   floorRms = rms < floorRms ? rms : floorRms * .995 + Math.min(rms, .2) * .005;   // Stille sofort übernehmen
 }
 let lastMouse = -1e9;
+addEventListener('keydown', () => { lastMouse = performance.now(); }, true);   // Tastenklicks sind kein Knall
 ['pointerdown', 'mousedown', 'pointerup', 'mouseup'].forEach(ev => addEventListener(ev, () => { lastMouse = performance.now(); }, true));
 function checkSysMouse(t) {   // auch Klicks außerhalb des Fensters (systemweit) ausschließen
   lastClap = t;
