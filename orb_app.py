@@ -190,6 +190,7 @@ def clap_loop():
             time.sleep(1)
             continue
         floor, cand, last, claps, cfg_t, thr_base = .0003, None, 0.0, [], 0.0, .0024
+        hist, pks = [], []
         try:
             with sd.RawInputStream(samplerate=sr, channels=1, dtype="int16", blocksize=block) as st:
                 while not window_open():
@@ -202,13 +203,17 @@ def clap_loop():
                         thr_base = .0006 * (11 - float(server.load_cfg().get("empfindlichkeit", 6)))   # leise Laptop-Mikros: Klatscher kommen nur mit ~0,003–0,01 an
                     pk = max(max(x), -min(x)) / 32768.0
                     rms = math.sqrt(sum(v * v for v in x) / len(x)) / 32768.0
+                    pre = sum(hist[-6:-1]) / 5 if len(hist) >= 6 else 1.0   # Lautstärke 25–150 ms vorher
+                    hist = (hist + [rms])[-8:]
                     if cand:
                         if now - cand[0] >= .075:
                             # Klatschen klingt kurz nach; Mausklick im selben Moment -> verwerfen
                             if rms < cand[1] * .35 and server.mouse_ago() > .4:
                                 last = cand[0]
                                 claps = [c for c in claps if last - c < 1.1] + [last]
-                                if len(claps) >= 2 and .22 < claps[-1] - claps[-2] < 1.0:
+                                pks = (pks + [cand[2]])[-2:]
+                                gleich = len(pks) < 2 or (pks[0] / pks[1] < 3 and pks[1] / pks[0] < 3)   # zwei ähnlich laute Klatscher
+                                if len(claps) >= 2 and .22 < claps[-1] - claps[-2] < 1.0 and gleich:
                                     claps = []
                                     show(wake=True)
                                     break
@@ -220,8 +225,10 @@ def clap_loop():
                         e = sum(v * v for v in x) or 1
                         hf = sum((x[i] - x[i - 1]) ** 2 for i in range(1, len(x))) / e
                         # Schnipser (hell, Energie bei 2–5 kHz) zählen nicht als Klatschen
-                        if hf < 2.6 and pk / rms < 18 and server.mouse_ago() > .4 and snap_ratio(x, sr) < 1.4:
-                            cand = (now, rms)
+                        # Knall aus der Stille (Sprache/Musik hat davor schon Energie) und keine Tastatur/Maus gerade
+                        if (hf < 2.6 and pk / rms < 18 and pre < rms * .3 and server.mouse_ago() > .4
+                                and server.input_ago() > .4 and snap_ratio(x, sr) < 1.4):
+                            cand = (now, rms, pk)
                     floor = rms if rms < floor else floor * .995 + min(rms, .2) * .005   # Stille sofort übernehmen
         except Exception as e:
             print("Mikrofon:", e)

@@ -855,7 +855,7 @@ function startClap() {
   clapBuf = new Float32Array(clapAn.fftSize); micSrc.connect(clapAn);
   clapTimer = setInterval(clapTick, 25);
 }
-let fBuf = null, snapT = 0;
+let fBuf = null, snapT = 0, clapPk = [];
 // Schnipsen klingt hell (Energie um 2–5 kHz), Klatschen voll (viel Energie unter 1,5 kHz)
 function snapRatio() {
   if (!fBuf) fBuf = new Float32Array(clapAn.frequencyBinCount);
@@ -888,6 +888,8 @@ function clapTick() {
   let pk = 0, s = 0;
   for (const v of clapBuf) { const a = Math.abs(v); if (a > pk) pk = a; s += v * v; }
   const rms = Math.sqrt(s / clapBuf.length), now = performance.now();
+  const hist = clapTick.h || (clapTick.h = []); const pre = hist.length >= 6 ? hist.slice(-6, -1).reduce((a, b) => a + b, 0) / 5 : 1;
+  hist.push(rms); if (hist.length > 8) hist.shift();
   const ownSpeak = speakingNow() || now < lastSfx + 500;   // eigene Stimme/Sounds
   const own = ownSpeak || listening || convoRec;
   const mouse = now - lastMouse < 400;   // Klickgeräusch der Maus ist kein Klatschen
@@ -901,7 +903,7 @@ function clapTick() {
           // nicht beim Tippen oder Klicken (klingt ähnlich hell)
           fetch('/mouse').then(r => r.json()).then(j => { if (!(j.eingabe < .6) && !(j.ago < .6)) onSnap(); }).catch(() => onSnap()); }, 900);
       }
-      else if (knall && !cand.snap && !own && !mouse && cfg.klatschen) { snapT = 0; checkSysMouse(cand.t); }
+      else if (knall && !cand.snap && !own && !mouse && cfg.klatschen) { snapT = 0; clapPk.push([cand.t, cand.pk]); checkSysMouse(cand.t); }
       else if (!knall) claps = [];   // Dauergeräusch statt Knall
       cand = null;
     }
@@ -914,8 +916,9 @@ function clapTick() {
       const hf = d / (s || 1), hfMax = 2 - 2 * Math.cos(2 * Math.PI * 4800 / ac.sampleRate);
       const snapHf = 2 - 2 * Math.cos(2 * Math.PI * 7000 / ac.sampleRate);   // Schwerpunkt über ~7 kHz
       if (window.ORB_DEBUG) console.log('Knall', 'pk', pk.toFixed(3), 'hf', hf.toFixed(2), 'crest', (pk / rms).toFixed(1));
-      if (hf > snapHf && pk > Math.max(thr * 2, .04) && pk / rms < 14) cand = { t:now, rms, snap:true };
-      else if (hf < hfMax && pk / rms < 18) cand = { t:now, rms, snap:snapRatio() > 1.4 };
+      const still = pre < rms * .3;   // davor (25–150 ms) war es deutlich leiser – bei Sprache fast nie
+      if (hf > snapHf && pk > Math.max(thr * 2, .04) && pk / rms < 14 && still) cand = { t:now, rms, pk, snap:true };
+      else if (hf < hfMax && pk / rms < 18 && still) cand = { t:now, rms, pk, snap:snapRatio() > 1.4 };
     }
   }
   floorRms = rms < floorRms ? rms : floorRms * .995 + Math.min(rms, .2) * .005;   // Stille sofort übernehmen
@@ -930,7 +933,11 @@ function checkSysMouse(t) {   // auch Klicks außerhalb des Fensters (systemweit
 function registerClap(t) {
   if (t - lastMouse < 400) return;
   lastClap = t; claps = claps.filter(c => t - c < 1100); claps.push(t); ripple(.4);
-  if (claps.length >= 2) { const gap = claps[claps.length - 1] - claps[claps.length - 2]; if (gap > 220 && gap < 1000) { claps = []; onDoubleClap(); } }
+  if (claps.length >= 2) {
+    const gap = claps[claps.length - 1] - claps[claps.length - 2];
+    const p = clapPk.slice(-2).map(x => x[1]), gleich = p.length < 2 || (p[0] / p[1] < 3 && p[1] / p[0] < 3);   // zwei ähnlich laute Klatscher
+    if (gap > 220 && gap < 1000 && gleich) { claps = []; clapPk = []; onDoubleClap(); }
+  }
 }
 function onDoubleClap() {
   SFX.clap();
@@ -985,7 +992,8 @@ const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
 let rec = null, listening = false, recFinal = '', recLive = '', pttEnd = false, wakeRec = null, armedUntil = 0, hintTimer;
 function hint(t, ms = 2600) { $('hint').textContent = t; $('hint').classList.add('on'); clearTimeout(hintTimer); hintTimer = setTimeout(() => $('hint').classList.remove('on'), ms); }
 const NAME_RE = () => new RegExp('\\b(jarvis|' + (cfg.wakeword || 'jarvis').toLowerCase().replace(/[^a-zäöüß]/g, '') + ')\\b', 'i');
-const STOP_RE = /^((orb|jarvis),?\s*)?(stopp?|stop zuhören|hör auf|hör auf zuzuhören|aufhören|ende|halt|danke,? das wars?|das wars?)$/i;
+const STOP_WORT = /(?<![a-zäöüß])(stopp?|hör auf|hör mal auf|aufhören|ruhe|sei still|schluss|genug|das war'?s|tschüss)(?![a-zäöüß])/i;
+const STOP_RE = { test: t => { t = t.trim(); return t.split(/\s+/).length <= 5 && STOP_WORT.test(t); } };   // kurze Sätze mit Stopp-Wort
 async function ask(text) {
   text = text.trim(); if (!text) return;
   lastAct = performance.now();
@@ -1079,7 +1087,7 @@ function handleConvo(t) {
 /* ---------- Unterbrechen mit „Jarvis“ ---------- */
 let bargeRec = null, bargeLast = 0;
 function killBarge() { if (bargeRec) { const r = bargeRec; bargeRec = null; try { r.abort(); } catch (e) {} } }
-function bargeWanted() { return cfg.unterbrechen && SR && !S.sleep && !listening && !convoRec && (speakingNow() || S.busy); }
+function bargeWanted() { return SR && !S.sleep && !listening && !convoRec && (speakingNow() || S.busy); }   // hört auf „Jarvis“ (falls an) und „Stopp“
 function bargeListen() {
   if (bargeRec || !bargeWanted() || performance.now() - bargeLast < 600) return;
   bargeLast = performance.now(); stopWake();
@@ -1088,7 +1096,12 @@ function bargeListen() {
     for (let i = e.resultIndex; i < e.results.length; i++) {
       const t = e.results[i][0].transcript;
       // eigene Stimme ignorieren, falls ORB den Namen gerade selbst sagt
-      if (NAME_RE().test(t) && !NAME_RE().test(curSay)) return interrupt();
+      if (cfg.unterbrechen && NAME_RE().test(t) && !NAME_RE().test(curSay)) return interrupt();
+      // „Stopp“ während ORB spricht oder arbeitet: sofort still und Zuhören beenden
+      if (e.results[i].isFinal && STOP_RE.test(t) && !STOP_WORT.test(curSay)) {
+        killBarge(); stopAudio(); caption(''); if (S.busy) fetch('/stop', { method:'POST' }).catch(() => {});
+        return convo ? stopConvo() : hint('Okay', 1500);
+      }
     }
   };
   r.onend = () => { if (bargeRec === r) bargeRec = null; };
