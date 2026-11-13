@@ -183,22 +183,56 @@ def restart(update=False):
     os._exit(0)
 
 
+def github_head():
+    """Neuester Stand von main – über die Git-Schnittstelle (sparsam, ohne API-Abfragegrenze)."""
+    req = urllib.request.Request("https://github.com/Larsen140/ORB.git/info/refs?service=git-upload-pack",
+                                 headers={"User-Agent": "git/2.45 ORB"})
+    with urllib.request.urlopen(req, timeout=8) as r:
+        for line in r.read().decode("utf-8", "ignore").split("\n"):
+            if line.endswith("refs/heads/main") or " refs/heads/main" in line:
+                sha = line[4:44] if len(line) > 44 else ""
+                if len(sha) == 40:
+                    return sha
+    return None
+
+
 def update_loop():
-    """Alle 30 Minuten auf GitHub nach einer neuen Version schauen; einspielen, wenn ORB gerade nicht benutzt wird."""
+    """Jede Minute auf GitHub nachsehen und ein Update SOFORT einspielen – nur nicht mitten im Sprechen oder Arbeiten."""
     launcher = sys.modules.get("__main__")
-    if not hasattr(launcher, "remote_sha"):
+    if not hasattr(launcher, "local_sha"):
         return  # läuft ohne Starter (Entwicklung)
     while True:
-        time.sleep(1800)
+        time.sleep(60)
         try:
-            sha = launcher.remote_sha()
+            sha = github_head()
             if not sha or sha == launcher.local_sha():
                 continue
-            idle = not server.BRAIN.busy and time.time() - server.BRAIN.last_used > 600
-            if idle and (not window_open() or server.read_state().get("mode") in ("idle", "spricht")):
+            st = server.read_state()
+            ruhig = (not server.BRAIN.busy and st.get("mode") not in ("denkt", "auftrag", "wartet")
+                     and time.time() - float(st.get("time", 0)) > 12)   # gerade nichts gesagt/getan
+            if ruhig:
                 restart(update=True)
         except Exception as e:
             print("Update-Prüfung:", e)
+
+
+def announce_update():
+    """Nach einem Update einmal kurz Bescheid sagen."""
+    launcher = sys.modules.get("__main__")
+    if not hasattr(launcher, "local_sha"):
+        return
+    sha, marker = launcher.local_sha(), os.path.join(server.HOME, "letzter_stand.txt")
+    try:
+        with open(marker) as f:
+            alt = f.read().strip()
+    except Exception:
+        alt = ""
+    if sha and sha != alt:
+        with open(marker, "w") as f:
+            f.write(sha)
+        if alt:
+            time.sleep(4)   # Fenster hat sich inzwischen neu geladen
+            server.write_answer("Update installiert, Version %s." % server.VERSION, heard="")
 
 
 def main():
@@ -244,6 +278,7 @@ def main():
     server.set_autostart(bool(cfg.get("autostart", True)))
     threading.Thread(target=clap_loop, daemon=True).start()
     threading.Thread(target=update_loop, daemon=True).start()
+    threading.Thread(target=announce_update, daemon=True).start()
     if not BG and not RESTART:
         show()
     while True:  # bleibt im Hintergrund, bis „ORB beenden“ gewählt wird

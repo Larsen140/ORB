@@ -218,6 +218,74 @@
   .swc { width:36px; height:36px; border-radius:50%; cursor:pointer; transition:transform .5s var(--spring); position:relative; }
   .swc:hover { transform:scale(1.18); } .swc.on::after { content:''; position:absolute; inset:-5px; border-radius:50%; border:2px solid #fff; }
 
+  /* ================= Design v2: mehrfarbig, ruhiger, sparsamer ================= */
+  :root { --c3:255,170,60; --c4:140,90,255; }
+  /* weniger Unschärfe = deutlich weniger Grafiklast, sieht fast gleich aus */
+  .glass { backdrop-filter:blur(16px) saturate(185%); -webkit-backdrop-filter:blur(16px) saturate(185%);
+    background:radial-gradient(240px circle at var(--mx,-400px) var(--my,-400px), rgba(var(--ac,var(--c)),.16), transparent 65%),
+      linear-gradient(160deg, rgba(255,255,255,.11) 0%, rgba(255,255,255,.035) 45%, rgba(var(--ac,var(--c)),.09) 100%); }
+  .glass::before { background:radial-gradient(90% 50% at 22% -8%, rgba(255,255,255,.2), transparent 60%),
+      radial-gradient(70% 45% at 95% 115%, rgba(var(--ac2,var(--c2)),.2), transparent 65%); }
+  /* farbiger Glasrand je Karte (statisch – kostet pro Bild nichts) */
+  .acc::after { content:''; position:absolute; inset:0; border-radius:inherit; padding:1px; pointer-events:none;
+    background:linear-gradient(140deg, rgba(var(--ac),.8), rgba(255,255,255,.1) 30%, transparent 55%, rgba(var(--ac2,var(--ac)),.55));
+    -webkit-mask:linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite:xor; mask-composite:exclude; }
+  .rim::after { animation:none; background:linear-gradient(110deg, rgba(var(--c),.85), rgba(var(--c3),.5) 28%, transparent 52%, rgba(var(--c4),.7)); }
+  h5 .dot { background:rgb(var(--ac,var(--c))); box-shadow:0 0 10px rgb(var(--ac,var(--c))); animation:dotp 2.6s ease-in-out infinite; }
+  @keyframes dotp { 50% { transform:scale(.6); opacity:.6; } }
+  .acc h5 { color:rgba(var(--ac),.9); }
+  /* Uhr: Sekunden-Lauflicht */
+  #secbar { height:3px; margin-top:12px; border-radius:3px; background:var(--faint); overflow:hidden; }
+  #secbar i { display:block; height:100%; width:100%; transform-origin:left; transform:scaleX(0); border-radius:3px;
+    background:linear-gradient(90deg, rgb(var(--c)), rgb(var(--c3)), rgb(var(--c4))); }
+  /* Statuskapsel wechselt die Farbe je Zustand */
+  #island { transition:width .65s var(--spring), background .8s, box-shadow .8s; }
+  #island[data-m=hoert] { --ac:var(--c3); } #island[data-m=denkt] { --ac:var(--c4); } #island[data-m=auftrag] { --ac:var(--c); }
+  #island[data-m=spricht] { --ac:var(--c2); } #island[data-m=wartet] { --ac:255,170,40; }
+  #island { box-shadow:inset 0 1px 0 rgba(255,255,255,.5), 0 0 26px rgba(var(--ac,var(--c)),.35), 0 18px 40px rgba(0,0,0,.5); }
+  #wave i { background:rgb(var(--ac,var(--c))); box-shadow:0 0 8px rgba(var(--ac,var(--c)),.9); transition:background .6s; }
+  /* Nachrichten: Glanzwelle beim Erscheinen */
+  .msg { overflow:hidden; }
+  .msg::after { content:''; position:absolute; inset:0; pointer-events:none; border-radius:inherit;
+    background:linear-gradient(105deg, transparent 35%, rgba(255,255,255,.22) 50%, transparent 65%); transform:translateX(-120%);
+    animation:shine 1.4s .35s var(--ease) both; }
+  @keyframes shine { to { transform:translateX(120%); } }
+  .msg.orb { background:linear-gradient(150deg, rgba(var(--c4),.16), rgba(255,255,255,.06) 55%, rgba(var(--c3),.1)); }
+  .msg.me { background:linear-gradient(150deg, rgba(var(--c),.62), rgba(var(--c2),.38) 70%, rgba(var(--c4),.3)); }
+  .typing i:nth-child(1) { background:rgb(var(--c)); } .typing i:nth-child(2) { background:rgb(var(--c3)); } .typing i:nth-child(3) { background:rgb(var(--c4)); }
+  /* Messinstrumente in verschiedenen Farben */
+  #g_cpu { stroke:url(#gcpu); filter:drop-shadow(0 0 5px rgba(var(--c3),.7)); }
+  #g_ram { stroke:url(#gram); filter:drop-shadow(0 0 5px rgba(var(--c4),.7)); }
+  #g_bat { stroke:url(#gbat); filter:drop-shadow(0 0 5px rgba(var(--c2),.7)); }
+  #bar i { background:linear-gradient(90deg, transparent, rgb(var(--c)), rgb(var(--c3)), rgb(var(--c4)), transparent); }
+  #terms li b { color:rgb(var(--ac,var(--c))); }
+  #sp_pp { background:rgba(var(--ac,var(--c)),.4) !important; }
+  .chip { --chip:var(--c); }
+  .chip:hover { background:rgba(var(--chip),.35); box-shadow:inset 0 1px 0 rgba(255,255,255,.2), 0 0 18px rgba(var(--chip),.35); }
+  .chip::before { content:''; display:inline-block; width:6px; height:6px; border-radius:50%; margin-right:7px; vertical-align:middle;
+    background:rgb(var(--chip)); box-shadow:0 0 6px rgb(var(--chip)); }
+  #send { background:radial-gradient(circle at 40% 30%, rgba(255,255,255,.6), rgb(var(--c)) 50%, rgb(var(--c4))); }
+  #mic { background:radial-gradient(circle at 38% 28%, rgba(255,255,255,.75), rgba(var(--c),.95) 34%, rgba(var(--c2),.7) 62%, rgba(var(--c4),.65)); }
+  /* gleicher Innenabstand für alle Karten – egal in welcher Spalte sie liegen */
+  .col > [data-w] { padding:16px 18px; flex:none; }
+  /* Drag & Drop der Widgets */
+  .col > [data-w] h5, .col > [data-w] > header, #clockc { cursor:grab; }
+  .dragging, .dropping { position:fixed !important; z-index:50; margin:0 !important; pointer-events:none; animation:none !important; }
+  .dragging { transform:scale(1.045) rotate(-1.4deg) !important; opacity:.97; transition:transform .3s var(--spring) !important;
+    box-shadow:0 34px 80px rgba(0,0,0,.65), 0 0 0 1px rgba(var(--ac,var(--c)),.7), 0 0 46px rgba(var(--ac,var(--c)),.4) !important; }
+  .dropping { transition:left .45s var(--spring), top .45s var(--spring), transform .45s var(--spring) !important; transform:none !important; }
+  .ph { flex:none; border-radius:30px; border:2px dashed rgba(var(--c3),.45); background:rgba(var(--c3),.06);
+    box-shadow:inset 0 0 30px rgba(var(--c3),.08); animation:phIn .35s var(--ease); }
+  @keyframes phIn { from { opacity:0; transform:scale(.96); } }
+  body.dragmode .col > [data-w]:not(.dragging) { filter:saturate(.8); }
+  /* Spotify-Equalizer */
+  #eq { margin-left:auto; display:inline-flex; gap:2px; align-items:flex-end; height:12px; }
+  #eq i { width:3px; height:12px; border-radius:2px; background:rgb(var(--ac)); transform-origin:bottom; animation:eq .9s ease-in-out infinite; }
+  #eq i:nth-child(2) { animation-delay:-.3s; } #eq i:nth-child(3) { animation-delay:-.6s; } #eq i:nth-child(4) { animation-delay:-.15s; }
+  @keyframes eq { 0%,100% { transform:scaleY(.25); } 50% { transform:scaleY(1); } }
+  #spot.off #eq i { animation-play-state:paused; transform:scaleY(.2); opacity:.4; }
+  @media (prefers-reduced-motion:reduce) { *, *::before, *::after { animation-duration:.01ms !important; } }
+
   @media (max-width:1250px) { :root { --R:0px; } #right { display:none; } }
   @media (max-width:900px) { :root { --L:0px; } #left { display:none; } }
 </style>
@@ -226,24 +294,28 @@
 <canvas id="gl"></canvas>
 <canvas id="fx"></canvas>
 <div id="grain"></div>
-<svg width="0" height="0" style="position:absolute"><defs><linearGradient id="gg" x1="0" y1="0" x2="1" y2="1">
-  <stop offset="0" stop-color="rgb(var(--c))" id="gg1"/><stop offset="1" stop-color="rgb(var(--c2))" id="gg2"/></linearGradient></defs></svg>
+<svg width="0" height="0" style="position:absolute"><defs>
+  <linearGradient id="gg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" id="gg1"/><stop offset="1" id="gg2"/></linearGradient>
+  <linearGradient id="gcpu" x1="0" y1="0" x2="1" y2="1"><stop offset="0" class="s-c3"/><stop offset="1" class="s-c"/></linearGradient>
+  <linearGradient id="gram" x1="0" y1="0" x2="1" y2="1"><stop offset="0" class="s-c4"/><stop offset="1" class="s-c2"/></linearGradient>
+  <linearGradient id="gbat" x1="0" y1="0" x2="1" y2="1"><stop offset="0" class="s-c2"/><stop offset="1" class="s-c3"/></linearGradient>
+</defs></svg>
 
-<div id="left" class="side">
-  <div id="clockc" class="glass enter tilt"><div id="clock">--:--</div><div id="date"></div></div>
-  <div id="termc" class="glass enter tilt" style="animation-delay:.04s">
+<div id="left" class="side col">
+  <div id="clockc" data-w="uhr" class="glass acc enter tilt" style="--ac:var(--c);--ac2:var(--c4)"><div id="clock">--:--</div><div id="date"></div><div id="secbar"><i></i></div></div>
+  <div id="termc" data-w="termine" class="glass acc enter tilt" style="animation-delay:.04s;--ac:var(--c4);--ac2:var(--c2)">
     <h5><i class="dot"></i>Termine</h5>
     <ul id="terms"><li class="leer">Keine Termine – sag z. B. „Termin am 20.11. um 15 Uhr Zahnarzt“</li></ul>
   </div>
-  <section id="chatp" class="glass enter" style="animation-delay:.08s">
+  <section id="chatp" data-w="gespraech" class="glass acc enter" style="animation-delay:.08s;--ac:var(--c2);--ac2:var(--c4)">
     <header><h5 style="margin:0"><i class="dot"></i>Gespräch</h5><button id="clr" title="Verlauf leeren">⟲</button></header>
     <div id="msgs"></div>
     <form id="compose" onsubmit="return false"><input id="txt" placeholder="Nachricht an ORB …" autocomplete="off"><button id="send" title="Senden">↑</button></form>
   </section>
 </div>
 
-<div id="right" class="side">
-  <div class="glass enter tilt" style="animation-delay:.05s">
+<div id="right" class="side col">
+  <div data-w="system" class="glass acc enter tilt" style="animation-delay:.05s;--ac:var(--c3);--ac2:var(--c)">
     <h5><i class="dot"></i>System</h5>
     <div class="gauges">
       <div class="gauge"><svg viewBox="0 0 70 70"><circle class="bgc" cx="35" cy="35" r="28"/><circle class="val" id="g_cpu" cx="35" cy="35" r="28"/></svg><b id="v_cpu">–</b>CPU</div>
@@ -252,22 +324,22 @@
     </div>
     <div id="conn">verbinde …</div>
   </div>
-  <div class="glass enter tilt" style="animation-delay:.12s">
+  <div data-w="wetter" class="glass acc enter tilt" style="animation-delay:.12s;--ac:var(--c2);--ac2:var(--c3)">
     <h5><i class="dot"></i>Wetter</h5>
     <div id="wxnow"><span id="wxi">·</span><div><div id="wxt">–</div><div id="wxd">lädt …</div></div></div>
     <div id="hours"></div>
   </div>
-  <div id="spot" class="glass enter tilt" style="animation-delay:.15s">
-    <h5><i class="dot"></i>Spotify</h5>
+  <div id="spot" data-w="spotify" class="glass acc enter tilt" style="animation-delay:.15s;--ac:30,215,96;--ac2:var(--c4)">
+    <h5><i class="dot"></i>Spotify<span id="eq"><i></i><i></i><i></i><i></i></span></h5>
     <div id="sp_t">Spotify ist zu</div><div id="sp_a"></div>
     <div id="sp_ctl"><button data-m="prev" title="Zurück">⏮</button><button data-m="play" id="sp_pp" title="Play/Pause">⏯</button><button data-m="next" title="Weiter">⏭</button></div>
   </div>
-  <div id="act" class="glass enter tilt" style="animation-delay:.19s">
+  <div id="act" data-w="aktivitaet" class="glass acc enter tilt" style="animation-delay:.19s;--ac:var(--c);--ac2:var(--c3)">
     <h5><i class="dot"></i>Aktivität</h5>
     <div id="task">Bereit</div><div id="detail">Warte auf deinen Auftrag</div>
     <div id="bar"><i></i></div><ul id="log"></ul>
   </div>
-  <div id="chipsc" class="glass enter" style="animation-delay:.26s">
+  <div id="chipsc" data-w="vorschlaege" class="glass acc enter" style="animation-delay:.26s;--ac:var(--c4);--ac2:var(--c3)">
     <h5><i class="dot"></i>Vorschläge</h5><div id="chips"></div>
   </div>
 </div>
@@ -319,6 +391,7 @@
     <div class="row col">Farbe<div id="swatches"></div></div>
     <div class="row col">Grafik<div class="seg" id="seg_fx"><button data-v="niedrig">Sparsam</button><button data-v="mittel">Flüssig</button><button data-v="hoch">Ultra</button></div></div>
     <div class="row">Untertitel unter der Kugel<input type="checkbox" class="sw" id="s_unter"></div>
+    <div class="row">Widgets per Drag &amp; Drop am Titel verschieben<button class="done" id="resetLayout">Zurücksetzen</button></div>
   </div></div>
   <div class="grp"><h4>Sound</h4><div class="card">
     <div class="row">Soundeffekte<input type="checkbox" class="sw" id="s_sfx"></div>
@@ -338,10 +411,20 @@ const $ = id => document.getElementById(id);
 let W = 0, H = 0;
 
 /* ================= Farben & Einstellungen ================= */
-const THEMES = { rot:[[255,50,40],[255,110,190]], blau:[[50,140,255],[150,90,255]], cyan:[[30,220,255],[120,110,255]],
-  gruen:[[30,235,130],[30,190,255]], lila:[[170,80,255],[255,80,190]], gold:[[255,180,40],[255,90,50]], weiss:[[210,225,255],[150,190,255]] };
+// Jede Palette hat 4 Farben: Hauptfarbe, Zweitfarbe und zwei Akzente (Karten, Partikel, Ringe, Hintergrund)
+const THEMES = {
+  rot:   [[255,50,40],  [255,100,180], [255,170,50],  [140,90,255]],   // Inferno
+  blau:  [[50,140,255], [150,90,255],  [40,225,215],  [255,110,180]],  // Ozean
+  cyan:  [[30,215,255], [120,110,255], [60,255,160],  [255,120,200]],  // Polarlicht
+  gruen: [[30,235,130], [30,190,255],  [200,255,80],  [255,200,60]],   // Dschungel
+  lila:  [[170,80,255], [255,80,190],  [80,170,255],  [255,190,90]],   // Galaxie
+  gold:  [[255,180,40], [255,90,60],   [255,90,170],  [130,110,255]],  // Sonnenuntergang
+  weiss: [[210,225,255],[150,190,255], [160,255,230], [255,170,220]],  // Eis
+};
 const AMBER = [255,165,30];
-let BASE = THEMES.rot[0], BASE2 = THEMES.rot[1];
+let BASE = THEMES.rot[0], BASE2 = THEMES.rot[1], BASE3 = THEMES.rot[2], BASE4 = THEMES.rot[3];
+const PAL = () => [BASE, BASE2, BASE3, BASE4];
+const pcol = (i, a, k = 0) => `rgba(${rgb(mix(PAL()[i % 4], [255,255,255], k))},${a})`;
 let cfg = { farbe:'rot', effekte:'mittel', untertitel:true, lautstaerke:90, sfx:true, sfxlaut:60, ambient:false,
   steuerung:'taste', wakeword:'Jarvis', stimme:'', tempo:'+15%', hoehe:'+0Hz', laenge:'kurz', rechte:'auto', tempo_claude:'low', ordner:'',
   schlaf_schliessen:true, klatschen:true, dauerzuhoeren:true, unterbrechen:true, empfindlichkeit:6, begruessung:true, ort:'', name:'', schlafen:5, vollbild:true, autostart:true };
@@ -358,10 +441,12 @@ const hhmm = d => d.toLocaleTimeString('de-DE', { hour:'2-digit', minute:'2-digi
 let lastAct = performance.now(), listenAfterSpeech = false, wasSpeaking = false;
 
 function applyCfg() {
-  [BASE, BASE2] = THEMES[cfg.farbe] || THEMES.rot;
-  document.documentElement.style.setProperty('--c', rgb(BASE));
-  document.documentElement.style.setProperty('--c2', rgb(BASE2));
+  [BASE, BASE2, BASE3, BASE4] = THEMES[cfg.farbe] || THEMES.rot;
+  const root = document.documentElement.style;
+  root.setProperty('--c', rgb(BASE)); root.setProperty('--c2', rgb(BASE2)); root.setProperty('--c3', rgb(BASE3)); root.setProperty('--c4', rgb(BASE4));
   $('gg1').setAttribute('stop-color', `rgb(${rgb(BASE)})`); $('gg2').setAttribute('stop-color', `rgb(${rgb(BASE2)})`);
+  for (const [cls, c] of [['s-c', BASE], ['s-c2', BASE2], ['s-c3', BASE3], ['s-c4', BASE4]])
+    document.querySelectorAll('.' + cls).forEach(s => s.setAttribute('stop-color', `rgb(${rgb(c)})`));
   document.body.classList.toggle('lite', cfg.effekte === 'niedrig');
   document.body.classList.toggle('ultra', cfg.effekte === 'hoch');
   applyAudio(); setupParticles(); syncSettingsUI(); glResize();
@@ -386,8 +471,9 @@ const gl = glc.getContext('webgl', { antialias:false, alpha:false, depth:false, 
 const FRAG = `
 precision highp float;
 uniform vec2 uRes, uC, uPar; uniform float uT, uR;
-uniform vec3 uCol, uCol2;
+uniform vec3 uCol, uCol2, uCol3, uCol4;
 uniform float uLevel, uEnergy, uSpeak, uListen, uSleep, uThink;
+vec3 pal(float x){ x = fract(x)*4.; return x < 1. ? mix(uCol, uCol2, x) : x < 2. ? mix(uCol2, uCol3, x - 1.) : x < 3. ? mix(uCol3, uCol4, x - 2.) : mix(uCol4, uCol, x - 3.); }
 uniform vec4 uD[6];
 float smin(float a, float b, float k){ float h = clamp(.5 + .5*(b - a)/k, 0., 1.); return mix(b, a, h) - k*h*(1. - h); }
 float wob(vec3 p){ return sin(p.x*3.1 + uT*1.3)*sin(p.y*2.7 - uT*1.1)*sin(p.z*3.3 + uT*.9); }
@@ -414,15 +500,21 @@ vec3 bg(vec2 uv, vec2 p2, float rr){
   for (int i = 0; i < 4; i++){ float fi = float(i);
     q += .42*vec2(sin(q.y*1.3 + t*5. + fi*1.3), cos(q.x*1.1 - t*4. + fi*2.1));
     c += .05/(abs(sin(q.x*1.6 + q.y*.9 + t*3.)) + .09); }
-  vec3 b = mix(uCol, uCol2, .5 + .5*sin(uv.x*2.2 + uv.y + t*6.))*c*.045;
-  for (int i = 0; i < 4; i++){ float fi = float(i);
-    vec2 cp = vec2(sin(uT*.045 + fi*2.1)*.85, cos(uT*.037 + fi*1.7)*.42) - uPar*.03*(fi + 1.);
-    b += mix(uCol, uCol2, fi/3.)*.08*exp(-length(uv - cp)*(2.4 + fi*.4)); }
+  vec3 b = pal(uv.x*.25 + uv.y*.15 + t*.8)*c*.045;
+  // vier Leuchtwolken, jede in einer anderen Palettenfarbe
+  b += uCol *.085*exp(-length(uv - vec2(sin(uT*.045)*.85,        cos(uT*.037)*.42) + uPar*.03)*2.4);
+  b += uCol2*.08 *exp(-length(uv - vec2(sin(uT*.045 + 2.1)*.85,  cos(uT*.037 + 1.7)*.42) + uPar*.06)*2.8);
+  b += uCol3*.075*exp(-length(uv - vec2(sin(uT*.045 + 4.2)*.85,  cos(uT*.037 + 3.4)*.42) + uPar*.09)*3.2);
+  b += uCol4*.085*exp(-length(uv - vec2(sin(uT*.045 + 6.3)*.85,  cos(uT*.037 + 5.1)*.42) + uPar*.12)*3.0);
+  // Polarlicht-Bänder oben
+  float band = sin(uv.x*3.1 + uT*.12 + sin(uv.x*1.7 - uT*.08)*1.5)*.06 + .36;
+  b += pal(uv.x*.3 + uT*.02)*exp(-abs(uv.y - band)*26.)*.07*(.6 + .4*sin(uv.x*9. + uT*.5));
+  b += pal(uv.x*.3 + uT*.02 + .5)*exp(-abs(uv.y - band - .07)*34.)*.04;
   b += stars(uv + uPar*.012 + vec2(uT*.002, 0.), 55., .982)*.9;
   b += stars(uv + uPar*.035 + vec2(uT*.005, 0.), 120., .99)*.55;
   float a = atan(p2.y, p2.x);
   float rays = pow(.5 + .5*sin(a*9. + uT*.22)*sin(a*14. - uT*.15 + 1.), 5.)*exp(-max(rr - .8, 0.)*.5)*smoothstep(.8, 1.4, rr);
-  b += mix(uCol, uCol2, .35)*rays*(.06 + .16*uLevel + .05*uEnergy);
+  b += pal(a/6.2831 + uT*.01)*rays*(.06 + .16*uLevel + .05*uEnergy);
   return b;
 }
 void main(){
@@ -443,14 +535,16 @@ void main(){
       float s1 = pow(max(dot(reflect(-L1, n), v), 0.), 90.), s2 = pow(max(dot(reflect(-L2, n), v), 0.), 22.);
       vec3 irid = .5 + .5*cos(6.2831*(fr*1.15 + n.y*.22 + uT*.035) + vec3(0., 2.1, 4.2));
       float sw = .7 + .3*sin(p.x*5.5 + uT*1.4 + sin(p.y*4.5 - uT))*sin(p.z*5. + uT*.6);
-      vec3 inner = uCol*(.10 + .85*pow(ndv, 1.7))*sw*(.7 + .8*uLevel + .3*uEnergy);
-      inner += uCol2*pow(ndv, 6.)*.25*(.5 + uLevel);
-      vec3 rim = mix(uCol2, irid, .6)*fr*1.25;
+      // Innenleben wandert langsam durch die Palette (Farbströme in der Flüssigkeit)
+      vec3 flow = mix(uCol, pal(p.y*.35 + p.x*.2 + uT*.03), .45);
+      vec3 inner = flow*(.10 + .85*pow(ndv, 1.7))*sw*(.7 + .8*uLevel + .3*uEnergy);
+      inner += uCol3*pow(ndv, 6.)*.22*(.5 + uLevel);
+      vec3 rim = mix(pal(n.y*.5 + uT*.02 + .3), irid, .5)*fr*1.25;
       vec3 env = mix(vec3(0.), mix(uCol, vec3(1.), .25)*.45, smoothstep(-.2, .9, reflect(rd, n).y))*fr;
       col = (inner + rim + env + vec3(1.)*s1*1.2 + mix(uCol2, vec3(1.), .5)*s2*.32)*(1. - .55*uSleep);
     } else {
-      col += mix(uCol2, vec3(1.), .25)*(1. - smoothstep(0., .02, dm))*.55*(1. - .6*uSleep);
-      col += mix(uCol, uCol2, .5)*exp(-dm*20.)*.3*(1. - .6*uSleep);
+      col += mix(pal(atan(p2.y, p2.x)/6.2831 + uT*.02), vec3(1.), .25)*(1. - smoothstep(0., .02, dm))*.55*(1. - .6*uSleep);
+      col += pal(atan(p2.y, p2.x)/6.2831 + .25)*exp(-dm*20.)*.3*(1. - .6*uSleep);
     }
   }
   col = 1. - exp(-col*1.7);
@@ -469,12 +563,12 @@ if (gl) {
     gl.bindBuffer(gl.ARRAY_BUFFER, gl.createBuffer());
     gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW);
     const loc = gl.getAttribLocation(prog, 'p'); gl.enableVertexAttribArray(loc); gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
-    for (const n of ['uRes', 'uC', 'uPar', 'uT', 'uR', 'uCol', 'uCol2', 'uLevel', 'uEnergy', 'uSpeak', 'uListen', 'uSleep', 'uThink', 'uD']) U[n] = gl.getUniformLocation(prog, n);
+    for (const n of ['uRes', 'uC', 'uPar', 'uT', 'uR', 'uCol', 'uCol2', 'uCol3', 'uCol4', 'uLevel', 'uEnergy', 'uSpeak', 'uListen', 'uSleep', 'uThink', 'uD']) U[n] = gl.getUniformLocation(prog, n);
   }
 }
 function glResize() {
   W = innerWidth; H = innerHeight; if (W < 2 || H < 2) return;
-  glScale = [.5, .75, 1][Q()] * Math.min(devicePixelRatio || 1, 1.5);
+  glScale = [.45, .62, .9][Q()] * Math.min(devicePixelRatio || 1, 1.5);   // etwas niedriger = deutlich weniger Grafiklast
   glc.width = Math.round(W * glScale); glc.height = Math.round(H * glScale);
   fxc.width = W; fxc.height = H;
   if (gl) gl.viewport(0, 0, glc.width, glc.height);
@@ -499,6 +593,8 @@ function renderGL(t, cx, cy, R, speaking) {
   gl.uniform2f(U.uPar, S.px, S.py);
   gl.uniform1f(U.uR, R / .86 * glScale); gl.uniform1f(U.uT, t);
   gl.uniform3f(U.uCol, c1[0], c1[1], c1[2]); gl.uniform3f(U.uCol2, c2[0], c2[1], c2[2]);
+  const c3 = mix(BASE3, AMBER, S.warn).map(v => v / 255), c4 = mix(BASE4, AMBER, S.warn).map(v => v / 255);
+  gl.uniform3f(U.uCol3, c3[0], c3[1], c3[2]); gl.uniform3f(U.uCol4, c4[0], c4[1], c4[2]);
   gl.uniform1f(U.uLevel, S.level); gl.uniform1f(U.uEnergy, S.energy); gl.uniform1f(U.uSpeak, S.speakVis);
   gl.uniform1f(U.uListen, S.listenVis); gl.uniform1f(U.uSleep, S.sleepVis); gl.uniform1f(U.uThink, S.think);
   gl.uniform4fv(U.uD, dropArr);
@@ -975,9 +1071,13 @@ function onState(st, first) {
 /* ================= Uhr, Wetter, System, Vorschläge ================= */
 const WX = c => c === 0 ? '☀️' : c <= 2 ? '🌤️' : c === 3 ? '☁️' : c <= 48 ? '🌫️' : c <= 57 ? '🌦️' : c <= 67 ? '🌧️' : c <= 77 ? '❄️' : c <= 82 ? '🌧️' : c <= 86 ? '🌨️' : '⛈️';
 function tick() {
-  const d = new Date();
-  $('clock').innerHTML = hhmm(d) + `<small>${String(d.getSeconds()).padStart(2, '0')}</small>`;
+  const d = new Date(), s = d.getSeconds();
+  $('clock').innerHTML = hhmm(d) + `<small>${String(s).padStart(2, '0')}</small>`;
   $('date').textContent = d.toLocaleDateString('de-DE', { weekday:'long', day:'numeric', month:'long' });
+  // Sekunden-Lauflicht: läuft per CSS-Übergang weich (keine Arbeit pro Bild)
+  const bar = $('secbar').firstElementChild;
+  if (s === 0) { bar.style.transition = 'none'; bar.style.transform = 'scaleX(0)'; void bar.offsetWidth; }
+  bar.style.transition = 'transform 1s linear'; bar.style.transform = `scaleX(${(s + 1) / 60})`;
 }
 async function loadWeather() {
   try {
@@ -991,17 +1091,88 @@ async function loadWeather() {
   } catch (e) {}
 }
 function gauge(id, v) { const el = $('g_' + id); if (el) el.style.strokeDashoffset = 176 - 176 * Math.max(0, Math.min(100, v || 0)) / 100; }
+// Zahlen zählen weich hoch/runter statt zu springen
+function countTo(el, to, suffix = '%') {
+  const from = parseFloat(el.textContent) || 0, t0 = performance.now(), d = 900;
+  if (Math.round(from) === Math.round(to)) { el.textContent = Math.round(to) + suffix; return; }
+  (function step(n) { const k = Math.min(1, (n - t0) / d), e = 1 - Math.pow(1 - k, 3);
+    el.textContent = Math.round(from + (to - from) * e) + suffix; if (k < 1) requestAnimationFrame(step); })(t0);
+}
 async function loadSys() {
-  if (S.sleep) return;
+  if (S.sleep || document.hidden) return;
   try {
     const s = await (await fetch('/sys')).json();
-    if (s.cpu != null) { gauge('cpu', s.cpu); $('v_cpu').textContent = Math.round(s.cpu) + '%'; }
-    if (s.ram != null) { gauge('ram', s.ram); $('v_ram').textContent = Math.round(s.ram) + '%'; }
-    if (s.akku != null) { gauge('bat', s.akku); $('v_bat').textContent = Math.round(s.akku) + '%'; $('l_bat').textContent = s.laden ? 'Akku ⚡' : 'Akku'; }
+    if (s.cpu != null) { gauge('cpu', s.cpu); countTo($('v_cpu'), s.cpu); }
+    if (s.ram != null) { gauge('ram', s.ram); countTo($('v_ram'), s.ram); }
+    if (s.akku != null) { gauge('bat', s.akku); countTo($('v_bat'), s.akku); $('l_bat').textContent = s.laden ? 'Akku ⚡' : 'Akku'; }
   } catch (e) {}
 }
 const CHIPS = ['Wie ist das Wetter?', 'Öffne Spotify', 'Erzähl mir was Spannendes', 'Was weißt du über mich?', 'Merk dir: ', 'Öffne YouTube', 'Gib mir eine Idee für heute', 'Wie geht\'s dir?'];
-$('chips').innerHTML = CHIPS.map((c, i) => `<button class="chip" style="animation-delay:${.3 + i * .05}s">${esc(c)}</button>`).join('');
+const CHIP_C = ['var(--c)', 'var(--c2)', 'var(--c3)', 'var(--c4)'];
+$('chips').innerHTML = CHIPS.map((c, i) => `<button class="chip" style="animation-delay:${.3 + i * .05}s;--chip:${CHIP_C[i % 4]}">${esc(c)}</button>`).join('');
+
+/* ================= Widgets per Drag & Drop umsortieren ================= */
+const COLS = [$('left'), $('right')];
+function saveLayout() {
+  const l = {}; COLS.forEach(c => l[c.id] = [...c.querySelectorAll(':scope > [data-w]')].map(e => e.dataset.w));
+  try { localStorage.setItem('orbLayout', JSON.stringify(l)); } catch (e) {}
+}
+function loadLayout() {
+  let l = null; try { l = JSON.parse(localStorage.getItem('orbLayout') || 'null'); } catch (e) {}
+  if (!l) return;
+  for (const id of ['left', 'right']) (l[id] || []).forEach(w => { const el = document.querySelector(`[data-w="${w}"]`); if (el) $(id).appendChild(el); });
+}
+function flip(change) {   // Nachbarkarten gleiten weich an ihren neuen Platz
+  const els = [...document.querySelectorAll('.col > [data-w]:not(.dragging)')], before = new Map(els.map(e => [e, e.getBoundingClientRect()]));
+  change();
+  for (const e of els) { const a = before.get(e), b = e.getBoundingClientRect(), dx = a.left - b.left, dy = a.top - b.top;
+    if (dx || dy) e.animate([{ transform:`translate(${dx}px,${dy}px)` }, { transform:'none' }], { duration:380, easing:'cubic-bezier(.22,1,.36,1)' }); }
+}
+let drag = null;
+document.addEventListener('pointerdown', e => {
+  const card = e.target.closest('.col > [data-w]');
+  if (!card || e.button !== 0 || e.target.closest('button, input, select, a, .chip, #msgs, #terms li, #sp_ctl')) return;
+  if (!e.target.closest('h5, header') && card.id !== 'clockc') return;
+  e.preventDefault();
+  const r = card.getBoundingClientRect(), ph = document.createElement('div');
+  ph.className = 'ph'; ph.style.height = r.height + 'px';
+  if (card.id === 'chatp' || card.id === 'chipsc') ph.style.flex = '1';
+  card.parentNode.insertBefore(ph, card);
+  drag = { card, ph, dx:e.clientX - r.left, dy:e.clientY - r.top, orig:card.getAttribute('style') || '' };
+  card.classList.add('dragging'); document.body.classList.add('dragmode');
+  card.style.cssText = drag.orig + `;left:${r.left}px;top:${r.top}px;width:${r.width}px;height:${r.height}px`;
+  SFX.open();
+});
+addEventListener('pointermove', e => {
+  if (!drag) return;
+  drag.card.style.left = (e.clientX - drag.dx) + 'px'; drag.card.style.top = (e.clientY - drag.dy) + 'px';
+  const vis = COLS.filter(c => c.offsetWidth > 0);   // (fixierte Elemente haben kein offsetParent)
+  const col = vis.reduce((b, c) => { const r = c.getBoundingClientRect(), d = Math.abs(e.clientX - (r.left + r.width / 2)); return !b || d < b.d ? { c, d } : b; }, null)?.c;
+  if (!col) return;
+  let before = null;
+  for (const s of col.querySelectorAll(':scope > [data-w]:not(.dragging)')) { const r = s.getBoundingClientRect(); if (e.clientY < r.top + r.height / 2) { before = s; break; } }
+  if (drag.ph.parentNode !== col || drag.ph.nextElementSibling !== before) { flip(() => col.insertBefore(drag.ph, before)); SFX.hover(); }
+});
+addEventListener('pointerup', () => {
+  if (!drag) return;
+  const { card, ph, orig } = drag; drag = null;
+  const pr = ph.getBoundingClientRect();
+  card.classList.remove('dragging'); card.classList.add('dropping');
+  card.style.left = pr.left + 'px'; card.style.top = pr.top + 'px'; card.style.width = pr.width + 'px'; card.style.height = pr.height + 'px';
+  setTimeout(() => {
+    ph.replaceWith(card); card.classList.remove('dropping'); card.setAttribute('style', orig);
+    document.body.classList.remove('dragmode'); saveLayout(); LAY = layout(); SFX.drop(); ripple(.3);
+  }, 460);
+});
+// Lichtkegel auf den Karten folgt der Maus (nur auf der Karte unter dem Zeiger)
+let spotCard = null;
+addEventListener('mousemove', e => {
+  const c = e.target.closest && e.target.closest('.glass');
+  if (spotCard && spotCard !== c) { spotCard.style.removeProperty('--mx'); spotCard.style.removeProperty('--my'); }
+  spotCard = c;
+  if (c) { const r = c.getBoundingClientRect(); c.style.setProperty('--mx', (e.clientX - r.left) + 'px'); c.style.setProperty('--my', (e.clientY - r.top) + 'px'); }
+}, { passive:true });
+loadLayout();
 document.querySelectorAll('.chip').forEach(b => b.onclick = () => {
   SFX.click(); const t = b.textContent;
   if (t.endsWith(': ')) { $('txt').value = t; $('txt').focus(); } else ask(t);
@@ -1042,21 +1213,21 @@ let parts = [], bubbles = [], shooting = [];
 function setupParticles() {
   const n = [30, 70, 120][Q()];
   if (parts.length !== n) parts = Array.from({ length:n }, () => ({ a:Math.random() * 6.283, r:1.3 + Math.random() * 1.9,
-    sp:(.1 + Math.random() * .4) * (Math.random() < .5 ? -1 : 1), z:Math.random(), s:.5 + Math.random() * 1.4, wob:Math.random() * 6 }));
+    sp:(.1 + Math.random() * .4) * (Math.random() < .5 ? -1 : 1), z:Math.random(), s:.5 + Math.random() * 1.4, wob:Math.random() * 6, ci:Math.random() * 4 | 0 }));
   setupBubbles();
 }
 function setupBubbles() {
-  const n = [8, 20, 32][Q()];
+  const n = [8, 18, 28][Q()];
   bubbles = Array.from({ length:n }, () => newBubble(true));
 }
 function newBubble(any) {
   const z = Math.random();
-  return { x:Math.random() * W, y:any ? Math.random() * H : H + 30, r:3 + z * 14, sp:12 + z * 34, wob:Math.random() * 6, z };
+  return { x:Math.random() * W, y:any ? Math.random() * H : H + 30, r:3 + z * 14, sp:12 + z * 34, wob:Math.random() * 6, z, ci:Math.random() * 4 | 0 };
 }
 const waves = [], sparks = [];
-let bootT0 = performance.now(), nextPulse = 0, nextShoot = 4000;
-function ripple(k = 1) { if (waves.length < 12) waves.push({ r:0, a:.55 * Math.min(k, 1.4), w:1 + 2 * k, sp:1 + k * .4 }); if (k >= 1) SFX.thump(); }
-function burst(n) { if (n >= 20) SFX.sparkle(); n = Math.round(n * [.3, .6, 1][Q()]); for (let i = 0; i < n; i++) sparks.push({ a:Math.random() * 6.283, d:1, v:90 + Math.random() * 280, life:1, s:1 + Math.random() * 1.8 }); }
+let bootT0 = performance.now(), nextPulse = 0, nextShoot = 4000, waveCi = 0;
+function ripple(k = 1) { if (waves.length < 12) waves.push({ r:0, a:.55 * Math.min(k, 1.4), w:1 + 2 * k, sp:1 + k * .4, ci:waveCi++ % 4 }); if (k >= 1) SFX.thump(); }
+function burst(n) { if (n >= 20) SFX.sparkle(); n = Math.round(n * [.3, .6, 1][Q()]); for (let i = 0; i < n; i++) sparks.push({ a:Math.random() * 6.283, d:1, v:90 + Math.random() * 280, life:1, s:1 + Math.random() * 1.8, ci:i % 4 }); }
 const ease = (k, v, f) => S[k] += (v - S[k]) * Math.min(1, f);
 const waveBars = [...document.querySelectorAll('#wave i')];
 let mouse = { x:.5, y:.5 };
@@ -1080,7 +1251,7 @@ function setStatus(text) {
   }, 140);
 }
 function layout() {
-  const L = $('left').offsetParent ? $('left').offsetWidth + 20 : 0, Rr = $('right').offsetParent ? $('right').offsetWidth + 20 : 0;
+  const L = $('left').offsetWidth ? $('left').offsetWidth + 20 : 0, Rr = $('right').offsetWidth ? $('right').offsetWidth + 20 : 0;
   const mid = L + (W - L - Rr) / 2;
   document.documentElement.style.setProperty('--mid', mid + 'px');
   return { mid, cw:W - L - Rr };
@@ -1093,7 +1264,7 @@ function frame(now) {
   requestAnimationFrame(frame);
   const speaking = speakingNow();
   const active = speaking || listening || convoRec || S.mode === 'denkt' || S.mode === 'auftrag' || S.mode === 'wartet' || S.boot < 1 || waves.length || sparks.length;
-  const fps = S.sleep && S.sleepVis > .95 && !active ? 24 : active ? [30, 60, 120][Q()] : [30, 60, 90][Q()];
+  const fps = S.sleep && S.sleepVis > .95 && !active ? 24 : active ? [30, 60, 120][Q()] : [24, 40, 60][Q()];   // im Leerlauf weniger Bilder = weniger CPU
   if (now - lastT < 1000 / fps - 3) return;
   const t = now / 1000, dt = Math.min(.08, (now - lastT) / 1000); lastT = now;
   if (innerWidth < 2 || innerHeight < 2) return;
@@ -1101,6 +1272,7 @@ function frame(now) {
 
   let vm = listening || convoRec ? 'hoert' : speaking ? 'spricht' : (S.mode === 'spricht' ? 'idle' : S.mode);
   if (S.sleep && !speaking && !listening) vm = 'schlaf';
+  if ($('island').dataset.m !== vm) $('island').dataset.m = vm;
   setStatus({ idle:convo ? 'Gespräch läuft' : 'Bereit', hoert:convo ? 'Ich höre zu · „Stopp“ beendet' : 'Ich höre zu', denkt:'Denke nach',
     auftrag:'Arbeite', spricht:'Spreche', wartet:'Wartet auf dich', schlaf:cfg.klatschen ? 'Schlafe · 2× klatschen' : 'Schlafe' }[vm] || vm);
 
@@ -1147,23 +1319,22 @@ function frame(now) {
   try { drawFx(t, dt, now, cx, cy, R, speaking); } catch (e) { fx.globalCompositeOperation = 'source-over'; fx.globalAlpha = 1; fx.shadowBlur = 0; }
 }
 
-function ring3d(cx, cy, rx, ry, rot, A, t, beads, speed) {
-  // Ellipse als 3D-Ring: vorne hell, hinten dunkel
-  const n = 90;
+function ring3d(cx, cy, rx, ry, rot, A, t, beads, speed, ci = 0) {
+  // Ellipse als 3D-Ring: vorne hell, hinten dunkel – in einer Palettenfarbe, Perlen in den Nachbarfarben
+  const n = 48, cr = Math.cos(rot), sr = Math.sin(rot);
+  const p = (a) => { const x = Math.cos(a) * rx, y = Math.sin(a) * ry; return [cx + x * cr - y * sr, cy + x * sr + y * cr]; };
   fx.lineWidth = 1.2;
   for (let i = 0; i < n; i++) {
     const a0 = i / n * 6.283, a1 = (i + 1) / n * 6.283, depth = (Math.sin((a0 + a1) / 2) + 1) / 2;
-    const p = (a) => { const x = Math.cos(a) * rx, y = Math.sin(a) * ry; return [cx + x * Math.cos(rot) - y * Math.sin(rot), cy + x * Math.sin(rot) + y * Math.cos(rot)]; };
     const [x0, y0] = p(a0), [x1, y1] = p(a1);
-    fx.strokeStyle = lite(A * (.08 + .5 * depth), .4); fx.beginPath(); fx.moveTo(x0, y0); fx.lineTo(x1, y1); fx.stroke();
+    fx.strokeStyle = pcol(ci, A * (.08 + .5 * depth), .35); fx.beginPath(); fx.moveTo(x0, y0); fx.lineTo(x1, y1); fx.stroke();
   }
   for (let k = 0; k < beads; k++) {
     const a = t * speed + k * 6.283 / beads, depth = (Math.sin(a) + 1) / 2;
-    const x = Math.cos(a) * rx, y = Math.sin(a) * ry;
-    const bx = cx + x * Math.cos(rot) - y * Math.sin(rot), by = cy + x * Math.sin(rot) + y * Math.cos(rot);
-    const g = fx.createRadialGradient(bx, by, 0, bx, by, 9);
-    g.addColorStop(0, lite(A * (.3 + .7 * depth), .7)); g.addColorStop(1, col(0));
-    fx.fillStyle = g; fx.beginPath(); fx.arc(bx, by, 9, 0, 7); fx.fill();
+    const [bx, by] = p(a), bc = ci + k + 1;
+    const g = fx.createRadialGradient(bx, by, 0, bx, by, 10);
+    g.addColorStop(0, pcol(bc, A * (.35 + .65 * depth), .55)); g.addColorStop(1, pcol(bc, 0));
+    fx.fillStyle = g; fx.beginPath(); fx.arc(bx, by, 10, 0, 7); fx.fill();
   }
 }
 
@@ -1197,22 +1368,23 @@ function drawFx(t, dt, now, cx, cy, R, speaking) {
     b.y -= b.sp * dt * (1 + S.energy); b.x += Math.sin(t * .8 + b.wob) * .25;
     if (b.y < -30) { Object.assign(b, newBubble(false)); if (fade > .5 && Math.random() < .12) SFX.pop(); }
     const a = (.05 + b.z * .12) * (.35 + .65 * fade);
-    fx.strokeStyle = lite(a, .6); fx.lineWidth = 1; fx.beginPath(); fx.arc(b.x - S.px * b.z * 14, b.y, b.r, 0, 7); fx.stroke();
+    fx.strokeStyle = pcol(b.ci, a * 1.2, .5); fx.lineWidth = 1; fx.beginPath(); fx.arc(b.x - S.px * b.z * 14, b.y, b.r, 0, 7); fx.stroke();
     fx.fillStyle = `rgba(255,255,255,${a * 1.4})`; fx.beginPath(); fx.arc(b.x - S.px * b.z * 14 - b.r * .35, b.y - b.r * .4, b.r * .22, 0, 7); fx.fill();
   }
   // Sternschnuppen
-  if (now > nextShoot && q > 0 && fade > .5) { shooting.push({ x:Math.random() * W * .8, y:Math.random() * H * .35, life:1, vx:520 + Math.random() * 300, vy:160 + Math.random() * 90 }); nextShoot = now + 5000 + Math.random() * 7000; SFX.shoot(); }
+  if (now > nextShoot && q > 0 && fade > .5) { shooting.push({ x:Math.random() * W * .8, y:Math.random() * H * .35, life:1, vx:520 + Math.random() * 300, vy:160 + Math.random() * 90, ci:Math.random() * 4 | 0 }); nextShoot = now + 5000 + Math.random() * 7000; SFX.shoot(); }
   for (let i = shooting.length - 1; i >= 0; i--) {
     const s = shooting[i]; s.life -= dt * 1.2; s.x += s.vx * dt; s.y += s.vy * dt;
     if (s.life <= 0) { shooting.splice(i, 1); continue; }
     const g = fx.createLinearGradient(s.x, s.y, s.x - s.vx * .18, s.y - s.vy * .18);
-    g.addColorStop(0, `rgba(255,255,255,${.8 * s.life})`); g.addColorStop(1, 'rgba(255,255,255,0)');
+    g.addColorStop(0, `rgba(255,255,255,${.85 * s.life})`); g.addColorStop(.25, pcol(s.ci ?? 2, .6 * s.life, .3)); g.addColorStop(1, pcol(s.ci ?? 2, 0));
     fx.strokeStyle = g; fx.lineWidth = 1.6; fx.beginPath(); fx.moveTo(s.x, s.y); fx.lineTo(s.x - s.vx * .18, s.y - s.vy * .18); fx.stroke();
   }
   // Orbit-Ringe mit Perlen (immer da, beim Denken schneller)
   if (fade > .02) {
-    ring3d(cx, cy, R * 1.95, R * .5, -.32 + Math.sin(t * .2) * .05, (.35 + S.think * .5) * fade, t, 2, .5 + S.think * 1.5);
-    ring3d(cx, cy, R * 2.45, R * .42, .22 + Math.sin(t * .15) * .04, (.22 + S.think * .4) * fade, t, 3, -.32 - S.think);
+    ring3d(cx, cy, R * 1.95, R * .5, -.32 + Math.sin(t * .2) * .05, (.35 + S.think * .5) * fade, t, 2, .5 + S.think * 1.5, 2);
+    ring3d(cx, cy, R * 2.45, R * .42, .22 + Math.sin(t * .15) * .04, (.22 + S.think * .4) * fade, t, 3, -.32 - S.think, 3);
+    if (Q() > 0) ring3d(cx, cy, R * 3.0, R * .3, -.12 + Math.sin(t * .1) * .03, (.12 + S.think * .3) * fade, t, 4, .2 + S.think * .8, 1);
   }
   // Wellenform-Ring
   const vis = Math.max(S.speakVis, S.listenVis) * fade;
@@ -1229,7 +1401,7 @@ function drawFx(t, dt, now, cx, cy, R, speaking) {
       }
       fx.closePath();
       fx.strokeStyle = layer ? col2(.35 * vis) : lite(.55 * vis, .35);
-      fx.lineWidth = layer ? 1.2 : 1.8; fx.shadowColor = col(1); fx.shadowBlur = q > 1 ? 12 : 0; fx.stroke();
+      fx.lineWidth = layer ? 1.2 : 1.8; fx.stroke();
     }
     fx.shadowBlur = 0;
     // Lichtstrahlen beim Sprechen
@@ -1257,18 +1429,18 @@ function drawFx(t, dt, now, cx, cy, R, speaking) {
     p.a += p.sp * dt * (.1 + S.energy * .6 + S.level * .5);
     if (S.listenVis > .3) { p.r -= dt * .45 * S.listenVis; if (p.r < 1.15) p.r = 3; }
     const rr = R * (p.r + Math.sin(t * .7 + p.wob) * .08);
-    fx.fillStyle = lite((.12 + p.z * .4) * (.45 + S.energy) * fade, .4);
+    fx.fillStyle = pcol(p.ci, (.14 + p.z * .42) * (.45 + S.energy) * fade, .35);
     fx.beginPath(); fx.arc(cx + Math.cos(p.a) * rr, cy + Math.sin(p.a) * rr * (.8 + p.z * .35), p.s * .7, 0, 7); fx.fill();
   }
   for (let i = sparks.length - 1; i >= 0; i--) {
     const s = sparks[i]; s.life -= dt * 1.3; s.d += s.v * dt / R; s.v *= Math.pow(.15, dt);
     if (s.life <= 0) { sparks.splice(i, 1); continue; }
-    fx.fillStyle = lite(s.life, .6); fx.beginPath(); fx.arc(cx + Math.cos(s.a) * R * s.d, cy + Math.sin(s.a) * R * s.d, s.s * s.life, 0, 7); fx.fill();
+    fx.fillStyle = pcol(s.ci || 0, s.life, .45); fx.beginPath(); fx.arc(cx + Math.cos(s.a) * R * s.d, cy + Math.sin(s.a) * R * s.d, s.s * s.life, 0, 7); fx.fill();
   }
   for (let i = waves.length - 1; i >= 0; i--) {
     const w = waves[i]; w.r += dt * w.sp * 1.5; const al = w.a * (1 - w.r / 3);
     if (al <= 0) { waves.splice(i, 1); continue; }
-    fx.strokeStyle = lite(al, .45); fx.lineWidth = w.w * (1 - w.r / 3) + .4;
+    fx.strokeStyle = pcol(w.ci || 0, al, .35); fx.lineWidth = w.w * (1 - w.r / 3) + .4;
     fx.beginPath(); fx.arc(cx, cy, R * (1.05 + w.r), 0, 7); fx.stroke();
   }
   // Hologramm beim Arbeiten
@@ -1288,7 +1460,7 @@ function drawFx(t, dt, now, cx, cy, R, speaking) {
     if (fx.createConicGradient && q > 0) { const sweep = fx.createConicGradient(0, 0, 0);
       sweep.addColorStop(0, col(0)); sweep.addColorStop(.85, col(0)); sweep.addColorStop(1, col(.12 * A));
       fx.fillStyle = sweep; fx.beginPath(); fx.arc(0, 0, R * 2.2, 0, 7); fx.arc(0, 0, R * 1.2, 0, 7, true); fx.fill(); }
-    fx.strokeStyle = lite(.85 * A, .3); fx.lineWidth = 2.5; fx.shadowColor = col(1); fx.shadowBlur = q > 1 ? 14 : 0;
+    fx.strokeStyle = pcol(2, .85 * A, .3); fx.lineWidth = 2.5;
     fx.beginPath(); fx.arc(0, 0, R * 2.2, -.35, 0); fx.stroke(); fx.shadowBlur = 0;
     fx.restore();
   }
@@ -1391,6 +1563,7 @@ $('s_sfxl').onchange = () => SFX.done();
 $('s_wake').onchange = e => saveCfg({ wakeword:e.target.value.trim() || 'Jarvis' });
 $('s_ordner').onchange = e => saveCfg({ ordner:e.target.value.trim() });
 $('schlafjetzt').onclick = () => { toggleSettings(false); goSleep(); };
+$('resetLayout').onclick = () => { try { localStorage.removeItem('orbLayout'); } catch (e) {} location.reload(); };
 $('beenden').onclick = async () => { SFX.sleep(); await fetch('/quit', { method:'POST' }).catch(() => {}); setTimeout(() => window.close(), 300); };
 $('probe').onclick = async () => {
   initAudio(); if (!audioOk()) return;
