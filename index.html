@@ -413,7 +413,8 @@
   <div class="sh"><span>Einstellungen</span><button class="done" id="setx">Fertig</button></div>
   <div class="grp"><h4>Wecken &amp; Gespräch</h4><div class="card">
     <div class="row">Zweimal klatschen weckt ORB<input type="checkbox" class="sw" id="s_klatsch"></div>
-    <div class="row">Schnipsen schickt ORB weg<input type="checkbox" class="sw" id="s_schnipsen"></div>
+    <div class="row">Schnipsen schickt ORB in den Hintergrund<input type="checkbox" class="sw" id="s_schnipsen"></div>
+    <div class="row">„Jarvis“ rufen – ORB hört jederzeit zu<input type="checkbox" class="sw" id="s_jarvis"></div>
     <div class="row col"><div class="lbl">Klatsch-Empfindlichkeit<span class="v" id="v_empf"></span></div><input type="range" id="s_empf" min="1" max="10" step="1"></div>
     <div class="row">Dauerhaft zuhören bis „Stopp“<input type="checkbox" class="sw" id="s_dauer"></div>
     <div class="row">Mit „Jarvis“ unterbrechen<input type="checkbox" class="sw" id="s_unterbrechen"></div>
@@ -421,12 +422,12 @@
     <div class="row">Einschlafen nach<select id="s_schlaf"><option value="0">nie</option><option value="2">2 Min.</option><option value="5">5 Min.</option><option value="10">10 Min.</option><option value="30">30 Min.</option></select></div>
     <div class="row">Dein Name<input type="text" id="s_name" placeholder="optional"></div>
     <div class="row">Ort fürs Wetter<input type="text" id="s_ort" placeholder="automatisch"></div>
-  </div><p class="note">2× klatschen = ORB erscheint · „Jarvis“ = ORB hört zu · Schnipsen = ORB verschwindet · „Stopp“ beendet</p></div>
+  </div><p class="note">Alles gleichzeitig aktiv: 2× klatschen = ORB erscheint · Schnipsen = ORB schläft im Hintergrund · „Jarvis“ = ORB hört zu, auch aus dem Schlaf · „Stopp“ beendet</p></div>
   <div class="grp"><h4>Start</h4><div class="card">
     <div class="row">Mit Windows starten (lauscht im Hintergrund)<input type="checkbox" class="sw" id="s_auto"></div>
     <div class="row">Im Vollbild öffnen<input type="checkbox" class="sw" id="s_voll"></div>
     <div class="row">Im Schlaf Fenster schließen (spart ~800 MB)<input type="checkbox" class="sw" id="s_schliessen"></div>
-  </div><p class="note">ORB wartet unsichtbar mit ~30 MB. Zweimal klatschen → ORB springt im Vollbild an.</p></div>
+  </div><p class="note">ORB wartet unsichtbar mit ~30 MB. Zweimal klatschen → ORB springt im Vollbild an. Ist „Jarvis“ an, wird das Fenster im Schlaf nur ausgeblendet, damit ORB dich weiter hört.</p></div>
   <div class="grp"><h4>Stimme</h4><div class="card">
     <div class="row col">Sprecher<select id="s_stimme"></select></div>
     <div class="row col"><div class="lbl">Sprechtempo<span class="v" id="v_tempo"></span></div><input type="range" id="s_tempo" min="-20" max="50" step="5"></div>
@@ -465,7 +466,6 @@
     <div class="row">Status<span id="up_stat">automatisch jede Minute</span></div>
   </div><div style="margin-top:9px"><button class="btn" id="up_btn">↻ Nach Updates suchen</button></div></div>
   <div class="grp"><h4>Steuerung</h4><div class="card">
-    <div class="row col">Sprechen mit<div class="seg" id="seg_st"><button data-v="taste">Nur Klatschen / Taste</button><button data-v="wort">Klatschen + „Jarvis“</button></div></div>
     <div class="row">Aktivierungswort<input type="text" id="s_wake"></div>
   </div><div style="margin-top:9px"><button class="btn" id="schlafjetzt">☾ Jetzt schlafen</button><button class="btn red" id="beenden">⏻ ORB ganz beenden</button></div>
   <p class="note">Leertaste halten = sprechen · Esc = stoppen · T = tippen · M = Stimme · F = Vollbild · E = Einstellungen</p></div>
@@ -870,8 +870,17 @@ function snapRatio() {
 function onSnap() {
   if (S.sleep) return;
   SFX.close(); ripple(.8); hint('Bis gleich · zweimal klatschen holt mich zurück', 2500);
-  goSleep(true);
-  clearTimeout(hideTimer); hideTimer = setTimeout(() => { if (S.sleep) fetch('/hide', { method:'POST' }).catch(() => {}); }, 1200);
+  goSleep(true); toBack(1200);
+}
+// In den Hintergrund: mit „Jarvis“ nur ausblenden (Seite hört weiter zu), sonst Fenster schließen (spart ~800 MB)
+let verborgen = false;
+function toBack(ms) {
+  clearTimeout(hideTimer);
+  hideTimer = setTimeout(() => {
+    if (!S.sleep) return;
+    const keep = cfg.steuerung === 'wort'; verborgen = keep;
+    fetch('/hide', { method:'POST', headers:{ 'Content-Type':'application/json' }, body:JSON.stringify({ keep }) }).catch(() => {});
+  }, ms);
 }
 function clapTick() {
   if (!cfg.klatschen && !cfg.schnipsen) return;
@@ -919,6 +928,7 @@ function registerClap(t) {
 }
 function onDoubleClap() {
   SFX.clap();
+  verborgen = false; fetch('/show', { method:'POST' }).catch(() => {});   // Klatschen holt ORB immer in den Vordergrund
   if (S.sleep) return wake();
   if (cfg.dauerzuhoeren) { if (!convo) startConvo(); }
   else if (!S.busy && !listening) listenOnce();
@@ -932,20 +942,24 @@ function goSleep(silent) {
   stopAudio(); stopWake(); stopConvo(true); killBarge(); if (listening && rec) { pttEnd = false; rec.abort(); }
   if (!silent) SFX.sleep();
   caption(''); fetch('/sleep', { method:'POST' }).catch(() => {});
-  hint(cfg.klatschen ? 'Schlafmodus · zweimal klatschen' : 'Schlafmodus · Leertaste', 4000);
+  hint(cfg.klatschen ? 'Schlafmodus · zweimal klatschen' + (cfg.steuerung === 'wort' ? ' oder „' + (cfg.wakeword || 'Jarvis') + '“' : '') : cfg.steuerung === 'wort' ? 'Schlafmodus · „' + (cfg.wakeword || 'Jarvis') + '“ weckt mich' : 'Schlafmodus · Leertaste', 4000);
   if (cfg.steuerung === 'wort') setTimeout(startWake, 500);   // Aktivierungswort weckt auch aus dem Schlaf
-  // Fenster nach kurzer Zeit ganz schließen – spart ~800 MB; im Hintergrund wird weiter auf Klatschen gelauscht
+  // Fenster nach kurzer Zeit wegräumen – im Hintergrund wird weiter auf Klatschen (und „Jarvis“) gelauscht
   clearTimeout(hideTimer);
-  if (cfg.schlaf_schliessen && cfg.klatschen) hideTimer = setTimeout(() => { if (S.sleep) fetch('/hide', { method:'POST' }).catch(() => {}); }, 45000);
+  if (cfg.schlaf_schliessen && (cfg.klatschen || cfg.steuerung === 'wort')) toBack(45000);
 }
 let hideTimer;
-function wake() {
-  if (!S.sleep) return startListening();
+function wake(frage) {
+  clearTimeout(hideTimer);
+  if (verborgen || document.hidden) { verborgen = false; fetch('/show', { method:'POST' }).catch(() => {}); }   // aus dem Hintergrund nach vorne
+  if (!S.sleep) return frage === undefined ? startListening() : frage ? ask(frage) : undefined;
   S.sleep = false; document.body.classList.remove('sleeping');
   lastAct = performance.now(); bootT0 = performance.now();
   SFX.boot(); SFX.liquid(); ripple(1.6); burst(80); replayEnter(); loadSys();
   if (cfg.steuerung === 'wort') startWake();
-  if (cfg.begruessung) { listenAfterSpeech = true; fetch('/greet', { method:'POST' }).catch(() => {}); }
+  if (frage) { fetch('/warm', { method:'POST' }).catch(() => {}); setTimeout(() => ask(frage), 300); }   // „Jarvis, …“ – Frage direkt annehmen
+  else if (frage === '') { fetch('/warm', { method:'POST' }).catch(() => {}); setTimeout(startListening, 700); }
+  else if (cfg.begruessung) { listenAfterSpeech = true; fetch('/greet', { method:'POST' }).catch(() => {}); }
   else { fetch('/warm', { method:'POST' }).catch(() => {}); setTimeout(startListening, 1200); }
 }
 function replayEnter() { document.querySelectorAll('.enter').forEach(el => { el.style.animation = 'none'; void el.offsetWidth; el.style.animation = ''; }); }
@@ -953,8 +967,10 @@ let started = false;
 async function startup() {
   if (started) return; started = true;
   await loadCfg();
+  const leise = location.hash === '#schlaf';   // unsichtbar gestartet (Autostart mit „Jarvis“)
   if (location.hash) window.history.replaceState(null, '', location.pathname);
   await ensureMic(); startClap();
+  if (leise) { verborgen = true; goSleep(true); return; }
   S.sleep = true; wake();   // Fenster offen = wach. Schlafen = Fenster zu (Klatschen weckt über den Hintergrund-Lauscher)
 }
 
@@ -977,7 +993,7 @@ async function ask(text) {
   }
   // „Schließ dich“ → nur das Fenster zu, ORB wartet im Hintergrund weiter auf Klatschen
   if (/^((orb|jarvis),?\s*)?(schlie(ß|ss)e? dich|geh in den hintergrund|versteck dich|minimier(e)? dich|fenster zu)$/i.test(t0)) {
-    addMsg('me', text); goSleep(true); SFX.sleep(); setTimeout(() => fetch('/hide', { method:'POST' }).catch(() => {}), 700);
+    addMsg('me', text); goSleep(true); SFX.sleep(); toBack(700);
     return;
   }
   if (/^((orb|jarvis),?\s*)?(schlaf|geh schlafen|gute nacht|ruhemodus|schlafmodus)\b/i.test(text)) { addMsg('me', text); return goSleep(); }
@@ -1090,11 +1106,11 @@ function startWake() {
 function stopWake() { if (wakeRec) { wakeRec._stopped = true; try { wakeRec.abort(); } catch (e) {} wakeRec = null; } }
 function onWake(t) {
   const low = t.toLowerCase(), m = low.match(NAME_RE());
-  if (S.sleep) { if (m) wake(); return; }
+  const rest = m ? t.slice(m.index + m[0].length).replace(/^[\s,.!?:;]+/, '') : '';
+  if (S.sleep) { if (m) wake(rest.length > 2 ? rest : ''); return; }   // aus Schlaf/Hintergrund: aufwachen und die Frage annehmen
   if (S.busy || speakingNow()) return;
   if (performance.now() < armedUntil) { armedUntil = 0; return ask(t); }
   if (!m) return;
-  const rest = t.slice(m.index + m[0].length).replace(/^[\s,.!?:;]+/, '');
   if (rest.length > 2) ask(rest); else { armedUntil = performance.now() + 8000; SFX.listenOn(); ripple(.6); hint('Ich höre …', 8000); }
 }
 
@@ -1165,7 +1181,7 @@ async function poll() {
     const aktiv = speakingNow() || listening || !!convoRec ? '1' : '0';
     const st = await (await fetch('/state?aktiv=' + aktiv, { cache:'no-store' })).json(); lastOk = performance.now(); S.busy = !!st.busy;
     // neue ORB-Version läuft → Seite neu laden (sonst sieht man Änderungen erst nach Fenster-Neustart)
-    if (st.version) { if (!poll._v) poll._v = st.version; else if (st.version !== poll._v) { location.replace('/#wake'); location.reload(); return; } }
+    if (st.version) { if (!poll._v) poll._v = st.version; else if (st.version !== poll._v) { location.replace(S.sleep ? '/#schlaf' : '/#wake'); location.reload(); return; } }
     if (st.seq !== S.seq && (S.seq === -1 || st.seq > S.seq || st.seq < S.seq - 1000)) { const first = S.seq === -1; S.seq = st.seq; onState(st, first); }
   } catch (e) {}
   poll._busy = false;
@@ -1746,7 +1762,7 @@ const pct = v => (v >= 0 ? '+' : '') + v + '%', hz = v => (v >= 0 ? '+' : '') + 
 $('swatches').innerHTML = Object.entries(THEMES).map(([k, [c, c2]]) =>
   `<div class="swc" data-k="${k}" title="${k}" style="background:radial-gradient(circle at 35% 28%,#fff,rgb(${rgb(c)}) 42%,rgb(${rgb(c2)}));box-shadow:0 0 16px rgba(${rgb(c)},.7)"></div>`).join('');
 document.querySelectorAll('.swc').forEach(el => el.onclick = () => { saveCfg({ farbe:el.dataset.k }); ripple(1.2); burst(40); SFX.drop(); });
-const segs = { seg_eff:'tempo_claude', seg_len:'laenge', seg_rechte:'rechte', seg_fx:'effekte', seg_st:'steuerung' };
+const segs = { seg_eff:'tempo_claude', seg_len:'laenge', seg_rechte:'rechte', seg_fx:'effekte' };
 for (const [id, key] of Object.entries(segs)) $(id).querySelectorAll('button').forEach(b => b.onclick = () => { saveCfg({ [key]:b.dataset.v }); SFX.click(); });
 function fillRange(el) { el.style.setProperty('--p', (el.value - el.min) / (el.max - el.min) * 100 + '%'); }
 const CHK = { s_klatsch:'klatschen', s_schnipsen:'schnipsen', s_dauer:'dauerzuhoeren', s_unterbrechen:'unterbrechen', s_gruss:'begruessung', s_voll:'vollbild', s_auto:'autostart', s_schliessen:'schlaf_schliessen', s_screen:'bildschirm', s_unter:'untertitel', s_sfx:'sfx', s_amb:'ambient' };
@@ -1756,6 +1772,7 @@ function syncSettingsUI() {
   set('s_laut', cfg.lautstaerke); set('s_sfxl', cfg.sfxlaut); set('s_ordner', cfg.ordner); set('s_wake', cfg.wakeword);
   set('s_empf', cfg.empfindlichkeit); set('s_schlaf', String(cfg.schlafen)); set('s_name', cfg.name); set('s_ort', cfg.ort);
   for (const [id, key] of Object.entries(CHK)) $(id).checked = !!cfg[key];
+  $('s_jarvis').checked = cfg.steuerung === 'wort';
   $('s_voice').checked = voiceOn;
   $('v_tempo').textContent = cfg.tempo; $('v_hoehe').textContent = cfg.hoehe; $('v_laut').textContent = cfg.lautstaerke + ' %';
   $('v_sfxl').textContent = cfg.sfxlaut + ' %'; $('v_empf').textContent = cfg.empfindlichkeit;
@@ -1765,6 +1782,7 @@ function syncSettingsUI() {
 }
 for (const [id, key] of Object.entries(CHK)) $(id).onchange = e => { saveCfg({ [key]:e.target.checked }); e.target.checked ? SFX.on() : SFX.off(); if (key === 'dauerzuhoeren' && !e.target.checked && convo) stopConvo(); };
 $('s_voice').onchange = e => setVoice(e.target.checked);
+$('s_jarvis').onchange = e => { saveCfg({ steuerung:e.target.checked ? 'wort' : 'taste' }); e.target.checked ? SFX.on() : SFX.off(); };
 $('s_empf').oninput = e => saveCfg({ empfindlichkeit:+e.target.value });
 $('s_schlaf').onchange = e => saveCfg({ schlafen:+e.target.value });
 $('s_name').onchange = e => saveCfg({ name:e.target.value.trim() });

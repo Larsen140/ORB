@@ -68,7 +68,7 @@ DEFAULT_CFG = {
 }
 # Damit ORB immer dein Claude-Code-Login (Max-Abo) nutzt und nie einen API-Schlüssel
 CLAUDE_ENV_DROP = ("ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "ANTHROPIC_BASE_URL")
-VERSION = "37"
+VERSION = "38"
 ORB_UI = ("Deine Oberfläche (die Larsen gerade sieht): in der Mitte du als flüssige leuchtende Kugel mit Tropfen, "
           "Orbit-Ringen und Sternenhimmel; links eine Uhr und darunter der Gesprächsverlauf mit Eingabefeld; rechts "
           "Karten für System (CPU, RAM, Akku), Wetter mit Stundenvorschau, Aktivität (was du gerade tust) und Vorschläge; "
@@ -1049,10 +1049,11 @@ class Handler(BaseHTTPRequestHandler):
             self.send(200, {"ok": bool(text)})
         elif u.path == "/hide":
             self.send(200, {"ok": True})
-            if not BRAIN.busy:
+            keep = bool(b.get("keep"))   # nur ausblenden: Seite hört weiter auf „Jarvis“
+            if not BRAIN.busy and not keep:
                 BRAIN.kill()
             if ON_HIDE[0]:
-                threading.Thread(target=ON_HIDE[0], daemon=True).start()
+                threading.Thread(target=ON_HIDE[0], kwargs={"keep": keep}, daemon=True).start()
         elif u.path == "/show":  # Fenster öffnen bzw. nach vorne holen (z. B. zweiter Doppelklick auf ORB.exe)
             if ON_SHOW[0]:
                 threading.Thread(target=ON_SHOW[0], kwargs={"wake": bool(b.get("wake"))}, daemon=True).start()

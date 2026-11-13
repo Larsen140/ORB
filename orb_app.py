@@ -51,29 +51,51 @@ def window_open():
     return time.time() - server.LAST_POLL[0] < 4 or time.time() - _win["opened"] < 15
 
 
+def orb_windows():
+    """Alle ORB-Fenster (auch ausgeblendete) – Edge-App-Fenster mit dem Titel „ORB“."""
+    u = ctypes.windll.user32
+    found = []
+
+    @ctypes.WINFUNCTYPE(ctypes.c_bool, ctypes.c_void_p, ctypes.c_void_p)
+    def cb(h, _):
+        if u.GetWindowTextLengthW(h) == 3:
+            b = ctypes.create_unicode_buffer(4)
+            u.GetWindowTextW(h, b, 4)
+            c = ctypes.create_unicode_buffer(64)
+            u.GetClassNameW(h, c, 64)
+            if b.value == "ORB" and c.value.startswith("Chrome_WidgetWin"):
+                found.append(h)
+        return True
+
+    u.EnumWindows(cb, 0)
+    return found
+
+
 def bring_front():
-    """ORB-Fenster nach vorne holen (Windows erlaubt das nur mit kleinem Alt-Tasten-Trick)."""
+    """ORB-Fenster nach vorne holen – auch wenn es ausgeblendet war (Windows erlaubt das nur mit kleinem Alt-Tasten-Trick)."""
     try:
         u = ctypes.windll.user32
-        found = []
-
-        @ctypes.WINFUNCTYPE(ctypes.c_bool, ctypes.c_void_p, ctypes.c_void_p)
-        def cb(h, _):
-            n = u.GetWindowTextLengthW(h)
-            if n and u.IsWindowVisible(h):
-                b = ctypes.create_unicode_buffer(n + 1)
-                u.GetWindowTextW(h, b, n + 1)
-                if b.value == "ORB":
-                    found.append(h)
-            return True
-
-        u.EnumWindows(cb, 0)
-        for h in found:
+        for h in orb_windows():
             u.keybd_event(0x12, 0, 0, 0); u.keybd_event(0x12, 0, 2, 0)
-            u.ShowWindow(h, 9)
+            u.ShowWindow(h, 9 if u.IsIconic(h) else 5)
             u.SetForegroundWindow(h)
     except Exception as e:
         print("Fenster nach vorne:", e)
+
+
+def hide_hidden_soon():
+    """Gerade gestartetes Fenster sofort ausblenden (Start im Hintergrund, damit „Jarvis“ trotzdem zuhört)."""
+    end = time.time() + 20
+    while time.time() < end:
+        try:
+            hs = orb_windows()
+            if hs:
+                for h in hs:
+                    ctypes.windll.user32.ShowWindow(h, 0)
+                return
+        except Exception:
+            pass
+        time.sleep(.05)
 
 
 def window_process_running():
@@ -90,25 +112,37 @@ def window_process_running():
     return False
 
 
-def show(wake=False):
+def show(wake=False, hidden=False):
     if window_open() or window_process_running():
+        if hidden:
+            return
         bring_front()
         if wake:
             server.write_state(wake_req=time.time())
         return
     _win["opened"] = time.time()
     browser = find_browser()
-    url = URL + ("/#wake" if wake else "/")
+    url = URL + ("/#schlaf" if hidden else "/#wake" if wake else "/")
     if not browser:
         webbrowser.open(url)
         return
     profile = os.path.join(os.environ.get("LOCALAPPDATA", os.path.expanduser("~")), "ORB", "fenster")
     extra = ["--start-fullscreen"] if server.load_cfg().get("vollbild", True) else []
     subprocess.Popen([browser, "--app=" + url, "--user-data-dir=" + profile] + LEAN + extra)
+    if hidden:
+        threading.Thread(target=hide_hidden_soon, daemon=True).start()
 
 
-def hide_window():
-    """ORB-Fenster schließen (spart ~800 MB) – im Hintergrund wird weiter auf Klatschen gelauscht."""
+def hide_window(keep=False):
+    """ORB-Fenster schließen (spart ~800 MB) – im Hintergrund wird weiter auf Klatschen gelauscht.
+    keep=True: nur ausblenden – die Seite läuft weiter und hört auf „Jarvis“, Klatschen und Schnipsen."""
+    if keep:
+        try:
+            for h in orb_windows():
+                ctypes.windll.user32.ShowWindow(h, 0)
+            return
+        except Exception as e:
+            print("Fenster ausblenden:", e)
     try:
         import psutil
         for p in psutil.process_iter(["name", "cmdline"]):
@@ -121,6 +155,23 @@ def hide_window():
         print("Fenster schließen:", e)
     server.LAST_POLL[0] = 0
     _win["opened"] = 0
+
+
+def snap_ratio(x, sr):
+    """Helle (2–5,5 kHz) zu volle Energie (150–1500 Hz) – Schnipsen > 1,4, Klatschen darunter.
+    Goertzel auf wenigen Frequenzen, nur für Knall-Kandidaten berechnet."""
+    import math
+
+    def power(f):
+        w = 2 * math.cos(2 * math.pi * f / sr)
+        s1 = s2 = 0.0
+        for v in x:
+            s1, s2 = v + w * s1 - s2, s1
+        return s1 * s1 + s2 * s2 - w * s1 * s2
+
+    lo = sum(power(f) for f in range(200, 1500, 200)) / 7
+    hi = sum(power(f) for f in range(2000, 5500, 400)) / 9
+    return (hi * 3500) / ((lo * 1350) or 1e-9)
 
 
 def clap_loop():
@@ -168,7 +219,8 @@ def clap_loop():
                         # Klatschen ist breitbandig; ein Mausklick ist fast nur hohes Klicken
                         e = sum(v * v for v in x) or 1
                         hf = sum((x[i] - x[i - 1]) ** 2 for i in range(1, len(x))) / e
-                        if hf < 2.6 and pk / rms < 18 and server.mouse_ago() > .4:
+                        # Schnipser (hell, Energie bei 2–5 kHz) zählen nicht als Klatschen
+                        if hf < 2.6 and pk / rms < 18 and server.mouse_ago() > .4 and snap_ratio(x, sr) < 1.4:
                             cand = (now, rms)
                     floor = rms if rms < floor else floor * .995 + min(rms, .2) * .005   # Stille sofort übernehmen
         except Exception as e:
@@ -372,6 +424,8 @@ def main():
     threading.Thread(target=backup_jarvis, daemon=True).start()
     if not BG and not RESTART:
         show()
+    elif BG and cfg.get("steuerung", "wort") == "wort":
+        show(hidden=True)   # unsichtbar starten, damit „Jarvis“ auch direkt nach dem PC-Start zuhört
     while True:  # bleibt im Hintergrund, bis „ORB beenden“ gewählt wird
         time.sleep(3600)
 
