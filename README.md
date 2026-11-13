@@ -14,6 +14,7 @@ Voraussetzung für Antworten: [Claude Code](https://claude.com/claude-code) inst
 - **Gespräch**: hört dauerhaft zu, bis man „Stopp“ sagt; „Jarvis“ unterbricht ihn.
 - **Antwortet laut** auf Deutsch (Microsoft-Neural-Stimmen), Satz für Satz, während die Antwort entsteht.
 - **Apps & Webseiten öffnen**, Wetter, Termine, Spotify-Steuerung – ohne Token.
+- **iCloud-Kalender**: Termine eintragen, lesen und löschen (Einstellungen → iCloud-Kalender, app-spezifisches Passwort).
 - **Oberfläche** im Liquid-Glass-Stil mit Uhr, Gesprächsverlauf, System, Wetter, Termine, Spotify und Vorschlägen.
 - **Wissensbasis**: arbeitet im Ordner `Documents\Jarvis` und merkt sich dort alles.
 
@@ -23,6 +24,7 @@ Voraussetzung für Antworten: [Claude Code](https://claude.com/claude-code) inst
 | `orb_launcher.py` | wird zur einzigen `ORB.exe`: installiert, lädt Code von GitHub, aktualisiert, setzt bei Fehlern zurück |
 | `orb_app.py` | Start, Fenster, Klatsch-Erkennung im Hintergrund, Autostart, Update-Prüfung |
 | `server.py` | lokaler Server: Zustand, Stimme, Claude-Anbindung, Wetter, Apps, Termine, Spotify |
+| `icloud.py` | iCloud-Kalender über CalDAV (Zugang in der Windows-Anmeldeinformationsverwaltung) |
 | `hook.py` | Claude-Code-Hooks → zeigt in ORB an, was Claude gerade tut |
 | `index.html` | Oberfläche (WebGL-Kugel, Effekte, Sounds, Einstellungen) |
 | `check.py` | prüft Code und Oberfläche vor jedem Update |

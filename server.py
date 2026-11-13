@@ -24,6 +24,18 @@ HOME = os.path.join(os.path.expanduser("~"), "Orb")
 STATE = os.path.join(HOME, "state.json")
 CONFIG = os.path.join(HOME, "config.json")
 PAGE = os.path.join(RES, "index.html")
+
+
+def _lade_icloud():
+    """icloud.py liegt neben server.py – ausdrücklich von dort laden (der App-Ordner steht nicht im Suchpfad)."""
+    import importlib.util
+    spec = importlib.util.spec_from_file_location("icloud", os.path.join(RES, "icloud.py"))
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
+icloud = _lade_icloud()  # iCloud-Kalender (CalDAV)
 TTS_PS = os.path.join(RES, "tts.ps1")
 PORT = int(os.environ.get("ORB_PORT", "8766"))  # ORB_PORT nur für Tests (update.ps1 prüft auf 8799)
 NO_WINDOW = 0x08000000
@@ -54,7 +66,7 @@ DEFAULT_CFG = {
 }
 # Damit ORB immer dein Claude-Code-Login (Max-Abo) nutzt und nie einen API-Schlüssel
 CLAUDE_ENV_DROP = ("ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "ANTHROPIC_BASE_URL")
-VERSION = "30"
+VERSION = "32"
 ORB_UI = ("Deine Oberfläche (die Larsen gerade sieht): in der Mitte du als flüssige leuchtende Kugel mit Tropfen, "
           "Orbit-Ringen und Sternenhimmel; links eine Uhr und darunter der Gesprächsverlauf mit Eingabefeld; rechts "
           "Karten für System (CPU, RAM, Akku), Wetter mit Stundenvorschau, Aktivität (was du gerade tust) und Vorschläge; "
@@ -66,6 +78,15 @@ KURZ_REGELN = ("Antworte immer auf Deutsch. Du sprichst über ORB, eine Sprachob
                "bestätigen. Bei Erledigtem reicht z. B. „Erledigt.“ oder „Läuft.“.")
 LANG_REGELN = ("Antworte immer auf Deutsch. Du sprichst über ORB, eine Sprachoberfläche; alles wird laut vorgelesen. Antworte natürlich "
                "gesprochen ohne Markdown oder Listen; ausführlicher ist erlaubt, wenn es nötig ist.")
+
+KALENDER_REGELN = (
+    "Larsens Kalender ist sein iCloud-Kalender (iPhone); das Termine-Widget links zeigt ihn. Termine trägst du NICHT in "
+    "termine.md ein, sondern per Bash-Befehl über ORB ein, liest oder löschst sie so: "
+    "curl -s -X POST http://127.0.0.1:%d/kalender -H \"X-ORB-Token: $(cat \"$LOCALAPPDATA/ORB/token.txt\")\" "
+    "-H \"Content-Type: application/json\" -d '<JSON>'. JSON: neu = {\"aktion\":\"neu\",\"titel\":\"Zahnarzt\","
+    "\"start\":\"2026-11-20T15:00\"} (optional \"ende\", \"ort\", \"notiz\", \"kalender\"; nur Datum = ganztägig, "
+    "Ende sonst +1 Stunde); lesen = {\"aktion\":\"liste\",\"von\":\"2026-11-13\",\"bis\":\"2026-11-20\"}; "
+    "löschen = erst lesen, dann {\"aktion\":\"loeschen\",\"id\":\"<id aus der Liste>\"}. Zeiten sind Ortszeit.")
 
 
 def system_prompt(cfg):
@@ -684,6 +705,12 @@ TERMIN_RE = re.compile(r"^\s*[-*]?\s*(\d{4}-\d{2}-\d{2}|\d{1,2}\.\d{1,2}\.\d{4})
 
 
 def termine():
+    if icloud.verbunden():
+        return icloud.termine_widget()
+    return termine_md()
+
+
+def termine_md():
     """Liest <ordner>/termine.md – Zeilen wie '- 14.11.2026 15:00 Zahnarzt'. Liefert die nächsten Termine."""
     path = os.path.join(load_cfg()["ordner"], "termine.md")
     out, heute = [], datetime.date.today()
@@ -707,6 +734,29 @@ def termine():
         pass
     out.sort(key=lambda x: (x["datum"], x["zeit"] or "99"))
     return out[:6]
+
+
+def kalender_aktion(b):
+    if not icloud.verbunden():
+        return {"ok": False, "fehler": "iCloud ist nicht verbunden (ORB-Einstellungen > iCloud-Kalender)"}
+    try:
+        a = str(b.get("aktion", "")).lower()
+        if a == "neu":
+            if not b.get("titel") or not b.get("start"):
+                return {"ok": False, "fehler": "titel und start nötig"}
+            return {"ok": True, "termin": icloud.neu(b["titel"], b["start"], b.get("ende"), b.get("ort", ""),
+                                                    b.get("notiz", ""), b.get("kalender", ""))}
+        if a == "liste":
+            von = icloud._parse(b["von"])[0] if b.get("von") else None
+            bis = icloud._parse(b["bis"])[0] + datetime.timedelta(days=1) if b.get("bis") else None
+            if von and not bis:
+                bis = von + datetime.timedelta(days=30)
+            return {"ok": True, "termine": icloud.liste(von, bis)}
+        if a == "loeschen":
+            return {"ok": icloud.loeschen(str(b.get("id", "")))}
+        return {"ok": False, "fehler": "aktion muss neu, liste oder loeschen sein"}
+    except Exception as e:
+        return {"ok": False, "fehler": str(e)}
 
 
 def spotify_now():
@@ -797,7 +847,12 @@ class Handler(BaseHTTPRequestHandler):
     def body(self):
         n = int(self.headers.get("Content-Length") or 0)
         try:
-            return json.loads(self.rfile.read(n).decode("utf-8")) if n else {}
+            raw = self.rfile.read(n) if n else b""
+            try:
+                txt = raw.decode("utf-8")
+            except UnicodeDecodeError:
+                txt = raw.decode("cp1252", "replace")  # z. B. Windows-PowerShell
+            return json.loads(txt) if txt else {}
         except Exception:
             return {}
 
@@ -875,6 +930,9 @@ class Handler(BaseHTTPRequestHandler):
                 self.send(200, {})
         elif u.path == "/termine":
             self.send(200, {"termine": termine()})
+        elif u.path == "/icloud":
+            z = icloud.zugang()
+            self.send(200, {"verbunden": bool(z), "apple_id": z[0] if z else ""})
         elif u.path == "/spotify":
             try:
                 self.send(200, spotify_now())
@@ -899,6 +957,20 @@ class Handler(BaseHTTPRequestHandler):
             self.send(200, {"ok": media_key(str(b.get("cmd", "")))})
         elif u.path == "/config":
             self.send(200, {"config": save_cfg(b)})
+        elif u.path == "/icloud":  # Einstellungen: verbinden / trennen
+            try:
+                if b.get("trennen"):
+                    icloud.trennen()
+                    res = {"ok": True}
+                else:
+                    res = {"ok": True, "kalender": icloud.verbinden(b.get("apple_id", ""), b.get("passwort", ""))}
+                if not BRAIN.busy:
+                    BRAIN.kill()  # Claude kennt beim nächsten Auftrag den Kalender
+            except Exception as e:
+                res = {"ok": False, "fehler": str(e)}
+            self.send(200, res)
+        elif u.path == "/kalender":  # für Claude: Termine anlegen, lesen, löschen
+            self.send(200, kalender_aktion(b))
         elif u.path == "/greet":
             threading.Thread(target=lambda: write_answer(greeting(), heard="", holo=holo_for("Wetter abrufen", "")), daemon=True).start()
             threading.Thread(target=BRAIN.start, daemon=True).start()  # Gehirn schon mal aufwecken

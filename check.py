@@ -11,7 +11,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 PORT = 8799
 fehler = []
 
-for f in ("server.py", "orb_app.py", "hook.py"):
+for f in ("server.py", "orb_app.py", "hook.py", "icloud.py"):
     try:
         with open(os.path.join(HERE, f), encoding="utf-8-sig") as fh:
             ast.parse(fh.read(), f)

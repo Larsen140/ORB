@@ -203,9 +203,10 @@
   input[type=range]::-webkit-slider-thumb { -webkit-appearance:none; width:26px; height:26px; border-radius:50%;
     background:radial-gradient(circle at 40% 30%, #fff, #e6e6ec); box-shadow:0 3px 10px rgba(0,0,0,.45); transition:transform .45s var(--spring); }
   input[type=range]:active::-webkit-slider-thumb { transform:scale(1.3); }
-  select, #set input[type=text] { font:inherit; font-size:14px; color:var(--txt); background:rgba(255,255,255,.08); border:0;
+  select, #set input[type=text], #set input[type=password] { font:inherit; font-size:14px; color:var(--txt); background:rgba(255,255,255,.08); border:0;
     box-shadow:inset 0 1px 0 rgba(255,255,255,.08); border-radius:13px; padding:9px 11px; outline:none; max-width:58%; }
-  .row.col select, .row.col input[type=text] { max-width:none !important; }
+  .row.col select, .row.col input[type=text], .row.col input[type=password] { max-width:none !important; }
+  #ic_stat { font-size:13px; color:var(--sub); } #ic_stat.ok { color:rgb(var(--c4)); } #ic_stat.err { color:#ff8a80; }
   select option { background:#15151b; }
   .seg { display:flex; background:rgba(0,0,0,.25); border-radius:14px; padding:3px; gap:2px; }
   .seg button { flex:1; padding:8px 4px; border-radius:11px; font-size:12.5px; font-weight:600; color:var(--sub); transition:background .45s var(--spring), color .3s, transform .45s var(--spring); }
@@ -439,6 +440,12 @@
     <div class="row">ORB sieht meinen Bildschirm (bei jeder Frage)<input type="checkbox" class="sw" id="s_screen"></div>
     <div class="row col">Wissensordner<input type="text" id="s_ordner"></div>
   </div><div style="margin-top:9px"><button class="btn" id="neu">⟲ Neue Unterhaltung</button></div></div>
+  <div class="grp"><h4>iCloud-Kalender</h4><div class="card">
+    <div class="row">Status<span id="ic_stat">nicht verbunden</span></div>
+    <div class="row col" id="ic_felder">Apple-ID<input type="text" id="s_icid" autocomplete="off" spellcheck="false">
+      App-spezifisches Passwort<input type="password" id="s_icpw" autocomplete="off" placeholder="xxxx-xxxx-xxxx-xxxx"></div>
+  </div><div style="margin-top:9px"><button class="btn" id="ic_btn">Verbinden</button></div>
+  <p class="note">Passwort erstellen unter account.apple.com → Anmeldung und Sicherheit → App-spezifische Passwörter. Es wird nur in der Windows-Anmeldeinformationsverwaltung gespeichert.</p></div>
   <div class="grp"><h4>Aussehen</h4><div class="card">
     <div class="row col">Farbe<div id="swatches"></div></div>
     <div class="row col">Grafik<div class="seg" id="seg_fx"><button data-v="niedrig">Sparsam</button><button data-v="mittel">Flüssig</button><button data-v="hoch">Ultra</button></div></div>
@@ -1721,6 +1728,28 @@ $('s_sfxl').oninput = e => saveCfg({ sfxlaut:+e.target.value });
 $('s_sfxl').onchange = () => SFX.done();
 $('s_wake').onchange = e => saveCfg({ wakeword:e.target.value.trim() || 'Jarvis' });
 $('s_ordner').onchange = e => saveCfg({ ordner:e.target.value.trim() });
+async function loadICloud() {
+  try {
+    const r = await (await fetch('/icloud', { cache:'no-store' })).json();
+    $('ic_stat').textContent = r.verbunden ? 'verbunden · ' + r.apple_id : 'nicht verbunden';
+    $('ic_stat').className = r.verbunden ? 'ok' : '';
+    $('ic_felder').style.display = r.verbunden ? 'none' : '';
+    $('ic_btn').textContent = r.verbunden ? 'Trennen' : 'Verbinden';
+    $('ic_btn').classList.toggle('red', r.verbunden); loadICloud.on = r.verbunden;
+  } catch (e) {}
+}
+$('ic_btn').onclick = async () => {
+  const body = loadICloud.on ? { trennen:true } : { apple_id:$('s_icid').value.trim(), passwort:$('s_icpw').value };
+  $('ic_stat').textContent = loadICloud.on ? 'trenne …' : 'verbinde …'; $('ic_stat').className = ''; SFX.click();
+  try {
+    const r = await (await fetch('/icloud', { method:'POST', headers:{ 'Content-Type':'application/json' }, body:JSON.stringify(body) })).json();
+    if (!r.ok) { $('ic_stat').textContent = r.fehler || 'Fehler'; $('ic_stat').className = 'err'; SFX.off(); return; }
+    $('s_icpw').value = ''; SFX.done(); await loadICloud();
+    if (r.kalender) $('ic_stat').textContent += ' · ' + r.kalender.length + ' Kalender';
+    loadTermine._k = null; loadTermine();
+  } catch (e) { $('ic_stat').textContent = 'Fehler'; $('ic_stat').className = 'err'; }
+};
+loadICloud();
 $('schlafjetzt').onclick = () => { toggleSettings(false); goSleep(); };
 $('resetLayout').onclick = () => { try { localStorage.removeItem('orbLayout'); } catch (e) {} location.reload(); };
 $('beenden').onclick = async () => { SFX.sleep(); await fetch('/quit', { method:'POST' }).catch(() => {}); setTimeout(() => window.close(), 300); };
