@@ -183,6 +183,10 @@
   #hint { position:fixed; top:80px; left:var(--mid,50%); transform:translateX(-50%) translateY(-10px) scale(.85); font-size:13px; font-weight:600;
     padding:9px 17px; border-radius:999px; opacity:0; filter:blur(6px); transition:opacity .35s, transform .6s var(--spring), filter .35s; white-space:nowrap; pointer-events:none; }
   #hint.on { opacity:1; transform:translateX(-50%); filter:none; }
+  /* Schnips-Countdown: schmaler Balken läuft ab – Sprechen oder Klatschen bricht ab */
+  #hint.zaehlt::after { content:''; position:absolute; left:16px; right:16px; bottom:4px; height:2px; border-radius:2px; transform-origin:left;
+    background:linear-gradient(90deg, rgb(var(--c)), rgb(var(--c2)), rgb(var(--c3))); box-shadow:0 0 8px rgba(var(--c),.7); animation:hintZaehlt 1.1s linear forwards; }
+  @keyframes hintZaehlt { from { transform:scaleX(1); } to { transform:scaleX(0); } }
   #start { position:fixed; inset:0; display:grid; place-items:center; background:rgba(0,0,0,.5); cursor:pointer; z-index:30; }
   #start div { padding:16px 28px; border-radius:999px; font-weight:600; }
 
@@ -1258,11 +1262,25 @@ function snapInfo(txt, ok) {
   const el = $('snap_test'); el.textContent = txt; el.className = 'note ' + (ok ? 'ok' : 'nein');
   if (ok) ripple(.5);
 }
+// Nach einem Schnipser erst ~1 s Hinweis mit ablaufendem Balken – Sprechen oder Klatschen bricht ab (Fehlauslöser)
+let snapPending = null, stimmeT = -1e9, lautBl = [];   // stimmeT: zuletzt Sprache erkannt · lautBl: Zeitpunkte lauter Mikro-Blöcke
 function onSnap() {
   if (performance.now() < snapTest) return snapInfo('✓ Schnipsen erkannt', true);
-  if (S.sleep) return;
-  SFX.close(); ripple(.8); hint('Bis gleich · zweimal klatschen holt mich zurück', 2500);
-  goSleep(true, 'Schnipsen erkannt'); toBack(1200, 'Schnipsen erkannt');
+  if (S.sleep || snapPending) return;
+  const el = $('hint');
+  hint('Schnipsen erkannt – gleich weg · sprechen oder klatschen bricht ab', 1300);
+  el.classList.remove('zaehlt'); void el.offsetWidth; el.classList.add('zaehlt'); ripple(.5);
+  snapPending = { t0:performance.now(), laut:0, timer:setTimeout(() => {
+    snapPending = null; el.classList.remove('zaehlt');
+    if (S.sleep) return;
+    SFX.close(); ripple(.8); hint('Bis gleich · zweimal klatschen holt mich zurück', 2500);
+    goSleep(true, 'Schnipsen erkannt'); toBack(1200, 'Schnipsen erkannt');
+  }, 1100) };
+}
+function snapAbbruch(grund) {
+  if (!snapPending) return;
+  clearTimeout(snapPending.timer); snapPending = null; $('hint').classList.remove('zaehlt');
+  hint('Okay, ich bleibe', 1500); hlog('Schnipsen abgebrochen: ' + grund);
 }
 // In den Hintergrund: mit „Jarvis“ nur ausblenden (Seite hört weiter zu), sonst Fenster schließen (spart ~800 MB)
 let verborgen = false;
@@ -1286,13 +1304,22 @@ function clapTick(tBlock) {
   // Nach einem Schnipser muss es still bleiben – Hämmern, Gespräche, Klicken gehen weiter → kein Schnipser
   // (einzelne Nachhall-Blöcke zählen nicht – erst anhaltender Lärm bricht ab)
   const sEmpf = +cfg.schnips_empf || 6;
-  if (snapT && now - snapT > 150 && rms > snapRms * (.2 + .05 * sEmpf) && ++snapLaut > 4) { snapT = 0; snapInfo('Knall gehört – danach war es nicht still (Hintergrundgeräusch)'); }
+  // laute Blöcke merken: Sprache, Tippen und Musik erzeugen viele davon, ein einzelner Schnipser nur 1–2
+  const lautGrenze = Math.max(floorRms * 4, .001);
+  if (rms > lautGrenze) { lautBl.push(now); if (lautBl.length > 60) lautBl.shift(); }
+  if (snapT && now - snapT > 150 && rms > Math.max(floorRms * 4, snapRms * (.1 + .03 * sEmpf)) && ++snapLaut > 2) { snapT = 0; snapInfo('Knall gehört – danach war es nicht still (Hintergrundgeräusch)'); }
   const ownSpeak = speakingNow() || now < lastSfx + 500;   // eigene Stimme/Sounds
+  // Countdown nach dem Schnipsen läuft: Klatscher (starker Knall) oder Sprache (mehrere laute Blöcke) bricht ab
+  if (snapPending && !ownSpeak && now > snapPending.t0 + 60) {
+    if (pk > Math.max(floorRms * 18, .02)) snapAbbruch('Knall');
+    else if (rms > Math.max(floorRms * 5, .002) && ++snapPending.laut >= 4) snapAbbruch('Geräusch/Sprache');
+  }
   const mouse = now - lastMouse < 400;   // Klickgeräusch der Maus ist kein Klatschen
   if (cand) {
     if (now - cand.t >= 75) {
-      const knall = rms < cand.rms * (cand.snap ? .5 : .35);
+      const knall = rms < cand.rms * .35;   // nach 75 ms muss der Knall abgeklungen sein (Schnipser sind sehr kurz)
       if (knall && cand.snap && !cand.ruhig && testet) snapInfo('Knall gehört – aber zu viel Hintergrundgeräusch');
+      else if (knall && cand.snap && cand.ruhig && !cand.streng && testet) snapInfo('Knall gehört – aber ' + cand.warum);
       const nachKlatscher = lastClap > 0 && cand.t - lastClap < 1100 && cand.t - lastClap > 150;
       const zweiterHeller = snapT && cand.t - snapT > 150 && cand.t - snapT < 1100;   // zwei helle Knalle = Doppelklatscher
       // Schnipsen nur, wenn ORB sichtbar ist und nicht selbst spricht – sonst zählt ein heller Knall als Klatscher
@@ -1301,14 +1328,16 @@ function clapTick(tBlock) {
         if (zweiterHeller) { claps = [snapT]; lastClap = snapT; clapPk.push([snapT, snapPk]); }
         snapT = 0; clapPk.push([cand.t, cand.pk]); clapPk = clapPk.slice(-4); checkSysMouse(cand.t);
       }
-      else if (knall && cand.snap && cand.ruhig && !mouse && schnippOk) {   // auch im Schlaf (Fenster sichtbar), beim Arbeiten und Sprechen
+      else if (knall && cand.snap && cand.ruhig && cand.streng && !mouse && schnippOk) {   // auch im Schlaf (Fenster sichtbar), beim Arbeiten
         // Schnipser: kurz warten – bleibt es still und kommt kein zweiter Knall, verschwindet ORB
         const t = cand.t; snapT = t; snapRms = cand.rms; snapLaut = 0; snapPk = cand.pk;
         setTimeout(() => { if (snapT !== t) return;
           snapT = 0;
           if (lastClap > t + 50) return snapInfo('Zwei Knalle gehört – das zählt als Klatschen');
+          if (stimmeT > t - 1500) return snapInfo('Knall gehört – aber gleichzeitig wurde gesprochen');
+          if (lautBl.filter(x => x > t + 120).length > 3) return snapInfo('Knall gehört – danach ging das Geräusch weiter');
           // nicht beim Tippen oder Klicken (klingt ähnlich hell); im Zweifel bleibt ORB da
-          fetch('/mouse').then(r => r.json()).then(j => { if (j.eingabe > 1 && j.ago > 1) onSnap(); else snapInfo('Knall gehört – aber Maus/Tastatur war gerade in Benutzung'); }).catch(() => {}); }, 900);
+          fetch('/mouse').then(r => r.json()).then(j => { if (j.eingabe > 2 && j.ago > 1.5) onSnap(); else snapInfo('Knall gehört – aber Maus/Tastatur war gerade in Benutzung'); }).catch(() => {}); }, 900);
       }
       else if (knall && !cand.snap && testet) snapInfo('Knall gehört – klang eher dumpf wie Klatschen');
       else if (knall && !cand.snap && !mouse) {
@@ -1332,8 +1361,16 @@ function clapTick(tBlock) {
       const still = pre < rms * .3;   // davor (30–150 ms) war es deutlich leiser – bei Sprache fast nie
       // Schnipsen nur, wenn es sich deutlich vom Raumgeräusch der letzten Sekunde abhebt (nicht bei Gesprächen/Werkzeug)
       const ruhig = slow < rms * (.05 + .035 * sEmpf) && pre < rms * .4;
-      if (hf > snapHf && pk > Math.max(floorRms * 18, (.02 - .0015 * sEmpf) * mf) && pk / rms < 16 && pre < rms * .4) cand = { t:now, rms, pk, snap:true, ruhig };
-      else if (hf < hfMax && pk / rms < 18 && still && pk > thr && rms > floorRms * 10) cand = { t:now, rms, pk, snap:snapRatio() > 1.4, ruhig };
+      // Strenge Schnips-Prüfung (gegen Fehlauslöser): hell statt dumpf, impulsartig, keine Musik,
+      // und in der Sekunde davor höchstens ein lauter Block (sonst Sprache, Tippen, Musik)
+      const pruef = (ratio) => {
+        const vorher = lautBl.filter(x => x > now - 1000 && x < now - 30).length;
+        const warum = musik ? 'gerade läuft Musik' : vorher > 1 ? 'kurz davor war es nicht still (Sprache/Tippen?)'
+          : stimmeT > now - 1500 ? 'gerade wurde gesprochen' : ratio < 1.8 ? 'klang nicht hell genug' : pk / rms < 2.5 ? 'kein kurzer Knall' : '';
+        return { streng:!warum, warum };
+      };
+      if (hf > snapHf && pk > Math.max(floorRms * 18, (.02 - .0015 * sEmpf) * mf) && pk / rms < 16 && pre < rms * .4) cand = { t:now, rms, pk, snap:true, ruhig, ...pruef(snapRatio()) };
+      else if (hf < hfMax && pk / rms < 18 && still && pk > thr && rms > floorRms * 10) { const ratio = snapRatio(); cand = { t:now, rms, pk, snap:ratio > 1.4, ruhig, ...pruef(ratio) }; }
     }
   }
   floorRms = rms < floorRms ? rms : floorRms * .995 + Math.min(rms, .2) * .005;   // Stille sofort übernehmen
@@ -1703,6 +1740,7 @@ function startWake(warum) {
   if (typeof warum === 'string') hlog('Jarvis-Erkennung fehlte im Zustand ' + (S.sleep ? 'Schlaf' : convo ? 'Gespräch' : 'Bereit') + ' → neu gestartet (' + warum + ')');
   wakeRec = mkSR(); wakeRec.lang = 'de-DE'; wakeRec.continuous = true; wakeRec.interimResults = true; wakeRec.maxAlternatives = 3;
   wakeRec.onresult = e => {
+    stimmeT = performance.now(); snapAbbruch('Sprache erkannt');   // Sprache ist kein Schnipsen – und bricht den Schnips-Countdown ab
     for (let i = e.resultIndex; i < e.results.length; i++) {
       const r = e.results[i];
       // alle Alternativen prüfen – oft steht „Jarvis“ nur in der zweiten oder dritten
