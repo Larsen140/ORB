@@ -1140,13 +1140,28 @@ function pegelLernen(pk) {   // lernt aus Sätzen mit „Jarvis“, wie laut Lar
   try { localStorage.setItem('orbPegel', JSON.stringify({ nah:pegelNah, n:pegelN })); } catch (e) {}
 }
 let clapAn = null, clapBuf = null, clapTimer = null, claps = [], floorRms = .0003, cand = null, lastClap = 0;
-function startClap() {
-  if (clapTimer || !micSrc) return;
-  // Lückenlos jeden 10-ms-Block prüfen (vorher wurde nur alle 25 ms ein Ausschnitt angesehen – kurze Schnipser fielen durch)
-  clapTimer = ac.createScriptProcessor(512, 1, 1);
-  const mute = ac.createGain(); mute.gain.value = 0;
-  micSrc.connect(clapTimer); clapTimer.connect(mute); mute.connect(ac.destination);
-  clapTimer.onaudioprocess = e => { clapBuf = e.inputBuffer.getChannelData(0); pegelMerken(clapBuf); clapTick(); };
+const CLAP_WORKLET = `class K extends AudioWorkletProcessor {
+  constructor() { super(); this.b = new Float32Array(512); this.n = 0; }
+  process(inp) { const c = inp[0] && inp[0][0]; if (c) for (let i = 0; i < c.length; i++) { this.b[this.n++] = c[i];
+    if (this.n === 512) { this.port.postMessage({ d:this.b, t:currentTime }, [this.b.buffer]); this.b = new Float32Array(512); this.n = 0; } }
+    return true; } }
+registerProcessor('orb-knall', K);`;
+let clapStarting = false;
+async function startClap() {
+  if (clapTimer || clapStarting || !micSrc) return;
+  clapStarting = true;
+  const mute = ac.createGain(); mute.gain.value = 0; mute.connect(ac.destination);
+  try {
+    await ac.audioWorklet.addModule(URL.createObjectURL(new Blob([CLAP_WORKLET], { type:'application/javascript' })));
+    clapTimer = new AudioWorkletNode(ac, 'orb-knall');
+    // jeder Block mit seiner echten Aufnahmezeit – kommt er verspätet an, stimmen die Abstände trotzdem
+    clapTimer.port.onmessage = e => { clapBuf = e.data.d; const now = performance.now() - (ac.currentTime - e.data.t) * 1000; pegelMerken(clapBuf); clapTick(now); };
+  } catch (err) {
+    clapTimer = ac.createScriptProcessor(512, 1, 1);   // Ersatz für alte Browser
+    clapTimer.onaudioprocess = e => { clapBuf = e.inputBuffer.getChannelData(0); pegelMerken(clapBuf); clapTick(); };
+  }
+  micSrc.connect(clapTimer); clapTimer.connect(mute);
+  clapStarting = false;
 }
 let fBuf = null, snapT = 0, snapRms = 0, snapLaut = 0, clapPk = [], slowRms = 1, snapTest = 0, snapTestT = 0;   // slowRms: Lautstärke der letzten ~1–2 s
 // Schnipsen klingt hell (Energie um 2–5 kHz), Klatschen voll (viel Energie unter 1,5 kHz)
@@ -1180,12 +1195,12 @@ function toBack(ms, grund = 'unbekannt') {
     fetch('/hide', { method:'POST', headers:{ 'Content-Type':'application/json' }, body:JSON.stringify({ keep, grund }) }).catch(() => {});
   }, ms);
 }
-function clapTick() {
+function clapTick(tBlock) {
   const testet = performance.now() < snapTest;
   // Klatschen & Schnipsen laufen IMMER – auch bei Stopp, im Schlaf, im Meeting, bei Musik und während ORB spricht
   let pk = 0, s = 0;
   for (const v of clapBuf) { const a = Math.abs(v); if (a > pk) pk = a; s += v * v; }
-  const rms = Math.sqrt(s / clapBuf.length), now = performance.now();
+  const rms = Math.sqrt(s / clapBuf.length), now = tBlock ?? performance.now();
   const hist = clapTick.h || (clapTick.h = []); const pre = hist.length >= 14 ? hist.slice(-14, -2).reduce((a, b) => a + b, 0) / 12 : 1;   // ~30–150 ms vorher
   hist.push(rms); if (hist.length > 16) hist.shift();
   const slow = slowRms; slowRms = slowRms * .99 + rms * .01;
@@ -1298,7 +1313,24 @@ async function startup() {
 }
 
 /* ================= Sprechen ================= */
+let waechterT = 0;
+function zuhoerWaechter() {
+  const now = performance.now();
+  if (now - waechterT < 400 || !SR) return; waechterT = now;
+  try {
+    if (convo) { if (!convoRec && convoCanListen()) convoListen(); if (convoRec && !convoCanListen()) killConvoRec(); }
+    if (bargeWanted()) bargeListen(); else if (bargeRec) killBarge();
+    if (cfg.steuerung === 'wort' && !wakeRec && !listening && !convoRec && !bargeRec && !S.call) startWake();
+    // hängt eine Erkennung (läuft lange, hört aber nichts mehr), neu starten
+    for (const r of [wakeRec, convoRec, bargeRec]) if (r && now - r._t0 > 90000 && now - r._last > 45000) { try { r.abort(); } catch (e) {} }
+  } catch (e) {}
+}
+setInterval(zuhoerWaechter, 1000);
 const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+function mkSR() { const r = new SR(); r._t0 = performance.now(); r._last = r._t0;
+  ['result', 'audiostart', 'speechstart'].forEach(ev => r.addEventListener(ev, () => { r._last = performance.now(); }));
+  r.addEventListener('error', e => { if (e.error === 'network' || e.error === 'audio-capture') r._fehler = performance.now(); });
+  return r; }
 let rec = null, listening = false, recFinal = '', recLive = '', pttEnd = false, wakeRec = null, armedUntil = 0, hintTimer;
 function hint(t, ms = 2600) { $('hint').textContent = t; $('hint').classList.add('on'); clearTimeout(hintTimer); hintTimer = setTimeout(() => $('hint').classList.remove('on'), ms); }
 const NAME_VARIANTEN = 'jarvis|jarwis|jarvi|jarviz|jarves|jervis|javis|charvis|tscharvis|tschawis|dscharvis|dschawis|dschavis|schavis|chavis|harvis|garvis';
@@ -1351,7 +1383,7 @@ function startPTT(once) {
   setStumm(false);
   if (!SR) return hint('Spracherkennung fehlt – T zum Tippen');
   stopAudio(); stopWake(); killConvoRec(); killBarge(); ensureMic(); lastAct = performance.now();
-  rec = new SR(); rec.lang = 'de-DE'; rec.interimResults = true; rec.continuous = !once;
+  rec = mkSR(); rec.lang = 'de-DE'; rec.interimResults = true; rec.continuous = !once;
   recFinal = ''; recLive = ''; pttEnd = !!once;
   if (once) { const r = rec; setTimeout(() => { if (listening && rec === r) r.stop(); }, 12000); }
   rec.onresult = e => {
@@ -1416,7 +1448,7 @@ function convoCanListen() {
 function convoListen() {
   if (convoRec || !convoCanListen() || performance.now() - convoLastStart < 500) return;
   convoLastStart = performance.now(); stopWake(); killBarge();
-  const r = new SR(); r.lang = 'de-DE'; r.continuous = true; r.interimResults = true; r.maxAlternatives = 3;
+  const r = mkSR(); r.lang = 'de-DE'; r.continuous = true; r.interimResults = true; r.maxAlternatives = 3;
   adoptRec(r);
   try { r.start(); } catch (e) { convoRec = null; }
 }
@@ -1528,7 +1560,7 @@ function bargeWanted() { return !S.call && SR && !S.sleep && !listening && !conv
 function bargeListen() {
   if (bargeRec || !bargeWanted() || performance.now() - bargeLast < 600) return;
   bargeLast = performance.now(); stopWake();
-  const r = new SR(); r.lang = 'de-DE'; r.continuous = true; r.interimResults = true;
+  const r = mkSR(); r.lang = 'de-DE'; r.continuous = true; r.interimResults = true;
   r.onresult = e => {
     for (let i = e.resultIndex; i < e.results.length; i++) {
       const t = e.results[i][0].transcript;
@@ -1566,7 +1598,7 @@ let wakeErr = 0, wakeFehler = 0;
 function startWake(warum) {
   if (S.call || !SR || cfg.steuerung !== 'wort' || wakeRec || listening || convoRec || bargeRec) return;
   if (typeof warum === 'string') hlog('Jarvis-Erkennung fehlte im Zustand ' + (S.sleep ? 'Schlaf' : convo ? 'Gespräch' : 'Bereit') + ' → neu gestartet (' + warum + ')');
-  wakeRec = new SR(); wakeRec.lang = 'de-DE'; wakeRec.continuous = true; wakeRec.interimResults = true; wakeRec.maxAlternatives = 3;
+  wakeRec = mkSR(); wakeRec.lang = 'de-DE'; wakeRec.continuous = true; wakeRec.interimResults = true; wakeRec.maxAlternatives = 3;
   wakeRec.onresult = e => {
     for (let i = e.resultIndex; i < e.results.length; i++) {
       const r = e.results[i];
@@ -2265,7 +2297,7 @@ function frame(now) {
     if (convoRec && !convoCanListen()) killConvoRec();
     if (now - convoLastSpeech > 120000 && !S.busy && !speaking) stopConvo();
   }
-  if (bargeWanted()) bargeListen(); else if (bargeRec) killBarge();
+  zuhoerWaechter();
   if (speaking || listening || S.busy || convo) lastAct = now;
   if (!S.sleep && cfg.klatschen && +cfg.schlafen > 0 && now - lastAct > cfg.schlafen * 60000 && !autoSleepCheck && !tasksRunning()) {   // nicht einschlafen, solange Aufgaben laufen
     // nur einschlafen, wenn wirklich niemand ORB benutzt: Fenster im Vordergrund + Eingaben am PC = Larsen ist da
