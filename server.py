@@ -47,7 +47,7 @@ DEFAULT_CFG = {
 }
 # Damit ORB immer dein Claude-Code-Login (Max-Abo) nutzt und nie einen API-Schlüssel
 CLAUDE_ENV_DROP = ("ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "ANTHROPIC_BASE_URL")
-VERSION = "23"
+VERSION = "25"
 ORB_UI = ("Deine Oberfläche (die Larsen gerade sieht): in der Mitte du als flüssige leuchtende Kugel mit Tropfen, "
           "Orbit-Ringen und Sternenhimmel; links eine Uhr und darunter der Gesprächsverlauf mit Eingabefeld; rechts "
           "Karten für System (CPU, RAM, Akku), Wetter mit Stundenvorschau, Aktivität (was du gerade tust) und Vorschläge; "
@@ -163,6 +163,10 @@ def holo_for(task, detail):
                         "sub": "%s · %s" % (w["desc"], w["city"])}
         if task == "Öffne" and detail:
             return {"typ": "app", "titel": detail, "sub": "wird geöffnet"}
+        if task == "Währungen":
+            k = kurse()
+            if k:
+                return {"typ": "geld", "titel": "1 € =", "sub": "Live-Kurse", "rows": k}
     except Exception:
         pass
     return None
@@ -443,9 +447,44 @@ ARTICLE = re.compile(r"^(?:die\s+app\s+|das\s+programm\s+|den\s+|die\s+|das\s+|d
 WEATHER_RE = re.compile(r"\b(wetter|wie (warm|kalt) ist es|regnet es|wird es regnen)\b", re.I)
 
 
+KURS_CACHE = [0, None]
+KURS_RE = re.compile(r"(währung|wechselkurs|devisen|\bkurse\b|hologramm)", re.I)
+
+
+def kurse():
+    """1 € in Dollar, Pfund, Franken, Yen, Lira + Bitcoin/Ethereum in €. 5 Minuten zwischengespeichert."""
+    if KURS_CACHE[1] and time.time() - KURS_CACHE[0] < 300:
+        return KURS_CACHE[1]
+    rows = []
+    try:
+        fx = http_json("https://api.frankfurter.app/latest?from=EUR&to=USD,GBP,CHF,JPY,TRY")["rates"]
+        for code, sym, name in (("USD", "$", "Dollar"), ("GBP", "£", "Pfund"), ("CHF", "Fr", "Franken"),
+                                ("JPY", "¥", "Yen"), ("TRY", "₺", "Lira")):
+            if code in fx:
+                rows.append({"name": name, "wert": "%s %s" % (("%.2f" % fx[code]).replace(".", ","), sym), "chg": None})
+    except Exception as e:
+        print("Kurse:", e)
+    try:
+        c = http_json("https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,ethereum&vs_currencies=eur&include_24hr_change=true")
+        for cid, name in (("bitcoin", "Bitcoin"), ("ethereum", "Ethereum")):
+            if cid in c:
+                rows.append({"name": name, "wert": "{:,.0f} €".format(c[cid]["eur"]).replace(",", "."),
+                             "chg": round(c[cid].get("eur_24h_change") or 0, 1)})
+    except Exception as e:
+        print("Krypto:", e)
+    if rows:
+        KURS_CACHE[:] = [time.time(), rows]
+    return rows
+
+
 def try_local(text):
     """Schnelle Aufträge ohne Claude: Apps/Webseiten öffnen, Wetter. Gibt (Aufgabe, Detail, Antwort) oder None."""
     t = text.strip()
+    if KURS_RE.search(t) and len(t) < 80:
+        k = kurse()
+        if k:
+            usd = next((r["wert"] for r in k if r["name"] == "Dollar"), None)
+            return "Währungen", "", ("Hier sind die aktuellen Kurse." + (" Ein Euro sind gerade %s." % usd.replace(" $", " Dollar") if usd else ""))
     if WEATHER_RE.search(t) and len(t) < 70 and not re.search(r"\b(morgen|woche|wochenende)\b", t, re.I):
         return "Wetter abrufen", "", weather_text()
     for rx in OPEN_RE:
