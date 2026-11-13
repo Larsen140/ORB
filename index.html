@@ -1276,10 +1276,10 @@ async function startClap() {
     await ac.audioWorklet.addModule(URL.createObjectURL(new Blob([CLAP_WORKLET], { type:'application/javascript' })));
     clapTimer = new AudioWorkletNode(ac, 'orb-knall');
     // jeder Block mit seiner echten Aufnahmezeit – kommt er verspätet an, stimmen die Abstände trotzdem
-    clapTimer.port.onmessage = e => { clapBuf = e.data.d; const now = performance.now() - (ac.currentTime - e.data.t) * 1000; pegelMerken(clapBuf); clapTick(now); };
+    clapTimer.port.onmessage = e => { clapBuf = e.data.d; const now = performance.now() - (ac.currentTime - e.data.t) * 1000; knallT = performance.now(); pegelMerken(clapBuf); clapTick(now); };
   } catch (err) {
     clapTimer = ac.createScriptProcessor(512, 1, 1);   // Ersatz für alte Browser
-    clapTimer.onaudioprocess = e => { clapBuf = e.inputBuffer.getChannelData(0); pegelMerken(clapBuf); clapTick(); };
+    clapTimer.onaudioprocess = e => { clapBuf = e.inputBuffer.getChannelData(0); knallT = performance.now(); pegelMerken(clapBuf); clapTick(); };
   }
   // eigener, UNGEFILTERTER Mikrofon-Zugang: Echo-/Rauschunterdrückung schneidet genau die hellen Anteile weg,
   // an denen man Schnipsen erkennt (sonst klang ein Schnipser „dumpf wie Klatschen“)
@@ -1287,8 +1287,24 @@ async function startClap() {
   try { const roh = await navigator.mediaDevices.getUserMedia({ audio:{ echoCancellation:false, noiseSuppression:false, autoGainControl:false } });
         src = ac.createMediaStreamSource(roh); } catch (e) {}
   src.connect(clapTimer); clapTimer.connect(mute);
-  clapStarting = false;
+  clapStarting = false; knallT = performance.now(); clapSrc = src;
+  hlog('Knall-Erkenner gestartet (Mikrofon ' + (src === micSrc ? 'gefiltert' : 'roh') + ', Audio ' + ac.state + ')');
 }
+// Wächter: läuft der Knall-Erkenner wirklich? (nach Neustart/Update kann das Audio pausiert sein oder das Mikro nichts liefern)
+let knallT = 0, clapSrc = null, knallNeu = 0;
+setInterval(() => {
+  if (!started || !ac) return;
+  if (ac.state !== 'running') { hlog('Audio war ' + ac.state + ' → fortgesetzt (Klatschen/Schnipsen)'); ac.resume().catch(() => {}); return; }
+  if (!clapTimer) { if (!clapStarting) ensureMic().then(startClap).catch(() => {}); return; }
+  if (performance.now() - knallT > 6000 && knallNeu < 5) {
+    knallNeu++; hlog('Knall-Erkenner bekam keine Mikrofon-Daten → neu gestartet');
+    try { clapSrc && clapSrc.disconnect(clapTimer); clapTimer.disconnect(); } catch (e) {}
+    clapTimer = null; startClap();
+  }
+}, 5000);
+// Schnips-Protokoll (hoeren.log): warum ein heller Knall NICHT als Schnipsen zählte – höchstens alle 4 s
+let slogT = 0;
+function slog(t) { const n = performance.now(); if (n - slogT < 4000) return; slogT = n; hlog(t); }
 let snapPk = 0;
 let fBuf = null, snapT = 0, snapRms = 0, snapLaut = 0, clapPk = [], slowRms = 1, snapTest = 0, snapTestT = 0;   // slowRms: Lautstärke der letzten ~1–2 s
 // Schnipsen klingt hell (Energie um 2–5 kHz), Klatschen voll (viel Energie unter 1,5 kHz)
@@ -1351,7 +1367,7 @@ function clapTick(tBlock) {
   // laute Blöcke merken: Sprache, Tippen und Musik erzeugen viele davon, ein einzelner Schnipser nur 1–2
   const lautGrenze = Math.max(floorRms * 4, .001);
   if (rms > lautGrenze) { lautBl.push(now); if (lautBl.length > 60) lautBl.shift(); }
-  if (snapT && now - snapT > 150 && rms > Math.max(floorRms * 4, snapRms * (.1 + .03 * sEmpf)) && ++snapLaut > 2) { snapT = 0; snapInfo('Knall gehört – danach war es nicht still (Hintergrundgeräusch)'); }
+  if (snapT && now - snapT > 150 && rms > Math.max(floorRms * 4, snapRms * (.1 + .03 * sEmpf)) && ++snapLaut > 3) { snapT = 0; snapInfo('Knall gehört – danach war es nicht still (Hintergrundgeräusch)'); if (!testet) slog('Schnipsen? nein: danach war es nicht still'); }
   const ownSpeak = speakingNow() || now < lastSfx + 500;   // eigene Stimme/Sounds
   // Countdown nach dem Schnipsen läuft: Klatscher (starker Knall) oder Sprache (mehrere laute Blöcke) bricht ab
   if (snapPending && !ownSpeak && now > snapPending.t0 + 60) {
@@ -1361,7 +1377,15 @@ function clapTick(tBlock) {
   const mouse = now - lastMouse < 400;   // Klickgeräusch der Maus ist kein Klatschen
   if (cand) {
     if (now - cand.t >= 75) {
-      const knall = rms < cand.rms * .35;   // nach 75 ms muss der Knall abgeklungen sein (Schnipser sind sehr kurz)
+      const knall = rms < cand.rms * (cand.snap ? .45 : .35);   // nach 75 ms muss der Knall abgeklungen sein (Schnipser: etwas Raumhall erlaubt)
+      const werte = cand.snap ? ' · hell ' + cand.ratio.toFixed(1) + ' · Knall ' + (cand.pk / cand.rms).toFixed(1) + ' · Abklang ' + (rms / cand.rms).toFixed(2) : '';
+      if (cand.snap && !testet && !(verborgen && S.sleep)) {   // Diagnose nur, wenn Schnipsen überhaupt gilt
+        if (!knall) slog('Schnipsen? nein: klang nicht schnell genug ab' + werte);
+        else if (ownSpeak) slog('Schnipsen? nein: ORB sprach gerade' + werte);
+        else if (!cand.ruhig) slog('Schnipsen? nein: zu viel Hintergrundgeräusch' + werte);
+        else if (!cand.streng) slog('Schnipsen? nein: ' + cand.warum + werte);
+        else if (mouse) slog('Schnipsen? nein: Mausklick im Fenster' + werte);
+      }
       if (knall && cand.snap && !cand.ruhig && testet) snapInfo('Knall gehört – aber zu viel Hintergrundgeräusch');
       else if (knall && cand.snap && cand.ruhig && !cand.streng && testet) snapInfo('Knall gehört – aber ' + cand.warum);
       const nachKlatscher = lastClap > 0 && cand.t - lastClap < 1100 && cand.t - lastClap > 150;
@@ -1378,10 +1402,11 @@ function clapTick(tBlock) {
         setTimeout(() => { if (snapT !== t) return;
           snapT = 0;
           if (lastClap > t + 50) return snapInfo('Zwei Knalle gehört – das zählt als Klatschen');
-          if (stimmeT > t - 1500) return snapInfo('Knall gehört – aber gleichzeitig wurde gesprochen');
-          if (lautBl.filter(x => x > t + 120).length > 3) return snapInfo('Knall gehört – danach ging das Geräusch weiter');
+          const nein = w => { if (performance.now() >= snapTest) slog('Schnipsen? nein: ' + w); snapInfo('Knall gehört – aber ' + w); };
+          if (stimmeT > t - 1500) return nein('gleichzeitig wurde gesprochen');
+          if (lautBl.filter(x => x > t + 120).length > 5) return nein('danach ging das Geräusch weiter');
           // nicht beim Tippen oder Klicken (klingt ähnlich hell); im Zweifel bleibt ORB da
-          fetch('/mouse').then(r => r.json()).then(j => { if (j.eingabe > 2 && j.ago > 1.5) onSnap(); else snapInfo('Knall gehört – aber Maus/Tastatur war gerade in Benutzung'); }).catch(() => {}); }, 900);
+          fetch('/mouse').then(r => r.json()).then(j => { if (j.eingabe > 2 && j.ago > 1.5) { hlog('Schnipsen erkannt'); onSnap(); } else nein('Maus/Tastatur war gerade in Benutzung'); }).catch(() => {}); }, 900);
       }
       else if (knall && !cand.snap && testet) snapInfo('Knall gehört – klang eher dumpf wie Klatschen');
       else if (knall && !cand.snap && !mouse) {
@@ -1410,8 +1435,8 @@ function clapTick(tBlock) {
       const pruef = (ratio) => {
         const vorher = lautBl.filter(x => x > now - 1000 && x < now - 30).length;
         const warum = musik ? 'gerade läuft Musik' : vorher > 1 ? 'kurz davor war es nicht still (Sprache/Tippen?)'
-          : stimmeT > now - 1500 ? 'gerade wurde gesprochen' : ratio < 1.8 ? 'klang nicht hell genug' : pk / rms < 2.5 ? 'kein kurzer Knall' : '';
-        return { streng:!warum, warum };
+          : stimmeT > now - 1500 ? 'gerade wurde gesprochen' : ratio < 1.6 ? 'klang nicht hell genug' : pk / rms < 2.5 ? 'kein kurzer Knall' : '';
+        return { streng:!warum, warum, ratio };
       };
       if (hf > snapHf && pk > Math.max(floorRms * 18, (.02 - .0015 * sEmpf) * mf) && pk / rms < 16 && pre < rms * .4) cand = { t:now, rms, pk, snap:true, ruhig, ...pruef(snapRatio()) };
       else if (hf < hfMax && pk / rms < 18 && still && pk > thr && rms > floorRms * 10) { const ratio = snapRatio(); cand = { t:now, rms, pk, snap:ratio > 1.4, ruhig, ...pruef(ratio) }; }
