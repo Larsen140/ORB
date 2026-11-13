@@ -68,7 +68,7 @@ DEFAULT_CFG = {
 }
 # Damit ORB immer dein Claude-Code-Login (Max-Abo) nutzt und nie einen API-Schlüssel
 CLAUDE_ENV_DROP = ("ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "ANTHROPIC_BASE_URL")
-VERSION = "55"
+VERSION = "56"
 ORB_UI = ("Deine Oberfläche (die Larsen gerade sieht): in der Mitte du als flüssige leuchtende Kugel mit Tropfen, "
           "Orbit-Ringen und Sternenhimmel; links eine Uhr und darunter der Gesprächsverlauf mit Eingabefeld; rechts "
           "Karten für System (CPU, RAM, Akku), Wetter mit Stundenvorschau, Aktivität (was du gerade tust) und Vorschläge; "
@@ -697,6 +697,32 @@ OPEN_RE = [
 ]
 ARTICLE = re.compile(r"^(?:die\s+app\s+|das\s+programm\s+|den\s+|die\s+|das\s+|der\s+|meinen\s+|meine\s+|mein\s+)", re.I)
 WEATHER_RE = re.compile(r"\b(wetter|wie (warm|kalt) ist es|regnet es|wird es regnen)\b", re.I)
+GOLD_RE = re.compile(r"\b(gold|goldpreis|goldkurs|xau(?:\s*/?\s*usd)?)\b", re.I)
+GOLD = {"n": 0, "preis": None, "zeit": 0.0, "lock": threading.Lock()}   # Gold-Hologramm auf Zuruf
+
+
+def gold_preis():
+    """XAU/USD-Spotpreis (gold-api.com, ohne Schlüssel), höchstens alle 2 s neu abgefragt."""
+    with GOLD["lock"]:
+        if GOLD["preis"] is not None and time.time() - GOLD["zeit"] < 2:
+            return GOLD["preis"]
+        req = urllib.request.Request("https://api.gold-api.com/price/XAU", headers={"User-Agent": "ORB"})
+        with urllib.request.urlopen(req, timeout=6) as r:
+            GOLD["preis"] = float(json.loads(r.read().decode("utf-8"))["price"])
+        GOLD["zeit"] = time.time()
+        return GOLD["preis"]
+
+
+def gold_text():
+    GOLD["n"] += 1   # Oberfläche öffnet das Live-Hologramm
+    try:
+        p = gold_preis()
+    except Exception as e:
+        print("Goldkurs:", e)
+        return "Den Goldkurs bekomme ich gerade nicht."
+    d, c = divmod(int(round(p * 100)), 100)
+    zahl = "{:,}".format(d).replace(",", ".")
+    return ("Gold steht bei %s Dollar %d." % (zahl, c)) if c else ("Gold steht bei %s Dollar." % zahl)
 
 
 def try_local(text):
@@ -704,6 +730,8 @@ def try_local(text):
     t = text.strip()
     if WEATHER_RE.search(t) and len(t) < 70 and not re.search(r"\b(morgen|woche|wochenende)\b", t, re.I):
         return "Wetter abrufen", "", weather_text()
+    if GOLD_RE.search(t) and len(t) < 50 and not re.search(r"\b(öffne|starte|kaufen|verkaufen|ring|kette|schmuck|warum|wieso|wird|prognose|analyse|meinst|news|nachrichten)\b", t, re.I):
+        return "Goldkurs", "XAU/USD", gold_text()
     for rx in OPEN_RE:
         m = rx.match(t)
         if m:
@@ -1429,6 +1457,7 @@ class Handler(BaseHTTPRequestHandler):
             st["busy"] = BRAIN.busy
             st["aufgaben"] = tasks_list()   # Hintergrund-Aufgaben + Entwickler (je ein Hologramm)
             st["bild"] = {"n": BILD["n"], "name": BILD["name"]}   # Bild-Hologramm
+            st["gold"] = GOLD["n"]   # Gold-Hologramm auf Zuruf
             st["anruf"] = in_call()   # während Meet/Teams/Zoom nicht zuhören
             st["version"] = VERSION   # Fenster lädt sich neu, wenn eine neue Version läuft
             for i, p in enumerate(st.get("parts") or []):   # Stimme für alle Stücke vorbereiten
@@ -1478,6 +1507,11 @@ class Handler(BaseHTTPRequestHandler):
         elif u.path == "/weather":
             try:
                 self.send(200, weather_data() or {})
+            except Exception:
+                self.send(200, {})
+        elif u.path == "/gold":
+            try:
+                self.send(200, {"preis": gold_preis(), "zeit": GOLD["zeit"]})
             except Exception:
                 self.send(200, {})
         elif u.path == "/termine":
