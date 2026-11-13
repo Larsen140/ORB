@@ -297,6 +297,29 @@
   .col > [data-w].aus { display:none !important; }
   #act:not(.busy) { display:none; }
   #act.busy { animation:cardIn .7s var(--spring) both; }
+  /* ===== Holo-Projektion (Pepper's Ghost: schräge, durchsichtige Projektionsfläche über der Kugel) ===== */
+  #holo { --hl:var(--c3); position:fixed; left:50%; top:30%; z-index:4; pointer-events:none; min-width:200px; max-width:420px;
+    padding:14px 26px 13px; border-radius:16px; text-align:center; color:rgb(var(--hl)); opacity:0;
+    transform:translate(-50%,-100%) perspective(700px) rotateX(24deg) scale(.55); transform-origin:50% 100%;
+    transition:opacity .45s, transform .75s var(--spring);
+    background:linear-gradient(180deg, rgba(var(--hl),.13), rgba(var(--hl),.03) 70%, rgba(var(--hl),.1));
+    border:1px solid rgba(var(--hl),.5); box-shadow:0 0 34px rgba(var(--hl),.28), inset 0 0 26px rgba(var(--hl),.14);
+    text-shadow:-1.5px 0 rgba(255,60,110,.55), 1.5px 0 rgba(60,190,255,.55), 0 0 14px rgba(var(--hl),.9); mix-blend-mode:screen; }
+  #holo.on { opacity:1; transform:translate(-50%,-100%) perspective(700px) rotateX(12deg) scale(1); animation:holoFlick 3.4s steps(1) infinite; }
+  #holo::before { content:''; position:absolute; inset:0; border-radius:inherit; pointer-events:none;
+    background:repeating-linear-gradient(0deg, rgba(var(--hl),.16) 0 1px, transparent 1px 3px); animation:holoScan 2.2s linear infinite; }
+  #holo::after { content:''; position:absolute; left:0; right:0; height:26%; top:-30%; pointer-events:none;
+    background:linear-gradient(180deg, transparent, rgba(var(--hl),.22), transparent); animation:holoSweep 2.6s var(--ease) infinite; }
+  #holo.glitch { animation:holoGlitch .45s steps(2) 1; }
+  #holo .ico { font-size:38px; line-height:1.1; filter:grayscale(1) brightness(1.8) drop-shadow(0 0 10px rgb(var(--hl))); }
+  #holo .big { font-size:46px; font-weight:250; line-height:1.05; letter-spacing:-.01em; }
+  #holo .big.lang { font-size:22px; font-weight:600; letter-spacing:.01em; }
+  #holo .sub { margin-top:6px; font-size:12px; letter-spacing:.22em; text-transform:uppercase; opacity:.85; }
+  @keyframes holoScan { to { background-position:0 30px; } }
+  @keyframes holoSweep { 0% { top:-30%; } 100% { top:110%; } }
+  @keyframes holoFlick { 0%,100% { opacity:1; } 31% { opacity:.82; } 32% { opacity:.55; } 33% { opacity:.95; } 71% { opacity:.88; } 72% { opacity:.7; } 73% { opacity:1; } }
+  @keyframes holoGlitch { 0% { clip-path:inset(0 0 60% 0); transform:translate(-48%,-100%) perspective(700px) rotateX(12deg); }
+    50% { clip-path:inset(40% 0 0 0); transform:translate(-52%,-100%) perspective(700px) rotateX(12deg); } 100% { clip-path:none; } }
   /* gleicher Innenabstand für alle Karten – egal in welcher Spalte sie liegen */
   .col > [data-w] { padding:16px 18px; flex:none; }
   /* Drag & Drop der Widgets */
@@ -378,6 +401,7 @@
 <div id="island" class="glass rim"><div id="wave"><i></i><i></i><i></i><i></i><i></i></div><span id="status">Bereit</span></div>
 <div id="hint" class="glass"></div>
 <div id="caption"></div>
+<div id="holo"><div class="ico"></div><div class="big"></div><div class="sub"></div></div>
 <div id="dock" class="glass rim">
   <button class="ic" id="kb" title="Tippen (T)"><svg viewBox="0 0 24 24"><path d="M20 5H4a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2zm-9 3h2v2h-2V8zm0 3h2v2h-2v-2zM8 8h2v2H8V8zm0 3h2v2H8v-2zM5 8h2v2H5V8zm0 3h2v2H5v-2zm11 5H8v-2h8v2zm0-3h-2v-2h2v2zm0-3h-2V8h2v2zm3 3h-2v-2h2v2zm0-3h-2V8h2v2z"/></svg></button>
   <button class="ic" id="mic" title="Halten zum Sprechen (Leertaste) · 2× klatschen · „Jarvis“"><svg viewBox="0 0 24 24"><path d="M12 15a3 3 0 0 0 3-3V6a3 3 0 0 0-6 0v6a3 3 0 0 0 3 3zm5-3a5 5 0 0 1-10 0H5a7 7 0 0 0 6 6.9V22h2v-3.1a7 7 0 0 0 6-6.9z"/></svg></button>
@@ -699,6 +723,7 @@ const SFX = {
   sleep() { tone(700, .7, { type:'triangle', vol:.05, f2:180 }); tone(350, .9, { vol:.04, f2:90, delay:.15 }); },
   clap() { tone(1400, .05, { vol:.035 }); },
   drop() { tone(700, .14, { vol:.05, f2:1500 }); tone(1500, .1, { vol:.03, delay:.08, f2:900 }); },
+  holo() { noise(.5, { vol:.035, f:900, f2:5000, q:3 }); [660, 990, 1320].forEach((f, i) => tone(f, .35, { type:'triangle', vol:.025, delay:.05 + i * .05 })); },
   barge() { tone(1200, .06, { vol:.08, f2:800 }); tone(1600, .09, { vol:.07, delay:.06 }); },
   // --- Aufgaben: jede Art klingt anders ---
   read() { noise(.18, { vol:.05, f:2500, f2:6000, q:.8 }); tone(1900, .05, { vol:.025, delay:.12 }); },                 // Seite umblättern
@@ -775,6 +800,7 @@ function onParts(st, first) {
     sched = []; endTime = 0;
     if (first) { partsQueued = nextIdx = st.parts.length; return; }
     if (st.parts.length) { SFX.msgIn(); ripple(1.1); burst(30); setHum(false); }
+    if (st.holo && st.holo.titel) holoShow({ ico:st.holo.typ === 'wetter' ? WX(st.holo.code) : '🚀', titel:st.holo.titel, sub:st.holo.sub }, 7000);
   }
   if (st.say) { curSay = st.say; orbMsg(st.aid, st.say, st.final); caption(st.say); }
   while (partsQueued < st.parts.length) { fetchPart(st.aid, partsQueued, st.parts[partsQueued]); partsQueued++; }
@@ -1091,7 +1117,28 @@ function typeTo(el, text) {
   typeTimer = setInterval(() => { el.textContent = text.slice(0, ++i); if (i >= text.length) clearInterval(typeTimer); }, 18);
 }
 function renderActLog() { $('log').innerHTML = actLog.slice(-4).reverse().map(x => `<li>${esc(x)}</li>`).join(''); }
+/* Vorführung: alle Zustände nacheinander (Taste D oder state.json-Feld "demo") */
+let demoRun = 0;
+async function runDemo() {
+  const id = ++demoRun, wait = ms => new Promise(r => setTimeout(r, ms));
+  const seq = [
+    ['schlaf', 3500, () => hint('Schlafen', 3000)],
+    ['idle', 2500, () => { ripple(1); hint('Bereit', 2200); }],
+    ['hoert', 3500, () => { SFX.listenOn(); ripple(.6); hint('Zuhören', 3000); }],
+    ['denkt', 3500, () => { ripple(.8); hint('Nachdenken', 3000); }],
+    ['auftrag', 3500, () => { SFX.task(); burst(16); ripple(.35); hint('Arbeiten', 3000); }],
+    ['wartet', 3500, () => { SFX.warn(); ripple(.9); hint('Wartet auf dich', 3000); }],
+    ['spricht', 3500, () => { burst(30); hint('Sprechen', 3000); }],
+  ];
+  for (const [m, ms, fx] of seq) { if (id !== demoRun) return; S.demoVm = m; fx(); await wait(ms); }
+  if (id !== demoRun) return;
+  S.demoVm = null; burst(45); ripple(1.4); hint('Das war alles!', 2500);
+}
+let lastDemo = null;
+document.addEventListener('keydown', e => { if ((e.key === 'd' || e.key === 'D') && e.target.tagName !== 'INPUT') runDemo(); });
 function onState(st, first) {
+  if (st.demo !== undefined && st.demo !== lastDemo) { if (lastDemo !== null || !first) runDemo(); lastDemo = st.demo; }
+  if (first) lastDemo = st.demo ?? 0;
   const m = st.mode || 'idle', log = st.log || [];
   if (st.wake_req && st.wake_req !== lastWakeReq) { const fresh = lastWakeReq !== null; lastWakeReq = st.wake_req; if (fresh) wake(); }
   if (!first) {
@@ -1109,7 +1156,9 @@ function onState(st, first) {
   if (!first && m === 'denkt' && prevMode !== 'denkt' && prevMode !== 'auftrag') SFX.think();
   setHum(busy && !first);
   $('act').classList.toggle('busy', busy);
-  if (m === 'auftrag') { typeTo($('task'), st.task || 'Arbeite'); $('detail').textContent = st.detail || ''; }
+  if (m === 'auftrag') { typeTo($('task'), st.task || 'Arbeite'); $('detail').textContent = st.detail || '';
+    holoShow({ ico:holoIcon(st.task), titel:st.task || 'Arbeite', sub:st.detail || '' }, 0); holoTask = true; }
+  else if (holoTask && m !== 'wartet') holoHide();
   else if (m === 'wartet') { typeTo($('task'), 'Freigabe nötig'); $('detail').textContent = st.detail || ''; }
   else if (m === 'denkt') { $('task').textContent = 'Denke nach'; $('detail').textContent = st.heard ? '„' + st.heard.slice(0, 60) + '“' : ''; }
   else if (!first || $('task').textContent === 'Bereit') { $('task').textContent = 'Bereit'; $('detail').textContent = 'Warte auf deinen Auftrag'; }
@@ -1161,6 +1210,23 @@ async function loadSys() {
 const CHIPS = ['Wie ist das Wetter?', 'Öffne Spotify', 'Erzähl mir was Spannendes', 'Was weißt du über mich?', 'Merk dir: ', 'Öffne YouTube', 'Gib mir eine Idee für heute', 'Wie geht\'s dir?'];
 const CHIP_C = ['var(--c)', 'var(--c2)', 'var(--c3)', 'var(--c4)'];
 $('chips').innerHTML = CHIPS.map((c, i) => `<button class="chip" style="animation-delay:${.3 + i * .05}s;--chip:${CHIP_C[i % 4]}">${esc(c)}</button>`).join('');
+
+
+/* ================= Holo-Projektion & volumetrisches Display ================= */
+let holoUntil = 0, holoTask = false, holoBox = null;
+const holoIcon = l => { l = (l || '').toLowerCase();
+  return /lese/.test(l) ? '📄' : /schreibe|bearbeite/.test(l) ? '✏️' : /befehl/.test(l) ? '⌨️' : /durchsuche|suche/.test(l) ? '🔍'
+    : /webseite|recherch/.test(l) ? '🌐' : /unteragent/.test(l) ? '🤖' : /öffne/.test(l) ? '🚀' : /plane/.test(l) ? '🗂️' : '◈'; };
+function holoShow(d, ms) {
+  const h = $('holo');
+  h.querySelector('.ico').textContent = d.ico || '';
+  const big = h.querySelector('.big'); big.textContent = d.titel || ''; big.classList.toggle('lang', (d.titel || '').length > 7);
+  h.querySelector('.sub').textContent = d.sub || '';
+  if (!h.classList.contains('on')) { h.classList.add('on', 'glitch'); setTimeout(() => h.classList.remove('glitch'), 460); SFX.holo(); }
+  holoUntil = ms ? performance.now() + ms : Infinity;
+  holoBox = null;
+}
+function holoHide() { $('holo').classList.remove('on'); holoUntil = 0; holoTask = false; holoBox = null; }
 
 /* ================= Widgets per Drag & Drop umsortieren ================= */
 const COLS = [$('left'), $('right')];
@@ -1342,6 +1408,7 @@ function frame(now) {
 
   let vm = listening || convoRec ? 'hoert' : speaking ? 'spricht' : (S.mode === 'spricht' ? 'idle' : S.mode);
   if (S.sleep && !speaking && !listening) vm = 'schlaf';
+  if (S.demoVm) vm = S.demoVm;
   if ($('island').dataset.m !== vm) $('island').dataset.m = vm;
   setStatus({ idle:convo ? 'Gespräch läuft' : 'Bereit', hoert:convo ? 'Ich höre zu · „Stopp“ beendet' : 'Ich höre zu', denkt:'Denke nach',
     auftrag:'Arbeite', spricht:'Spreche', wartet:'Wartet auf dich', schlaf:cfg.klatschen ? 'Schlafe · 2× klatschen' : 'Schlafe' }[vm] || vm);
@@ -1385,6 +1452,13 @@ function frame(now) {
   const Rb = Math.min(LAY.cw * .8, H) * .15;
   const cx = LAY.mid + S.px * 10, cy = H * .44 + S.py * 6;
   const R = Rb * (1 + Math.sin(t * 1.3) * .02 * (1 - S.speakVis) + S.level * .12) * (1 - .22 * S.sleepVis) * Math.max(.02, bootE) * pop;
+  const hEl = $('holo');
+  if (hEl.classList.contains('on')) {
+    if (now > holoUntil) holoHide();
+    else { const top = cy - R * 1.32;
+      if (!holoBox || Math.abs(holoBox.cx - cx) > .5 || Math.abs(holoBox.top - top) > .5) {
+        hEl.style.left = cx + 'px'; hEl.style.top = top + 'px'; holoBox = { cx, top, w:hEl.offsetWidth, h:hEl.offsetHeight }; } }
+  }
   try { renderGL(t, cx, cy, R, speaking); } catch (e) {}
   try { drawFx(t, dt, now, cx, cy, R, speaking); } catch (e) { fx.globalCompositeOperation = 'source-over'; fx.globalAlpha = 1; fx.shadowBlur = 0; }
 }
@@ -1455,6 +1529,30 @@ function drawFx(t, dt, now, cx, cy, R, speaking) {
     ring3d(cx, cy, R * 1.95, R * .5, -.32 + Math.sin(t * .2) * .05, (.35 + S.think * .5) * fade, t, 2, .5 + S.think * 1.5, 2);
     ring3d(cx, cy, R * 2.45, R * .42, .22 + Math.sin(t * .15) * .04, (.22 + S.think * .4) * fade, t, 3, -.32 - S.think, 3);
     if (!CALM && Q() > 0) ring3d(cx, cy, R * 3.0, R * .3, -.12 + Math.sin(t * .1) * .03, (.12 + S.think * .3) * fade, t, 4, .2 + S.think * .8, 1);
+  }
+  // Projektionsstrahl von der Kugel zur Holo-Fläche
+  if (holoBox && $('holo').classList.contains('on')) {
+    const fl = .8 + .2 * Math.random(), y0 = cy - R * .92, y1 = holoBox.top - 4, hw = holoBox.w * .5;
+    const g = fx.createLinearGradient(0, y0, 0, y1); g.addColorStop(0, pcol(2, .22 * fl, .4)); g.addColorStop(1, pcol(2, .04 * fl, .4));
+    fx.fillStyle = g; fx.beginPath(); fx.moveTo(cx - R * .22, y0); fx.lineTo(cx + R * .22, y0); fx.lineTo(cx + hw, y1); fx.lineTo(cx - hw, y1); fx.closePath(); fx.fill();
+    for (let i = 0; i < 6; i++) { const k = ((t * .45 + i / 6) % 1), x = cx + (Math.sin(i * 7.3 + t) * .5) * (R * .44 + (hw * 2 - R * .44) * k), y = y0 + (y1 - y0) * k;
+      fx.fillStyle = pcol(2, .6 * (1 - k), .6); fx.fillRect(x - 1, y - 1, 2, 2); }
+  }
+  // Volumetrisches Display: rotierende LED-Streifen bilden einen Lichtpunkt-Globus (beim Arbeiten)
+  const vol = S.holo * fade;
+  if (vol > .02) {
+    const strips = 12, pts = 16, rr = R * 1.55;
+    for (let gh = 0; gh < 3; gh++) {
+      const rot = t * 1.3 - gh * .07, ga = vol * (1 - gh * .38);
+      for (let s2 = 0; s2 < strips; s2++) {
+        const lon = s2 / strips * 6.283 + rot, sl = Math.sin(lon), cl = Math.cos(lon);
+        for (let k = 0; k < pts; k++) {
+          const lat = -1.5708 + (k + .5) / pts * 3.1416, cla = Math.cos(lat), z = cl * cla;
+          fx.fillStyle = pcol(2 + (s2 & 1), ga * (.12 + .55 * (z + 1) / 2), .45);
+          const sz = 1.2 + (z + 1) * .9; fx.fillRect(cx + rr * cla * sl - sz / 2, cy + rr * Math.sin(lat) * .96 - sz / 2, sz, sz);
+        }
+      }
+    }
   }
   // Wellenform-Ring
   const vis = Math.max(S.speakVis, S.listenVis) * fade;

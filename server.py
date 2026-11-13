@@ -47,7 +47,7 @@ DEFAULT_CFG = {
 }
 # Damit ORB immer dein Claude-Code-Login (Max-Abo) nutzt und nie einen API-Schlüssel
 CLAUDE_ENV_DROP = ("ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "ANTHROPIC_BASE_URL")
-VERSION = "20"
+VERSION = "22"
 ORB_UI = ("Deine Oberfläche (die Larsen gerade sieht): in der Mitte du als flüssige leuchtende Kugel mit Tropfen, "
           "Orbit-Ringen und Sternenhimmel; links eine Uhr und darunter der Gesprächsverlauf mit Eingabefeld; rechts "
           "Karten für System (CPU, RAM, Akku), Wetter mit Stundenvorschau, Aktivität (was du gerade tust) und Vorschläge; "
@@ -153,8 +153,24 @@ def new_aid():
     return "a%d" % int(time.time() * 1000)
 
 
+def holo_for(task, detail):
+    """Daten für die Holo-Projektion über der Kugel (Wetter, geöffnete Apps)."""
+    try:
+        if task == "Wetter abrufen":
+            w = weather_data()
+            if w:
+                return {"typ": "wetter", "titel": "%d°" % round(w["temp"]), "code": w["code"],
+                        "sub": "%s · %s" % (w["desc"], w["city"])}
+        if task == "Öffne" and detail:
+            return {"typ": "app", "titel": detail, "sub": "wird geöffnet"}
+    except Exception:
+        pass
+    return None
+
+
 def write_answer(text, **kw):
     """Fertige Antwort (Begrüßung, lokale Aufträge, Fehler) in Sprech-Stücke zerlegen und ausgeben."""
+    kw.setdefault("holo", None)   # alte Holo-Projektion nicht mitschleppen
     write_state(mode="spricht", say=text, parts=split_sentences(text), aid=new_aid(), final=True, **kw)
 
 
@@ -518,7 +534,7 @@ class Brain:
             self.busy, self.stopped = True, False
             self.buf, self.full, self.spoken, self.aid = "", "", [], new_aid()
             self.last_used = time.time()
-            write_state(mode="denkt", heard=text, log=[], task="", detail="", say="", parts=[], aid=self.aid, final=False)
+            write_state(mode="denkt", heard=text, log=[], task="", detail="", say="", parts=[], aid=self.aid, final=False, holo=None)
             msg = {"type": "user", "message": {"role": "user", "content": [{"type": "text", "text": text}]}}
             try:
                 self.proc.stdin.write((json.dumps(msg, ensure_ascii=False) + "\n").encode("utf-8"))
@@ -632,7 +648,7 @@ def ask(text):
 
         def done():
             time.sleep(.6)  # kurz die Hologramm-Animation zeigen
-            write_answer(say)
+            write_answer(say, holo=holo_for(task, detail))
 
         threading.Thread(target=done, daemon=True).start()
         return True
@@ -834,7 +850,7 @@ class Handler(BaseHTTPRequestHandler):
         elif u.path == "/config":
             self.send(200, {"config": save_cfg(b)})
         elif u.path == "/greet":
-            threading.Thread(target=lambda: write_answer(greeting(), heard=""), daemon=True).start()
+            threading.Thread(target=lambda: write_answer(greeting(), heard="", holo=holo_for("Wetter abrufen", "")), daemon=True).start()
             threading.Thread(target=BRAIN.start, daemon=True).start()  # Gehirn schon mal aufwecken
             self.send(200, {"ok": True})
         elif u.path == "/warm":
