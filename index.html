@@ -948,11 +948,11 @@ function initAudio() {
     const eq = (type, f, g, q) => { const b = ac.createBiquadFilter(); b.type = type; b.frequency.value = f; if (g != null) b.gain.value = g; if (q != null) b.Q.value = q; return b; };
     const hp = eq('highpass', 75, null, .7), mud = eq('peaking', 260, -2, 1), pres = eq('peaking', 3200, 2.5, .9), air = eq('highshelf', 8500, 2);
     const lim = ac.createDynamicsCompressor();
-    lim.threshold.value = -3; lim.knee.value = 2; lim.ratio.value = 20; lim.attack.value = .001; lim.release.value = .1;
+    lim.threshold.value = -1; lim.knee.value = 1; lim.ratio.value = 20;   // Decke -1 dB statt -3 dB: lauter lim.attack.value = .001; lim.release.value = .1;
     outGain = ac.createGain();
     analyser.connect(hp); hp.connect(mud); mud.connect(pres); pres.connect(air); air.connect(outGain); outGain.connect(lim); lim.connect(ac.destination);
     const sfxLim = ac.createDynamicsCompressor();
-    sfxLim.threshold.value = -4; sfxLim.knee.value = 3; sfxLim.ratio.value = 12; sfxLim.attack.value = .002; sfxLim.release.value = .12;
+    sfxLim.threshold.value = -1.5; sfxLim.knee.value = 3; sfxLim.ratio.value = 12; sfxLim.attack.value = .002; sfxLim.release.value = .12;
     sfxGain = ac.createGain(); sfxGain.connect(sfxLim); sfxLim.connect(ac.destination);
     applyAudio();
   }
@@ -961,7 +961,7 @@ function initAudio() {
 function applyAudio() {
   if (!ac) return;
   outGain.gain.value = (+cfg.lautstaerke) / 100;
-  sfxGain.gain.value = cfg.sfx ? (+cfg.sfxlaut) / 100 * 2.2 : 0;   // Effekte waren viel zu leise
+  sfxGain.gain.value = cfg.sfx ? (+cfg.sfxlaut) / 100 * 3.5 : 0;   // Effekte waren viel zu leise
   setAmbient(cfg.ambient && cfg.sfx);
 }
 const audioOk = () => ac && ac.state === 'running';
@@ -1282,8 +1282,14 @@ function clapTick(tBlock) {
       const knall = rms < cand.rms * (cand.snap ? .5 : .35);
       if (knall && cand.snap && !cand.ruhig && testet) snapInfo('Knall gehört – aber zu viel Hintergrundgeräusch');
       const nachKlatscher = lastClap > 0 && cand.t - lastClap < 1100 && cand.t - lastClap > 150;
-      if (knall && cand.snap && nachKlatscher && !mouse) { snapT = 0; clapPk.push([cand.t, cand.pk]); clapPk = clapPk.slice(-4); checkSysMouse(cand.t); }
-      else if (knall && cand.snap && cand.ruhig && !mouse && !ownSpeak && (testet || !verborgen || !S.sleep)) {   // auch im Schlaf (Fenster sichtbar), beim Arbeiten und Sprechen
+      const zweiterHeller = snapT && cand.t - snapT > 150 && cand.t - snapT < 1100;   // zwei helle Knalle = Doppelklatscher
+      // Schnipsen nur, wenn ORB sichtbar ist und nicht selbst spricht – sonst zählt ein heller Knall als Klatscher
+      const schnippOk = !ownSpeak && (testet || !verborgen || !S.sleep);
+      if (knall && cand.snap && !mouse && (nachKlatscher || zweiterHeller || !schnippOk)) {
+        if (zweiterHeller) { claps = [snapT]; lastClap = snapT; clapPk.push([snapT, snapPk]); }
+        snapT = 0; clapPk.push([cand.t, cand.pk]); clapPk = clapPk.slice(-4); checkSysMouse(cand.t);
+      }
+      else if (knall && cand.snap && cand.ruhig && !mouse && schnippOk) {   // auch im Schlaf (Fenster sichtbar), beim Arbeiten und Sprechen
         // Schnipser: kurz warten – bleibt es still und kommt kein zweiter Knall, verschwindet ORB
         const t = cand.t; snapT = t; snapRms = cand.rms; snapLaut = 0; snapPk = cand.pk;
         setTimeout(() => { if (snapT !== t) return;
