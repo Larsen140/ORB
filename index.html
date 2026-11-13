@@ -313,69 +313,81 @@
   #holo::after { content:''; position:absolute; left:0; right:0; height:26%; top:-30%; pointer-events:none;
     background:linear-gradient(180deg, transparent, rgba(var(--hl),.22), transparent); animation:holoSweep 2.6s var(--ease) infinite; }
   /* Aufgaben-Hologramme: eins pro laufender Aufgabe (Multitasking) */
-  #tasks { position:fixed; left:50%; bottom:190px; transform:translateX(-50%); z-index:5; display:flex; gap:14px;
-    flex-wrap:wrap-reverse; justify-content:center; width:min(900px, calc(100vw - 32px)); pointer-events:none; }
-  .th { --hl:var(--c3); position:relative; width:206px; padding:12px 14px 11px; border-radius:16px; pointer-events:auto; cursor:default;
-    background:linear-gradient(160deg, rgba(var(--hlr,120,220,255),.16), rgba(10,14,30,.55)); color:#e9f6ff;
-    border:1px solid color-mix(in srgb, var(--hl) 70%, transparent); backdrop-filter:blur(6px);
-    box-shadow:0 0 22px color-mix(in srgb, var(--hl) 35%, transparent), inset 0 0 18px color-mix(in srgb, var(--hl) 18%, transparent);
-    transform:perspective(700px) rotateX(10deg); animation:thIn .7s var(--spring) backwards, holoFlick 4.2s steps(1) infinite;
-    overflow:hidden; transition:opacity .5s, transform .5s; }
-  .th::before { content:''; position:absolute; inset:0; pointer-events:none; opacity:.35;
+  /* Platz wird laufend berechnet (holoPlatz): unter der Kugel, zwischen den Widget-Spalten, über Untertitel und Dock */
+  #tasks { position:fixed; left:var(--mid,50%); top:62%; transform:translateX(-50%); z-index:5; display:flex; gap:12px; padding:6px 4px 10px;
+    flex-wrap:wrap; justify-content:center; align-content:flex-start; width:min(900px, calc(100vw - 32px)); pointer-events:none;
+    overflow-y:auto; overflow-x:hidden; scrollbar-width:none; transition:top .6s var(--spring); }
+  #tasks::-webkit-scrollbar { display:none; }
+  .th { --hl:rgb(var(--c3)); position:relative; flex:none; width:212px; padding:12px 14px 11px; border-radius:16px; pointer-events:auto; cursor:default;
+    background:linear-gradient(160deg, color-mix(in srgb, var(--hl) 16%, rgba(8,12,26,.78)), rgba(8,12,26,.74)); color:#f2f9ff;
+    border:1px solid color-mix(in srgb, var(--hl) 62%, transparent); backdrop-filter:blur(14px) saturate(1.3); -webkit-backdrop-filter:blur(14px) saturate(1.3);
+    box-shadow:0 10px 30px rgba(0,0,0,.45), 0 0 22px color-mix(in srgb, var(--hl) 30%, transparent), inset 0 1px 0 rgba(255,255,255,.14), inset 0 0 18px color-mix(in srgb, var(--hl) 14%, transparent);
+    transform:perspective(700px) rotateX(4deg); animation:holoAuf .75s cubic-bezier(.2,.9,.25,1) backwards;
+    overflow:hidden; transition:opacity .4s, transform .5s var(--spring), border-color .5s, box-shadow .5s; }
+  .th > * { position:relative; z-index:1; }
+  .th::before { content:''; position:absolute; inset:0; pointer-events:none; opacity:.12;
     background:repeating-linear-gradient(0deg, transparent 0 2px, color-mix(in srgb, var(--hl) 40%, transparent) 2px 3px); }
   .th::after { content:''; position:absolute; left:0; right:0; height:30%; top:-35%; pointer-events:none;
     background:linear-gradient(transparent, color-mix(in srgb, var(--hl) 30%, transparent), transparent); animation:thScan 2.6s linear infinite; }
-  .th.dev { --hl:var(--c4); } .th.fertig { --hl:#5dffb0; } .th.fehler, .th.abgebrochen { --hl:#ff6b6b; }
+  .th.dev { --hl:rgb(var(--c4)); } .th.fertig { --hl:#5dffb0; } .th.fehler, .th.abgebrochen { --hl:#ff6b6b; }
   .th .tt { display:flex; align-items:center; gap:8px; font-size:11px; font-weight:700; letter-spacing:.14em; text-transform:uppercase; }
   .th .ring { width:14px; height:14px; border-radius:50%; flex:none; border:2px solid color-mix(in srgb, var(--hl) 35%, transparent);
     border-top-color:var(--hl); animation:spin .9s linear infinite; }
   .th.fertig .ring, .th.fehler .ring, .th.abgebrochen .ring { animation:none; border-color:var(--hl); background:var(--hl); box-shadow:0 0 10px var(--hl); }
   .th .nm { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   .th .zt { font-variant-numeric:tabular-nums; opacity:.7; font-weight:500; letter-spacing:0; }
-  .th .st { margin-top:7px; font-size:12.5px; line-height:1.35; opacity:.9; display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden; min-height:17px; }
+  .th .st { margin-top:7px; font-size:13px; line-height:1.4; opacity:.95; text-shadow:0 1px 3px rgba(0,0,0,.6); display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden; min-height:17px; }
   .th .bar { margin-top:8px; height:2px; border-radius:2px; background:color-mix(in srgb, var(--hl) 20%, transparent); overflow:hidden; }
   .th .bar i { display:block; height:100%; width:30%; background:var(--hl); box-shadow:0 0 8px var(--hl); animation:thBar 1.6s ease-in-out infinite; }
   .th.fertig .bar i, .th.fehler .bar i, .th.abgebrochen .bar i { width:100%; animation:none; }
   .th { touch-action:pan-y; user-select:none; }
-  .th .x { position:absolute; top:6px; right:6px; z-index:2; width:20px; height:20px; border-radius:50%; border:0; display:grid; place-items:center;
-    background:color-mix(in srgb, var(--hl) 14%, transparent); color:inherit; opacity:.45; cursor:pointer; font-size:11px; line-height:1;
+  .th .x { position:absolute !important; top:6px; right:6px; z-index:2; width:20px; height:20px; border-radius:50%; border:0; display:grid; place-items:center;
+    background:color-mix(in srgb, var(--hl) 14%, transparent); color:inherit; opacity:.7; cursor:pointer; font-size:11px; line-height:1;
     box-shadow:inset 0 0 0 1px color-mix(in srgb, var(--hl) 40%, transparent); transition:opacity .2s, transform .3s var(--spring), background .2s; }
   .th .x:hover { opacity:1; transform:scale(1.15); background:color-mix(in srgb, var(--hl) 30%, transparent); }
-  .th .stop { position:absolute; top:6px; right:30px; z-index:2; border:0; background:none; color:inherit; opacity:0; cursor:pointer; font-size:11px; transition:opacity .2s; }
+  .th .stop { position:absolute !important; top:6px; right:30px; z-index:2; border:0; background:none; color:inherit; opacity:0; cursor:pointer; font-size:11px; transition:opacity .2s; }
   .th.laeuft:not(.dev):hover .stop { opacity:.7; }
   .th .tt { padding-right:18px; }
-  .th.ziehen { animation:none; transition:none; }
+  .th.ziehen { transition:none; }
   .th.wisch { opacity:0 !important; transition:opacity .35s, transform .35s; }
-  .th.weg { opacity:0; transform:perspective(700px) rotateX(30deg) translateY(20px) scale(.9); }
-  @keyframes thIn { from { opacity:0; transform:perspective(700px) rotateX(70deg) translateY(40px) scale(.6); filter:blur(6px); } }
+  .th.weg { animation:holoAb .42s cubic-bezier(.5,0,.75,0) forwards; pointer-events:none; }
+  /* Einblenden wie eine Projektion: erst eine Lichtlinie, die sich weich zur Karte öffnet – Ausblenden umgekehrt */
+  @keyframes holoAuf { 0% { opacity:0; clip-path:inset(49% 8% 49% 8% round 16px); filter:blur(4px) brightness(2.2); }
+    40% { opacity:1; clip-path:inset(47% 0 47% 0 round 16px); filter:blur(1.5px) brightness(1.8); }
+    100% { opacity:1; clip-path:inset(0 0 0 0 round 16px); filter:none; } }
+  @keyframes holoAb { 0% { opacity:1; clip-path:inset(0 0 0 0 round 16px); filter:none; }
+    60% { opacity:1; clip-path:inset(47% 0 47% 0 round 16px); filter:blur(1px) brightness(1.8); }
+    100% { opacity:0; clip-path:inset(49% 12% 49% 12% round 16px); filter:blur(4px) brightness(2.2); } }
   @keyframes thScan { to { top:120%; } }
   @keyframes thBar { 0% { transform:translateX(-110%); } 100% { transform:translateX(360%); } }
   @keyframes spin { to { transform:rotate(360deg); } }
   /* Bild-Hologramm: neu erstellte Bilder (Bilder/ORB Bilder) – Klick vergrößert, ✕ schließt */
-  #bildh { --hl:var(--c3); position:fixed; left:50%; bottom:300px; z-index:6; width:300px; padding:10px 10px 9px; border-radius:18px;
-    color:#e9f6ff; cursor:zoom-in; overflow:hidden; opacity:0; pointer-events:none;
-    background:linear-gradient(160deg, rgba(var(--hl),.16), rgba(10,14,30,.55));
-    border:1px solid rgba(var(--hl),.70); backdrop-filter:blur(6px);
-    box-shadow:0 0 30px rgba(var(--hl),.40), inset 0 0 22px rgba(var(--hl),.20);
-    transform:translateX(-50%) perspective(800px) rotateX(10deg); transition:opacity .5s, transform .6s var(--spring), width .6s var(--spring), bottom .6s var(--spring); }
-  #bildh.on { opacity:1; pointer-events:auto; animation:bildIn .8s var(--spring) backwards, bildGlitch .5s steps(2) 1, holoFlick 4.2s 1s steps(1) infinite; }
-  #bildh.gross { width:min(78vw, 980px); bottom:50%; cursor:zoom-out; transform:translate(-50%, 50%) perspective(800px) rotateX(0deg); }
-  #bildh img { display:block; width:100%; max-height:min(52vh, 420px); object-fit:contain; border-radius:11px;
-    filter:drop-shadow(-2px 0 rgba(255,60,110,.35)) drop-shadow(2px 0 rgba(60,190,255,.35)) drop-shadow(0 0 12px rgba(var(--hl),.45)); }
-  #bildh.gross img { max-height:76vh; }
-  #bildh::before { content:''; position:absolute; inset:0; pointer-events:none; z-index:1; opacity:.3;
+  /* Position/Größe setzt holoPlatz: neben der Kugel (oder darunter, wenn es zu eng ist) – nie über Kugel oder Widgets */
+  #bildh { --hl:var(--c3); position:fixed; left:var(--bx,50%); top:var(--by,60%); z-index:6; width:var(--bw,300px); padding:10px 10px 9px; border-radius:18px;
+    color:#f2f9ff; cursor:zoom-in; overflow:hidden; opacity:0; pointer-events:none; visibility:hidden;
+    background:linear-gradient(160deg, rgba(var(--hl),.14), rgba(8,12,26,.78));
+    border:1px solid rgba(var(--hl),.62); backdrop-filter:blur(14px) saturate(1.3); -webkit-backdrop-filter:blur(14px) saturate(1.3);
+    box-shadow:0 14px 40px rgba(0,0,0,.5), 0 0 30px rgba(var(--hl),.32), inset 0 1px 0 rgba(255,255,255,.14), inset 0 0 22px rgba(var(--hl),.14);
+    transform:translate(-50%, var(--bty,-50%)); transition:left .6s var(--spring), top .6s var(--spring), width .6s var(--spring), transform .6s var(--spring), box-shadow .5s; }
+  #bildh.on { opacity:1; visibility:visible; pointer-events:auto; animation:holoAuf .8s cubic-bezier(.2,.9,.25,1) backwards; }
+  #bildh.zu { animation:holoAb .4s cubic-bezier(.5,0,.75,0) forwards; pointer-events:none; }
+  #bildh.gross { left:var(--mid,50%); top:50%; width:min(calc(100vw - 80px), 980px); cursor:zoom-out; transform:translate(-50%, -50%); z-index:60;
+    box-shadow:0 0 0 100vmax rgba(2,4,12,.62), 0 24px 70px rgba(0,0,0,.6), 0 0 40px rgba(var(--hl),.35), inset 0 1px 0 rgba(255,255,255,.14); }
+  #bildh img { position:relative; z-index:0; display:block; width:100%; max-height:var(--bimg, min(52vh, 420px)); object-fit:contain; border-radius:11px;
+    filter:drop-shadow(0 0 12px rgba(var(--hl),.35)); }
+  #bildh.gross img { max-height:78vh; }
+  #bildh::before { content:''; position:absolute; inset:0; pointer-events:none; z-index:1; opacity:.1;
     background:repeating-linear-gradient(0deg, transparent 0 2px, rgba(var(--hl),.40) 2px 3px); }
   #bildh::after { content:''; position:absolute; left:0; right:0; height:30%; top:-35%; pointer-events:none; z-index:1;
     background:linear-gradient(transparent, rgba(var(--hl),.28), transparent); animation:thScan 2.6s linear infinite; }
-  #bildh .tt { display:flex; align-items:center; gap:8px; margin:8px 4px 0; font-size:11px; font-weight:700; letter-spacing:.14em; text-transform:uppercase;
+  #bildh .tt { position:relative; z-index:2; display:flex; align-items:center; gap:8px; margin:8px 4px 0; font-size:11px; font-weight:700; letter-spacing:.14em; text-transform:uppercase;
     text-shadow:0 0 10px rgba(var(--hl),.80); }
   #bildh .tt i { width:8px; height:8px; border-radius:50%; flex:none; background:rgb(var(--hl)); box-shadow:0 0 10px rgb(var(--hl)); }
   #bildh .tt span { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   #bildh .x { position:absolute; top:8px; right:10px; z-index:2; border:0; background:rgba(10,14,30,.5); color:inherit; border-radius:50%;
-    width:24px; height:24px; cursor:pointer; font-size:13px; opacity:.0; transition:opacity .2s; }
-  #bildh:hover .x { opacity:.85; }
-  @keyframes bildIn { from { opacity:0; transform:translateX(-50%) perspective(800px) rotateX(70deg) translateY(40px) scale(.6); filter:blur(8px); } }
-  @keyframes bildGlitch { 0% { clip-path:inset(0 0 62% 0); translate:-6px 0; } 50% { clip-path:inset(38% 0 0 0); translate:6px 0; } 100% { clip-path:none; translate:0 0; } }
+    width:26px; height:26px; cursor:pointer; font-size:13px; opacity:.75; display:grid; place-items:center;
+    box-shadow:inset 0 0 0 1px rgba(var(--hl),.45); transition:opacity .2s, transform .3s var(--spring), background .2s; }
+  #bildh .x:hover { opacity:1; transform:scale(1.12); background:rgba(var(--hl),.3); }
   #holo.glitch { animation:holoGlitch .45s steps(2) 1; }
   #holo .ico { font-size:38px; line-height:1.1; filter:grayscale(1) brightness(1.8) drop-shadow(0 0 10px rgb(var(--hl))); }
   #holo .big { font-size:46px; font-weight:250; line-height:1.05; letter-spacing:-.01em; }
@@ -924,6 +936,20 @@ async function ensureMic() {
     micSrc = ac.createMediaStreamSource(st); micSrc.connect(micAn);
   } catch (e) { hint('Kein Mikrofon-Zugriff', 5000); }
 }
+/* Mikro-Pegel der letzten ~20 s: erkennt, ob jemand nah ins Mikro spricht oder nur Hintergrund läuft */
+const pegel = []; let pegelNah = 0, pegelN = 0;
+try { const p = JSON.parse(localStorage.getItem('orbPegel') || '{}'); pegelNah = +p.nah || 0; pegelN = +p.n || 0; } catch (e) {}
+function pegelMerken(buf) {
+  let s = 0; for (let i = 0; i < buf.length; i += 2) s += buf[i] * buf[i];
+  const v = Math.sqrt(2 * s / buf.length), now = performance.now(), last = pegel[pegel.length - 1];
+  if (last && now - last.t < 100) { if (v > last.v) last.v = v; } else { pegel.push({ t:now, v }); if (pegel.length > 200) pegel.shift(); }
+}
+const pegelSeit = t0 => pegel.reduce((m, p) => p.t >= t0 && p.v > m ? p.v : m, 0);
+function pegelLernen(pk) {   // lernt aus Sätzen mit „Jarvis“, wie laut Larsen normalerweise spricht
+  if (!(pk > 0)) return;
+  pegelNah = pegelN ? pegelNah * .8 + pk * .2 : pk; pegelN = Math.min(pegelN + 1, 50);
+  try { localStorage.setItem('orbPegel', JSON.stringify({ nah:pegelNah, n:pegelN })); } catch (e) {}
+}
 let clapAn = null, clapBuf = null, clapTimer = null, claps = [], floorRms = .0003, cand = null, lastClap = 0;
 function startClap() {
   if (clapTimer || !micSrc) return;
@@ -931,7 +957,7 @@ function startClap() {
   clapTimer = ac.createScriptProcessor(512, 1, 1);
   const mute = ac.createGain(); mute.gain.value = 0;
   micSrc.connect(clapTimer); clapTimer.connect(mute); mute.connect(ac.destination);
-  clapTimer.onaudioprocess = e => { clapBuf = e.inputBuffer.getChannelData(0); clapTick(); };
+  clapTimer.onaudioprocess = e => { clapBuf = e.inputBuffer.getChannelData(0); pegelMerken(clapBuf); clapTick(); };
 }
 let fBuf = null, snapT = 0, snapRms = 0, snapLaut = 0, clapPk = [], slowRms = 1, snapTest = 0, snapTestT = 0;   // slowRms: Lautstärke der letzten ~1–2 s
 // Schnipsen klingt hell (Energie um 2–5 kHz), Klatschen voll (viel Energie unter 1,5 kHz)
@@ -1170,6 +1196,7 @@ setInterval(pollMusik, 2000); pollMusik();
 addEventListener('pagehide', () => duckMusik(false));
 function startConvo() {
   if (S.sleep || !SR) return;
+  if (convo && convoRec) { followUntil = Math.max(followUntil, performance.now() + FOLLOW_MS); return; }   // hört schon (z. B. nach „Jarvis“)
   convo = true; convoLastSpeech = performance.now(); lastAct = performance.now(); followUntil = performance.now() + FOLLOW_MS;
   SFX.listenOn(); ripple(.8);
 }
@@ -1177,41 +1204,106 @@ function stopConvo(silent) {
   convo = false; killConvoRec(); liveMsg(null);
   if (!silent) { SFX.listenOff(); ripple(.5); hint('Zuhören beendet · 2× klatschen zum Weiterreden', 4500); }
 }
-function killConvoRec() { if (convoRec) { const r = convoRec; convoRec = null; try { r.abort(); } catch (e) {} } }
+function killConvoRec() { if (convoRec) { const r = convoRec; convoRec = null; try { r.abort(); } catch (e) {} } sbReset(); }
 function convoCanListen() {
   return !S.call && convo && !S.sleep && !listening && !speakingNow() && performance.now() >= askGap && S.mode !== 'wartet';   // auch während er arbeitet – Neues läuft parallel
 }
 function convoListen() {
   if (convoRec || !convoCanListen() || performance.now() - convoLastStart < 500) return;
   convoLastStart = performance.now(); stopWake(); killBarge();
-  const r = new SR(); r.lang = 'de-DE'; r.continuous = true; r.interimResults = true;
-  r.onresult = e => {
-    let interim = '';
-    for (let i = e.resultIndex; i < e.results.length; i++) {
-      const x = e.results[i];
-      if (x.isFinal) { const t = x[0].transcript.trim(); if (t) return handleConvo(t); } else interim += x[0].transcript;
-    }
-    if (interim.trim() && (followOpen() || NAME_RE().test(interim))) { liveMsg(interim.trim()); convoLastSpeech = performance.now(); if (NAME_RE().test(interim)) duckMusik(true); }
-  };
-  r.onerror = e => { if (e.error === 'not-allowed' || e.error === 'service-not-allowed') { hint('Mikrofon blockiert', 5000); stopConvo(true); } };
-  r.onend = () => { if (convoRec === r) convoRec = null; };
-  convoRec = r; try { r.start(); } catch (e) { convoRec = null; }
+  const r = new SR(); r.lang = 'de-DE'; r.continuous = true; r.interimResults = true; r.maxAlternatives = 3;
+  adoptRec(r);
+  try { r.start(); } catch (e) { convoRec = null; }
 }
-function handleConvo(t) {
-  if (musikAn() && !followOpen() && !NAME_RE().test(t)) { liveMsg(null); return; }   // Songtext, nicht Larsen
+// Erkenner als Gesprächs-Erkenner übernehmen – auch einen schon laufenden (nach „Jarvis“), damit der Satzanfang nicht verloren geht
+function adoptRec(r, start) {
+  r._stopped = true;   // Aufwach-Erkenner nicht neu starten
+  r.onresult = convoResult;
+  r.onerror = e => { if (e.error === 'not-allowed' || e.error === 'service-not-allowed') { hint('Mikrofon blockiert', 5000); stopConvo(true); } };
+  r.onend = () => { if (convoRec === r) { convoRec = null; if (sb.t) sbFlush(); } };   // Erkenner endet → Gesagtes trotzdem abschicken
+  convoRec = r;
+  if (start) { sb.name = true; sb.t0 = performance.now() - 2500; sbAdd(start, 0); }
+}
+function convoResult(e) {
+  let interim = '';
+  for (let i = e.resultIndex; i < e.results.length; i++) {
+    const x = e.results[i]; let t = x[0].transcript;
+    for (let k = 1; k < x.length; k++) if (!NAME_RE().test(t) && NAME_RE().test(x[k].transcript)) t = x[k].transcript;   // „Jarvis“ steht oft nur in einer Alternative
+    if (x.isFinal) { if (t.trim()) sbFinal(t.trim(), x[0].confidence); } else interim += t;
+  }
+  interim = interim.trim();
+  if (!interim) return;
+  const named = NAME_RE().test(interim);
+  if (sb.t || followOpen() || named) {
+    if (!sb.t0) sb.t0 = performance.now() - 1200;
+    if (named) { sb.name = true; duckMusik(true); }
+    liveMsg((sb.t + ' ' + interim).trim()); convoLastSpeech = performance.now();
+    sbWait();   // spricht noch → Pause neu abwarten
+  }
+}
+
+/* ---------- Satzpuffer: erst nach einer echten Sprechpause abschicken ---------- */
+// Die Erkennung schließt Teilstücke schon bei kurzen Atempausen ab – die werden hier gesammelt.
+const PAUSE_MS = 1200, PAUSE_LANG_MS = 2700;
+const HAENGT = /(?<![a-zäöüß])(und|oder|aber|sondern|weil|dass|ob|wenn|als|der|die|den|dem|des|ein|eine[nmrs]?|mein(e[nmrs]?)?|dein(e[nmrs]?)?|unser(e[nmrs]?)?|mit|von|vom|zum|zur|für|im|am|beim|bei|über|unter|bis|gegen|ohne|ähm?|äh|ehm|hm+|also)[\s,.!?…]*$/i;
+const FUELLWORT = /^(äh|ähm|ehm|hm+|mhm|also|so|na)$/i;
+const sb = { t:'', conf:[], timer:0, t0:0, name:false, lang:false, cut:false };
+function sbReset() { clearTimeout(sb.timer); sb.t = ''; sb.conf = []; sb.t0 = 0; sb.name = false; sb.lang = false; sb.cut = false; }
+function sbFinal(t, conf) {
+  const named = NAME_RE().test(t);
+  if (!sb.t) {
+    if (musikAn() && !followOpen() && !named) { liveMsg(null); sbReset(); return; }   // Songtext, nicht Larsen
+    if (STOP_RE.test(t.replace(/[.!?,]+$/g, '').trim())) { sbReset(); liveMsg(null); convoLastSpeech = performance.now(); return stopConvo(); }
+    if ((cfg.nur_jarvis || musikAn()) && !named && !followOpen()) { liveMsg(null); sbReset(); return; }   // Hintergrundgespräch, Fernseher … ignorieren
+  }
+  if (named) { sb.name = true; duckMusik(true); }
+  if (!sb.t0) sb.t0 = performance.now() - 1500;
+  sbAdd(t, conf);
+}
+function sbAdd(t, conf) {
+  sb.t = (sb.t + ' ' + t).trim(); if (conf > 0) sb.conf.push(conf);
+  convoLastSpeech = performance.now(); liveMsg(sb.t); sbWait();
+}
+function sbWait() {
+  if (!sb.t) return;
+  clearTimeout(sb.timer);
+  const rest = sb.t.replace(NAME_RE(), '').replace(/[\s,.!?:;]+/g, '');
+  // Satz hängt („… und“, „spiel den“) oder nur „Jarvis“ gesagt → länger auf den Rest warten
+  sb.lang = HAENGT.test(sb.t) || rest.length <= 2;
+  sb.timer = setTimeout(sbFlush, sb.lang ? PAUSE_LANG_MS : PAUSE_MS);
+}
+function sbFlush() {
+  clearTimeout(sb.timer);
+  const t = sb.t, cut = sb.cut, named = sb.name || NAME_RE().test(t), conf = sb.conf.length ? sb.conf.reduce((a, b) => a + b, 0) / sb.conf.length : 0;
+  const pk = sb.t0 ? pegelSeit(sb.t0) : 0;
+  sbReset();
+  if (t) handleConvo(t, { named, conf, pk, cut });
+}
+function handleConvo(t, info = {}) {
   convoLastSpeech = performance.now();
   if (STOP_RE.test(t.replace(/[.!?,]+$/g, '').trim())) { liveMsg(null); return stopConvo(); }
-  if (cfg.nur_jarvis || musikAn()) {
-    const m = t.match(NAME_RE());
-    if (!m && !followOpen()) { liveMsg(null); return; }   // Hintergrundgespräch, Fernseher … ignorieren
-    if (m) {
-      duckMusik(true);
-      const vorne = !t.slice(0, m.index).replace(/[\s,.!?:;]+/g, '').length;
-      if (vorne) t = t.slice(m.index + m[0].length).replace(/^[\s,.!?:;]+/, '');   // „Jarvis, …“ → nur die Frage
-      if (t.replace(/[.!?,\s]+/g, '').length <= 2) { liveMsg(null); followUntil = performance.now() + FOLLOW_MS; SFX.listenOn(); ripple(.6); hint('Ich höre …', FOLLOW_MS); return; }
-    }
-  }
+  const m = t.match(NAME_RE());
+  if ((cfg.nur_jarvis || musikAn()) && !m && !followOpen() && !info.named) { liveMsg(null); return; }
+  if (m) {
+    duckMusik(true); pegelLernen(info.pk);   // so laut spricht Larsen, wenn er ORB meint
+    const vorne = !t.slice(0, m.index).replace(/[\s,.!?:;]+/g, '').length;
+    if (vorne || info.cut) t = t.slice(m.index + m[0].length).replace(/^[\s,.!?:;]+/, '');   // „Jarvis, …“ → nur die Frage (beim Unterbrechen: eigene Stimme davor weg)
+    if (t.replace(/[.!?,\s]+/g, '').length <= 2) { liveMsg(null); followUntil = performance.now() + FOLLOW_MS; SFX.listenOn(); ripple(.6); hint('Ich höre …', FOLLOW_MS); return; }
+  } else if (!info.named && pegelN >= 3 && info.pk > 0 && info.pk < pegelNah * .3) { liveMsg(null); return; }   // viel leiser als Larsen → Hintergrund
+  const kern = t.replace(/[.!?,…]+/g, ' ').trim(), worte = kern.split(/\s+/).filter(Boolean);
+  if (!worte.length || worte.every(w => FUELLWORT.test(w))) { liveMsg(null); return; }   // nur „äh“, „hm“
+  // abgeschnitten oder sehr unsicher erkannt → nachfragen statt Unsinn abschicken
+  if ((worte.length >= 2 && HAENGT.test(kern)) || (info.conf > 0 && info.conf < .42 && worte.length <= 6)) return nachfragen(kern);
   followUntil = 0; killConvoRec(); askGap = performance.now() + 1800; ask(t);
+  if (!cfg.dauerzuhoeren) stopConvo(true);   // ohne Dauerzuhören: eine Frage, dann wieder nur auf „Jarvis“
+}
+function nachfragen(t) {
+  liveMsg(null); SFX.listenOn(); ripple(.6);
+  addMsg('me', t + ' …');
+  const satz = 'Ich habe nur „' + t + '“ verstanden – sag es bitte noch mal.';
+  if (!S.busy && voiceOn) fetch('/announce', { method:'POST', headers:{ 'Content-Type':'application/json' }, body:JSON.stringify({ text:'Wie bitte? Ich habe nur ' + t + ' verstanden.' }) }).catch(() => {});
+  else { addMsg('orb', satz); hint('Nicht ganz verstanden – bitte noch mal', 4000); }
+  followUntil = performance.now() + FOLLOW_MS * 1.5;   // Wiederholung ohne „Jarvis“ annehmen
 }
 
 /* ---------- Unterbrechen mit „Jarvis“ ---------- */
@@ -1238,10 +1330,14 @@ function bargeListen() {
   bargeRec = r; try { r.start(); } catch (e) { bargeRec = null; }
 }
 function interrupt() {
-  killBarge(); stopAudio(); caption(''); duckMusik(true);
+  const r = bargeRec; bargeRec = null;
+  stopAudio(); caption(''); duckMusik(true);
   if (S.busy) fetch('/stop', { method:'POST' }).catch(() => {});
   SFX.barge(); ripple(1.2); burst(24); hint('Ja?', 1500);
-  askGap = performance.now() + 400; convo = true; convoLastSpeech = performance.now(); followUntil = performance.now() + FOLLOW_MS;
+  convo = true; convoLastSpeech = performance.now(); followUntil = performance.now() + FOLLOW_MS;
+  // Erkenner weiterlaufen lassen statt neu starten – sonst fehlt der Anfang der Frage nach „Jarvis“
+  if (r) { askGap = 0; killConvoRec(); adoptRec(r); sb.name = true; sb.cut = true; sb.t0 = performance.now() - 1500; }
+  else askGap = performance.now() + 400;
 }
 
 /* ---------- Aktivierungswort ---------- */
@@ -1254,22 +1350,29 @@ function startWake() {
       // alle Alternativen prüfen – oft steht „Jarvis“ nur in der zweiten oder dritten
       let t = r[0].transcript;
       for (let k = 1; k < r.length; k++) if (!NAME_RE().test(t) && NAME_RE().test(r[k].transcript)) t = r[k].transcript;
-      if (r.isFinal) { wakeRec._sig = false; onWake(t); }
-      else if (!wakeRec._sig && NAME_RE().test(t) && !S.sleep) { wakeRec._sig = true; duckMusik(true); SFX.listenOn(); ripple(.6); hint('Ich höre …', 3000); }   // sofortige Rückmeldung
+      if (r.isFinal) return onWake(t, wakeRec);
+      if (NAME_RE().test(t) && !speakingNow()) return nameHeard(wakeRec);   // sofort übernehmen – der Rest des Satzes läuft im selben Erkenner weiter
     }
   };
   wakeRec.onend = () => { const was = wakeRec; wakeRec = null; if (was && !was._stopped && cfg.steuerung === 'wort') setTimeout(startWake, 300); };
   try { wakeRec.start(); } catch (e) { wakeRec = null; }
 }
 function stopWake() { if (wakeRec) { wakeRec._stopped = true; try { wakeRec.abort(); } catch (e) {} wakeRec = null; } }
-function onWake(t) {
-  const low = t.toLowerCase(), m = low.match(NAME_RE());
-  const rest = m ? t.slice(m.index + m[0].length).replace(/^[\s,.!?:;]+/, '') : '';
-  if (S.sleep) { if (m) { duckMusik(true); wake(rest.length > 2 ? rest : ''); } return; }   // aus Schlaf/Hintergrund: aufwachen und die Frage annehmen
+function onWake(t, r) {
+  const m = t.match(NAME_RE());
+  if (S.sleep && !m) return;
   if (speakingNow()) return;   // während er arbeitet darf man ihn trotzdem ansprechen (läuft dann parallel)
   if (performance.now() < armedUntil) { armedUntil = 0; return ask(t); }
-  if (!m) return;
-  if (rest.length > 2) ask(rest); else { armedUntil = performance.now() + 8000; SFX.listenOn(); ripple(.6); hint('Ich höre …', 8000); }
+  if (m) nameHeard(r, t);
+}
+// „Jarvis“ gehört: laufenden Erkenner als Gesprächs-Erkenner übernehmen (auch aus dem Schlaf) und auf die Sprechpause warten
+function nameHeard(r, start) {
+  if (!r || r !== wakeRec || S.call) return;
+  wakeRec = null; duckMusik(true);
+  convo = true; convoLastSpeech = performance.now(); followUntil = performance.now() + FOLLOW_MS; askGap = 0;
+  killConvoRec(); adoptRec(r, start); sb.name = true; if (!sb.t0) sb.t0 = performance.now() - 1500;
+  wake('');   // aus Schlaf/Hintergrund holen – ohne Begrüßung, die Frage kommt gleich
+  SFX.listenOn(); ripple(.6); hint('Ich höre …', 3000);
 }
 
 /* ================= Gespräch (linkes Panel) ================= */
@@ -1375,8 +1478,9 @@ let lastDemo = null;
 document.addEventListener('keydown', e => { if ((e.key === 'd' || e.key === 'D') && e.target.tagName !== 'INPUT') runDemo(); });
 /* ---------- Bild-Hologramm ---------- */
 let bildN = null, bildUrl = '', bildTimer = 0;
-function bildZu() { const el = $('bildh'); clearTimeout(bildTimer); if (!el.classList.contains('on')) return;
-  el.classList.remove('on', 'gross'); SFX.close(); }
+function bildZu() { const el = $('bildh'); clearTimeout(bildTimer); if (!el.classList.contains('on') || el.classList.contains('zu')) return;
+  el.classList.add('zu'); SFX.close();
+  clearTimeout(bildZu._t); bildZu._t = setTimeout(() => { el.classList.remove('on', 'gross', 'zu'); holoPlatz._k = ''; }, 420); }
 function bildWarte(ms) { clearTimeout(bildTimer); bildTimer = setTimeout(() => {
   const el = $('bildh'); if (el.matches(':hover') || el.classList.contains('gross')) bildWarte(4000); else bildZu(); }, ms); }
 async function bildHolo(b) {
@@ -1389,13 +1493,41 @@ async function bildHolo(b) {
     await new Promise(ok => { img.onload = img.onerror = ok; img.src = url; });
     if (bildUrl) URL.revokeObjectURL(bildUrl); bildUrl = url;
     el.querySelector('.tt span').textContent = b.name || 'Neues Bild';
-    el.classList.remove('on', 'gross'); void el.offsetWidth; el.classList.add('on');
+    clearTimeout(bildZu._t); el.classList.remove('on', 'gross', 'zu'); holoPlatz._k = ''; holoPlatz(); void el.offsetWidth; el.classList.add('on'); holoPlatz._k = '';
     SFX.holo(); ripple(.6); burst(24); bildWarte(14000);
   } catch (e) {}
 }
 $('bildh').addEventListener('click', e => { const el = $('bildh');
   if (e.target.classList.contains('x')) { bildZu(); return; }
-  el.classList.toggle('gross'); SFX.holo(); bildWarte(14000); });
+  el.classList.toggle('gross'); holoPlatz._k = ''; SFX.holo(); bildWarte(14000); });
+// Großansicht: Klick daneben verkleinert wieder
+document.addEventListener('pointerdown', e => { const el = $('bildh');
+  if (el.classList.contains('gross') && !el.contains(e.target)) { el.classList.remove('gross'); holoPlatz._k = ''; SFX.close(); bildWarte(8000); } }, true);
+/* ---------- Platz für Hologramme: nichts über Kugel, Widgets, Untertitel oder Dock ---------- */
+function holoPlatz(cx, cy, R) {
+  if (cx === undefined) { const a = holoPlatz._a; if (!a) return; [cx, cy, R] = a; } else holoPlatz._a = [cx, cy, R];
+  const bild = $('bildh'), offen = bild.classList.contains('on') && !bild.classList.contains('gross'), tb = $('tasks');
+  const nTasks = tb.childElementCount;
+  const k = [Math.round(cx), Math.round(cy), Math.round(R), W, H, Math.round(LAY.cw), offen, nTasks].join();
+  if (k === holoPlatz._k) return; holoPlatz._k = k;
+  const kugelUnten = cy + R * 1.35 + 12, boden = H - 186;   // Untertitel + Dock frei lassen
+  const spalteL = LAY.mid - LAY.cw / 2 + 16, spalteB = LAY.cw - 32;
+  const seite = LAY.cw / 2 - R * 1.5 - 30;   // Platz rechts neben der Kugel
+  let tasksTop = kugelUnten;
+  if (seite >= 160) {   // Bild neben der Kugel, senkrecht mittig
+    const bw = Math.min(360, seite - 10), bx = cx + R * 1.5 + 18 + bw / 2;
+    const hoch = Math.max(120, Math.min(440, 2 * Math.min(cy - 80, boden - cy) - 60));
+    bild.style.setProperty('--bx', bx + 'px'); bild.style.setProperty('--by', cy + 'px'); bild.style.setProperty('--bty', '-50%');
+    bild.style.setProperty('--bw', bw + 'px'); bild.style.setProperty('--bimg', hoch + 'px');
+  } else {   // zu eng: unter die Kugel, Aufgaben rutschen darunter
+    const bw = Math.min(320, spalteB);
+    bild.style.setProperty('--bx', (spalteL + spalteB / 2) + 'px'); bild.style.setProperty('--by', kugelUnten + 'px'); bild.style.setProperty('--bty', '0px');
+    bild.style.setProperty('--bw', bw + 'px'); bild.style.setProperty('--bimg', Math.max(70, Math.min(320, boden - kugelUnten - 60)) + 'px');
+    if (offen) tasksTop = kugelUnten + bild.offsetHeight + 10;
+  }
+  tb.style.top = tasksTop + 'px'; tb.style.width = Math.min(900, spalteB) + 'px';
+  tb.style.maxHeight = Math.max(60, H - 118 - tasksTop) + 'px';   // höchstens bis knapp über das Dock
+}
 /* ---------- Aufgaben-Hologramme ---------- */
 const taskEls = {};
 function fmtZeit(s) { s = Math.max(0, s | 0); return s < 60 ? s + 's' : Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); }
@@ -1803,6 +1935,7 @@ function frame(now) {
       if (!holoBox || Math.abs(holoBox.cx - cx) > .5 || Math.abs(holoBox.top - top) > .5) {
         hEl.style.left = cx + 'px'; hEl.style.top = top + 'px'; holoBox = { cx, top, w:hEl.offsetWidth, h:hEl.offsetHeight }; } }
   }
+  holoPlatz(LAY.mid, H * .44, Rb);
   try { renderGL(t, cx, cy, R, speaking); } catch (e) {}
   try { drawFx(t, dt, now, cx, cy, R, speaking); } catch (e) { fx.globalCompositeOperation = 'source-over'; fx.globalAlpha = 1; fx.shadowBlur = 0; }
 }
@@ -2010,6 +2143,7 @@ addEventListener('keydown', e => {
   const k = e.key.toLowerCase();
   if (k === 'escape') {
     if ($('set').classList.contains('on')) return toggleSettings(false);
+    if ($('bildh').classList.contains('on') && !$('bildh').classList.contains('zu')) return bildZu();
     if (speakingNow()) { stopAudio(); caption(''); }
     else if (S.busy) { fetch('/stop', { method:'POST' }); hint('Stoppe …'); }
     else if (convo) stopConvo();
