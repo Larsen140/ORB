@@ -400,7 +400,8 @@
   <div class="grp"><h4>Stimme</h4><div class="card">
     <div class="row col">Anbieter<div class="seg" id="seg_tts"><button data-v="edge">Microsoft · kostenlos</button><button data-v="elevenlabs">ElevenLabs · super echt</button></div></div>
     <div class="row col el">ElevenLabs-API-Schlüssel<input type="text" id="s_elkey" placeholder="sk_… (elevenlabs.io → Profil → API Keys)" autocomplete="off"></div>
-    <div class="row col el">ElevenLabs-Stimme<select id="s_elvoice"><option value="">– erst Schlüssel eintragen –</option></select></div>
+    <div class="row col el">Voice-ID (aus ElevenLabs → Stimme → „ID kopieren“)<input type="text" id="s_elvid" placeholder="z. B. JBFqnCBsd6RMkjVDRZzb" autocomplete="off" spellcheck="false"></div>
+    <div class="row col el">… oder aus deinen Stimmen wählen<select id="s_elvoice"><option value="">– erst Schlüssel eintragen –</option></select></div>
     <div class="row col el">Modell<div class="seg" id="seg_elm"><button data-v="eleven_flash_v2_5">Blitzschnell</button><button data-v="eleven_multilingual_v2">Beste Qualität</button></div></div>
     <div class="row col ms">Sprecher<select id="s_stimme"></select></div>
     <div class="row col"><div class="lbl">Sprechtempo<span class="v" id="v_tempo"></span></div><input type="range" id="s_tempo" min="-20" max="50" step="5"></div>
@@ -1568,7 +1569,12 @@ async function loadElVoices() {
   } catch (e) {}
 }
 $('s_elkey').onchange = e => { const v = e.target.value.trim(); if (v && !v.startsWith('••')) { saveCfg({ el_key:v, tts_anbieter:'elevenlabs' }); setTimeout(async () => { await loadCfg(); loadElVoices(); }, 300); } };
-$('s_elvoice').onchange = e => saveCfg({ el_voice:e.target.value });
+$('s_elvoice').onchange = e => { saveCfg({ el_voice:e.target.value }); $('s_elvid').value = e.target.value; };
+$('s_elvid').onchange = e => {
+  const id = e.target.value.trim().replace(/^.*voice[_-]?id[=:]\s*/i, '').replace(/[^A-Za-z0-9]/g, '');   // auch ganze Links/„voice_id=…“ akzeptieren
+  e.target.value = id;
+  if (id) { saveCfg({ el_voice:id, tts_anbieter:'elevenlabs' }); hint('Voice-ID gespeichert – „Probe hören“ zum Testen', 3500); SFX.on(); }
+};
 for (const [id, key] of Object.entries(segs)) $(id).querySelectorAll('button').forEach(b => b.onclick = () => { saveCfg({ [key]:b.dataset.v }); SFX.click(); });
 function fillRange(el) { el.style.setProperty('--p', (el.value - el.min) / (el.max - el.min) * 100 + '%'); }
 const CHK = { s_klatsch:'klatschen', s_dauer:'dauerzuhoeren', s_unterbrechen:'unterbrechen', s_gruss:'begruessung', s_voll:'vollbild', s_auto:'autostart', s_schliessen:'schlaf_schliessen', s_unter:'untertitel', s_sfx:'sfx', s_amb:'ambient' };
@@ -1577,7 +1583,7 @@ function syncSettingsUI() {
   set('s_stimme', cfg.stimme); set('s_tempo', parseInt(cfg.tempo) || 0); set('s_hoehe', parseInt(cfg.hoehe) || 0);
   set('s_laut', cfg.lautstaerke); set('s_sfxl', cfg.sfxlaut); set('s_ordner', cfg.ordner); set('s_wake', cfg.wakeword);
   set('s_empf', cfg.empfindlichkeit); set('s_schlaf', String(cfg.schlafen)); set('s_name', cfg.name); set('s_ort', cfg.ort);
-  set('s_elkey', cfg.el_key || '');
+  set('s_elkey', cfg.el_key || ''); set('s_elvid', cfg.el_voice || '');
   const el = cfg.tts_anbieter === 'elevenlabs';
   document.querySelectorAll('#set .el').forEach(r => r.style.display = el ? '' : 'none');
   document.querySelectorAll('#set .ms').forEach(r => r.style.display = el ? 'none' : '');
