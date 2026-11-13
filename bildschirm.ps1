@@ -27,5 +27,5 @@ $bw = [Math]::Min(1600, $w); $bh = [int]($h * $bw / $w)
 $klein = New-Object System.Drawing.Bitmap $bmp, $bw, $bh
 $pfad = "$dir\bildschirm.png"
 $klein.Save($pfad, [System.Drawing.Imaging.ImageFormat]::Png); $klein.Dispose(); $bmp.Dispose()
-Set-Content "$dir\massstab.txt" ("{0}" -f ($w / $bw)) -Encoding ASCII
+Set-Content "$dir\massstab.txt" (($w / $bw).ToString([System.Globalization.CultureInfo]::InvariantCulture)) -Encoding ASCII   # immer mit Punkt (de-DE schrieb "1,6" -> als 16 gelesen)
 Write-Output "Screenshot: $pfad ($bw x $bh Pixel). Mit dem Read-Werkzeug ansehen. Für Klicks diese Bild-Koordinaten an steuern.ps1 geben."

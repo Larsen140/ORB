@@ -11,19 +11,56 @@ Add-Type -AssemblyName System.Windows.Forms
 Add-Type @'
 using System; using System.Runtime.InteropServices;
 public class OrbIn {
+  [StructLayout(LayoutKind.Sequential)] public struct PT { public int X; public int Y; }
   [DllImport("user32.dll")] public static extern bool SetProcessDPIAware();
+  [DllImport("user32.dll")] public static extern bool SetProcessDpiAwarenessContext(IntPtr c);
+  [DllImport("user32.dll")] public static extern int GetSystemMetrics(int i);
   [DllImport("user32.dll")] public static extern bool SetCursorPos(int x, int y);
+  [DllImport("user32.dll")] public static extern bool GetCursorPos(out PT p);
+  [DllImport("user32.dll")] public static extern IntPtr WindowFromPoint(PT p);
+  [DllImport("user32.dll")] public static extern IntPtr GetAncestor(IntPtr h, uint f);
+  [DllImport("user32.dll")] public static extern IntPtr GetForegroundWindow();
+  [DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr h);
+  [DllImport("user32.dll")] public static extern uint GetWindowThreadProcessId(IntPtr h, IntPtr p);
+  [DllImport("user32.dll")] public static extern bool AttachThreadInput(uint a, uint b, bool f);
+  [DllImport("user32.dll")] public static extern bool BringWindowToTop(IntPtr h);
+  [DllImport("kernel32.dll")] public static extern uint GetCurrentThreadId();
   [DllImport("user32.dll")] public static extern void mouse_event(uint f, int dx, int dy, int d, IntPtr e);
   [DllImport("user32.dll")] public static extern void keybd_event(byte vk, byte s, uint f, IntPtr e);
   [DllImport("user32.dll")] public static extern bool ShowWindow(IntPtr h, int c);
 }
 '@
-[OrbIn]::SetProcessDPIAware() | Out-Null
+# Echte Pixel verwenden (Bildschirm 150 % usw.) – zuerst Per-Monitor-V2, sonst klassisch
+try { if (-not [OrbIn]::SetProcessDpiAwarenessContext([IntPtr](-4))) { [OrbIn]::SetProcessDPIAware() | Out-Null } } catch { [OrbIn]::SetProcessDPIAware() | Out-Null }
+$sw = [OrbIn]::GetSystemMetrics(0); $sh = [OrbIn]::GetSystemMetrics(1)
 # ORBs eigenes Fenster aus dem Weg (sonst landen Klicks auf ORB)
 $orb = Get-Process msedge -ErrorAction SilentlyContinue | Where-Object { $_.MainWindowTitle -eq 'ORB' } | Select-Object -First 1
 if ($orb) { [OrbIn]::ShowWindow($orb.MainWindowHandle, 6) | Out-Null; Start-Sleep -Milliseconds 300 }
-$f = 1.0; try { $f = [double](Get-Content "$env:LOCALAPPDATA\ORB\screen\massstab.txt" -ErrorAction Stop) } catch {}
-function Pos($x, $y) { [OrbIn]::SetCursorPos([int]([double]$x * $f), [int]([double]$y * $f)) | Out-Null; Start-Sleep -Milliseconds 60 }
+# Maßstab Screenshot -> echte Pixel (Komma oder Punkt; unplausible Werte verwerfen)
+$f = $sw / [Math]::Min(1600, $sw)
+try {
+  $roh = ((Get-Content "$env:LOCALAPPDATA\ORB\screen\massstab.txt" -ErrorAction Stop | Select-Object -First 1) -replace ',', '.').Trim()
+  $g = [double]::Parse($roh, [System.Globalization.CultureInfo]::InvariantCulture)
+  if ($g -ge 0.5 -and $g -le 4) { $f = $g }
+} catch {}
+# Fenster unter der Maus nach vorne holen, damit Klick und Tastatur dort ankommen
+function Fokus {
+  $p = New-Object OrbIn+PT; [OrbIn]::GetCursorPos([ref]$p) | Out-Null
+  $w = [OrbIn]::GetAncestor([OrbIn]::WindowFromPoint($p), 2)
+  if ($w -ne [IntPtr]::Zero -and $w -ne [OrbIn]::GetForegroundWindow()) {
+    # Eingabe-Threads kurz koppeln, damit Windows den Fokuswechsel erlaubt (ohne Tastendruck)
+    $ich = [OrbIn]::GetCurrentThreadId(); $vorne = [OrbIn]::GetWindowThreadProcessId([OrbIn]::GetForegroundWindow(), [IntPtr]::Zero)
+    $ok = $vorne -ne 0 -and $vorne -ne $ich -and [OrbIn]::AttachThreadInput($ich, $vorne, $true)
+    [OrbIn]::BringWindowToTop($w) | Out-Null; [OrbIn]::SetForegroundWindow($w) | Out-Null
+    if ($ok) { [OrbIn]::AttachThreadInput($ich, $vorne, $false) | Out-Null }
+    Start-Sleep -Milliseconds 120
+  }
+}
+function Pos($x, $y) {
+  $rx = [Math]::Max(0, [Math]::Min($sw - 1, [int][Math]::Round([double]$x * $f)))
+  $ry = [Math]::Max(0, [Math]::Min($sh - 1, [int][Math]::Round([double]$y * $f)))
+  [OrbIn]::SetCursorPos($rx, $ry) | Out-Null; Start-Sleep -Milliseconds 80; Fokus
+}
 function Klick([uint32]$down, [uint32]$up) { [OrbIn]::mouse_event($down, 0, 0, 0, [IntPtr]::Zero); Start-Sleep -Milliseconds 40; [OrbIn]::mouse_event($up, 0, 0, 0, [IntPtr]::Zero) }
 $VK = @{ win = 0x5B; ctrl = 0x11; alt = 0x12; shift = 0x10 }
 $SK = @{ enter='{ENTER}'; tab='{TAB}'; esc='{ESC}'; space=' '; backspace='{BACKSPACE}'; delete='{DELETE}'; up='{UP}'; down='{DOWN}';
@@ -35,8 +72,8 @@ switch ($Aktion.ToLower()) {
   'rechtsklick' { Pos $A $B; Klick 0x08 0x10; "Rechtsklick bei $A,$B" }
   'bewegen'     { Pos $A $B; "Maus bei $A,$B" }
   'scrollen'    { [OrbIn]::mouse_event(0x0800, 0, 0, [int]$A * 120, [IntPtr]::Zero); "Gescrollt $A" }
-  'tippen'      { $t = ($A -replace '([+^%~(){}\[\]])', '{$1}'); [System.Windows.Forms.SendKeys]::SendWait($t); "Getippt: $A" }
-  'taste' {
+  'tippen'      { Fokus; $t = ($A -replace '([+^%~(){}\[\]])', '{$1}'); [System.Windows.Forms.SendKeys]::SendWait($t); "Getippt: $A" }
+  'taste' { Fokus
     $teile = $A.ToLower() -split '\+'
     $haupt = $teile[-1]; $mods = @($teile | Select-Object -SkipLast 1)
     if ($haupt -eq 'win' -or $mods -contains 'win') {
