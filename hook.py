@@ -152,6 +152,8 @@ def main():
     log = st.get("log") or []
 
     if ev in ("SessionStart", "SessionEnd"):
+        if ORB_RUN:
+            return   # Gehirn-Start/-Ende soll ORBs Anzeige nicht auf „Bereit“ zurücksetzen
         st.update(mode="idle", log=[], task="", detail="", say="")
     elif ev == "UserPromptSubmit":
         if ORB_RUN:
@@ -162,7 +164,7 @@ def main():
         tool = data.get("tool_name", "")
         task, detail = label_for(tool), detail_for(data.get("tool_input"))
         log = (log + [task + (": " + detail if detail else "")])[-8:]
-        st.update(mode="auftrag", task=task, detail=detail, log=log)
+        st.update(mode="auftrag", task=task, detail=detail, log=log, tool_n=int(st.get("tool_n", 0)) + 1)
     elif ev == "PostToolUse":
         if st.get("mode") != "wartet":
             return  # nur nach einer Freigabe zurückschalten

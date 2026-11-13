@@ -27,14 +27,17 @@ if tool in ("Edit", "Write", "MultiEdit", "NotebookEdit"):
     sys.exit(0)
 
 cmd = str(inp.get("command", ""))
-if not cmd or re.search(r"entwickler\.ps1", cmd, re.I):
+if not cmd:
     sys.exit(0)
+if re.fullmatch(r'\s*powershell(\.exe)?\s+(-\w+\s+(\w+\s+)?)*-File\s+"?C:\\Users\\larse\\Orb\\entwickler\.ps1"?\s+(-Projekt\s+)?"[^"`$;|&<>]*"\s*', cmd, re.I):
+    sys.exit(0)   # genau der erlaubte Aufruf an den Entwickler
 VERBOTEN = [
     (r"pyinstaller", "selbst eine exe bauen"),
     (r"(copy-item|rename-item|move-item|remove-item)[^\n]*orb(_alt\w*)?\.exe", "ORB.exe kopieren/umbenennen"),
     (r"stop-process[^\n]*\borb\b|taskkill[^\n]*orb\.exe|8766/quit", "ORB von Hand beenden"),
     (r"(set-content|add-content|out-file|writealltext|copy-item|move-item|remove-item|-replace)[^\n]*[\\/]orb[\\/]", "ORB-Programmdateien ändern"),
     (r"update\.ps1", "selbst veröffentlichen"),
+    (r"(>|tee\b|sed\s+-i|open\()[^\n]*[\\/]orb[\\/]", "ORB-Programmdateien ändern"),
     (r"(remove-item|rmdir|rd |del )[^\n]*documents[\\/]jarvis[\\/]?['\"]?(\s|$|-)", "ganze Wissensbasis löschen"),
 ]
 for pattern, was in VERBOTEN:

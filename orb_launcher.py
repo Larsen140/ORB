@@ -87,6 +87,24 @@ def install_code(sha):
         f.write(sha)
 
 
+BAD = os.path.join(BASE, "gesperrt.txt")
+
+
+def bad_shas():
+    """Stände, die schon einmal kaputt waren – werden nie wieder automatisch installiert."""
+    try:
+        with open(BAD) as f:
+            return [l.strip() for l in f if l.strip()]
+    except Exception:
+        return []
+
+
+def mark_bad(sha):
+    if sha and sha not in bad_shas():
+        with open(BAD, "a") as f:
+            f.write(sha + "\n")
+
+
 def restore_latest():
     zips = sorted(glob.glob(os.path.join(BACKUPS, "ORB_*.zip")), key=os.path.getmtime, reverse=True)
     if not zips:
@@ -117,13 +135,15 @@ def self_install():
     shortcut(os.path.join(desk, "ORB.lnk"), INSTALLED_EXE)
     start_menu = os.path.join(os.environ.get("APPDATA", ""), r"Microsoft\Windows\Start Menu\Programs")
     shortcut(os.path.join(start_menu, "ORB.lnk"), INSTALLED_EXE)
-    subprocess.Popen([INSTALLED_EXE] + sys.argv[1:])
+    env = {k: v for k, v in os.environ.items() if not k.startswith("_PYI") and k not in ("_MEIPASS2", "_MEIPASS")}
+    env["PYINSTALLER_RESET_ENVIRONMENT"] = "1"   # frische Umgebung, sonst erbt die neue exe den gleich gelöschten Temp-Ordner
+    subprocess.Popen([INSTALLED_EXE] + sys.argv[1:], env=env)
     sys.exit(0)
 
 
 def update_if_needed(first_run):
     sha = remote_sha()
-    if sha and sha != local_sha():
+    if sha and sha != local_sha() and sha not in bad_shas():
         try:
             install_code(sha)
             return True
@@ -142,7 +162,7 @@ def main():
     if "--zurueck" in sys.argv:
         restore_latest()
     first_run = not os.path.exists(os.path.join(APP, "orb_app.py"))
-    if first_run or "--neustart" not in sys.argv or "--update" in sys.argv:
+    if (first_run or "--neustart" not in sys.argv or "--update" in sys.argv) and "--zurueck" not in sys.argv:
         update_if_needed(first_run)
     sys.path.insert(0, APP)
     os.environ["ORB_EXE"] = sys.executable
@@ -160,16 +180,30 @@ def main():
             spec.loader.exec_module(mod)
         return mod
 
+    def zurueck(e):
+        kaputt = local_sha()
+        if restore_latest():
+            mark_bad(kaputt)
+            message("Die neue ORB-Version hatte einen Fehler (%s).\nIch habe die letzte funktionierende Version wiederhergestellt." % e)
+            return True
+        message("ORB kann nicht starten: %s" % e)
+        return False
+
     try:
         orb_app = load_code()
     except Exception as e:
-        if restore_latest():
-            message("Die neue ORB-Version hatte einen Fehler (%s).\nIch habe die letzte funktionierende Version wiederhergestellt." % e)
-            orb_app = load_code()
-        else:
-            message("ORB kann nicht starten: %s" % e)
+        if not zurueck(e):
             sys.exit(1)
-    orb_app.main()
+        orb_app = load_code()
+    t0 = time.time()
+    try:
+        orb_app.main()
+    except Exception as e:   # Fehler direkt beim Start (nicht nur beim Laden) → ebenfalls zurück
+        if time.time() - t0 < 30 and zurueck(e):
+            orb_app = load_code()
+            orb_app.main()
+        else:
+            raise
 
 
 if __name__ == "__main__":

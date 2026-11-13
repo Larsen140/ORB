@@ -34,7 +34,7 @@
   @keyframes rim { to { --a:360deg; } }
   body.lite .glass { backdrop-filter:none; -webkit-backdrop-filter:none; background:rgba(18,18,24,.88); }
   body.lite .rim::after { animation:none; }
-  .enter { animation:cardIn 1s var(--spring) both; }
+  .enter { animation:cardIn 1s var(--spring) backwards; }
   @keyframes cardIn { 0% { opacity:0; transform:translateY(24px) scale(.92); filter:blur(12px); } 100% { opacity:1; transform:none; filter:none; } }
   .tilt { transition:transform .6s var(--ease); transform:perspective(900px) rotateX(var(--rx,0deg)) rotateY(var(--ry,0deg)); }
   button { font:inherit; color:var(--txt); cursor:pointer; border:0; background:none; }
@@ -135,7 +135,7 @@
   #chipsc { flex:1 !important; min-height:0; overflow:hidden; }
   #chips { display:flex; flex-wrap:wrap; gap:8px; }
   .chip { padding:9px 14px; border-radius:999px; font-size:13px; font-weight:550; background:rgba(255,255,255,.08);
-    box-shadow:inset 0 1px 0 rgba(255,255,255,.14); transition:transform .5s var(--spring), background .3s; animation:cardIn .7s var(--spring) both; }
+    box-shadow:inset 0 1px 0 rgba(255,255,255,.14); transition:transform .5s var(--spring), background .3s; animation:cardIn .7s var(--spring) backwards; }
   .chip:hover { transform:translateY(-2px) scale(1.06); background:rgba(var(--c),.3); }
   .chip:active { transform:scale(.92); }
 
@@ -338,7 +338,7 @@
   #eq i:nth-child(2) { animation-delay:-.3s; } #eq i:nth-child(3) { animation-delay:-.6s; } #eq i:nth-child(4) { animation-delay:-.15s; }
   @keyframes eq { 0%,100% { transform:scaleY(.25); } 50% { transform:scaleY(1); } }
   #spot.off #eq i { animation-play-state:paused; transform:scaleY(.2); opacity:.4; }
-  @media (prefers-reduced-motion:reduce) { *, *::before, *::after { animation-duration:.01ms !important; } }
+  @media (prefers-reduced-motion:reduce) { *, *::before, *::after { animation-duration:.01ms !important; animation-iteration-count:1 !important; } }
 
   @media (max-width:1250px) { :root { --R:0px; } #right { display:none; } }
   @media (max-width:900px) { :root { --L:0px; } #left { display:none; } }
@@ -441,6 +441,7 @@
     <div class="row col">Antwort-Tempo<div class="seg" id="seg_eff"><button data-v="low">Blitzschnell</button><button data-v="medium">Ausgewogen</button><button data-v="high">Gründlich</button></div></div>
     <div class="row col">Antwortlänge<div class="seg" id="seg_len"><button data-v="kurz">Kurz &amp; locker</button><button data-v="lang">Ausführlich</button></div></div>
     <div class="row col">Rechte<div class="seg" id="seg_rechte"><button data-v="auto">Selbstständig</button><button data-v="plan">Nur planen</button></div></div>
+    <div class="row">ORB sieht meinen Bildschirm (bei jeder Frage)<input type="checkbox" class="sw" id="s_screen"></div>
     <div class="row col">Wissensordner<input type="text" id="s_ordner"></div>
   </div><div style="margin-top:9px"><button class="btn" id="neu">⟲ Neue Unterhaltung</button></div></div>
   <div class="grp"><h4>Aussehen</h4><div class="card">
@@ -486,7 +487,7 @@ const PAL = () => [BASE, BASE2, BASE3, BASE4];
 const pcol = (i, a, k = 0) => `rgba(${rgb(mix(PAL()[i % 4], [255,255,255], k))},${a})`;
 let cfg = { farbe:'rot', effekte:'mittel', untertitel:true, lautstaerke:90, sfx:true, sfxlaut:60, ambient:false,
   steuerung:'taste', wakeword:'Jarvis', stimme:'', tempo:'+15%', hoehe:'+0Hz', laenge:'kurz', rechte:'auto', tempo_claude:'low', ordner:'',
-  schlaf_schliessen:true, klatschen:true, dauerzuhoeren:true, unterbrechen:true, empfindlichkeit:6, begruessung:true, ort:'', name:'', schlafen:5, vollbild:true, autostart:true };
+  schlaf_schliessen:true, bildschirm:false, klatschen:true, dauerzuhoeren:true, unterbrechen:true, empfindlichkeit:6, begruessung:true, ort:'', name:'', schlafen:5, vollbild:true, autostart:true };
 const S = { mode:'idle', seq:-1, busy:false, energy:.12, holo:0, think:0, speakVis:0, listenVis:0, level:0, warn:0, boot:0, sleep:false, sleepVis:0, px:0, py:0 };
 const mix = (a, b, t) => a.map((v, i) => Math.round(v + (b[i] - v) * t));
 const rgb = c => `${c[0]},${c[1]},${c[2]}`;
@@ -508,7 +509,8 @@ function applyCfg() {
     document.querySelectorAll('.' + cls).forEach(s => s.setAttribute('stop-color', `rgb(${rgb(c)})`));
   document.body.classList.toggle('lite', cfg.effekte === 'niedrig');
   document.body.classList.toggle('ultra', cfg.effekte === 'hoch');
-  applyAudio(); setupParticles(); syncSettingsUI(); glResize();
+  applyAudio(); syncSettingsUI();
+  if (applyCfg._fx !== cfg.effekte) { applyCfg._fx = cfg.effekte; setupParticles(); glResize(); }   // nur bei Grafikstufe neu aufbauen
   if (cfg.steuerung === 'wort' && !S.sleep) startWake(); else if (cfg.steuerung !== 'wort') stopWake();
 }
 async function loadCfg() {
@@ -519,9 +521,13 @@ async function loadCfg() {
   } catch (e) {}
   applyCfg();
 }
+let cfgPending = {}, cfgTimer;
 function saveCfg(patch) {
   Object.assign(cfg, patch); applyCfg();
-  fetch('/config', { method:'POST', headers:{ 'Content-Type':'application/json' }, body:JSON.stringify(patch) }).catch(() => {});
+  // beim Ziehen an Reglern nicht jeden Pixel speichern – kurz sammeln, dann einmal senden
+  Object.assign(cfgPending, patch); clearTimeout(cfgTimer);
+  cfgTimer = setTimeout(() => { const p = cfgPending; cfgPending = {};
+    fetch('/config', { method:'POST', headers:{ 'Content-Type':'application/json' }, body:JSON.stringify(p) }).catch(() => {}); }, 250);
 }
 
 /* ================= WebGL: flüssige Kugel + Weltraum ================= */
@@ -876,6 +882,7 @@ function goSleep(silent) {
   if (!silent) SFX.sleep();
   caption(''); fetch('/sleep', { method:'POST' }).catch(() => {});
   hint(cfg.klatschen ? 'Schlafmodus · zweimal klatschen' : 'Schlafmodus · Leertaste', 4000);
+  if (cfg.steuerung === 'wort') setTimeout(startWake, 500);   // Aktivierungswort weckt auch aus dem Schlaf
   // Fenster nach kurzer Zeit ganz schließen – spart ~800 MB; im Hintergrund wird weiter auf Klatschen gelauscht
   clearTimeout(hideTimer);
   if (cfg.schlaf_schliessen && cfg.klatschen) hideTimer = setTimeout(() => { if (S.sleep) fetch('/hide', { method:'POST' }).catch(() => {}); }, 45000);
@@ -1101,16 +1108,20 @@ let actLog = [];
 try { actLog = JSON.parse(localStorage.getItem('orbAct') || '[]'); } catch (e) {}
 async function poll() {
   clearTimeout(pollTimer);
+  if (poll._busy) return;   // nie zwei Abfragen gleichzeitig (sonst können ältere Zustände gewinnen)
+  poll._busy = true;
   try {
-    const st = await (await fetch('/state', { cache:'no-store' })).json(); lastOk = performance.now(); S.busy = !!st.busy;
+    const aktiv = speakingNow() || listening || !!convoRec ? '1' : '0';
+    const st = await (await fetch('/state?aktiv=' + aktiv, { cache:'no-store' })).json(); lastOk = performance.now(); S.busy = !!st.busy;
     // neue ORB-Version läuft → Seite neu laden (sonst sieht man Änderungen erst nach Fenster-Neustart)
     if (st.version) { if (!poll._v) poll._v = st.version; else if (st.version !== poll._v) { location.replace('/#wake'); location.reload(); return; } }
-    if (st.seq !== S.seq) { const first = S.seq === -1; S.seq = st.seq; onState(st, first); }
+    if (st.seq !== S.seq && (S.seq === -1 || st.seq > S.seq || st.seq < S.seq - 1000)) { const first = S.seq === -1; S.seq = st.seq; onState(st, first); }
   } catch (e) {}
+  poll._busy = false;
   $('conn').textContent = performance.now() - lastOk < 2000 ? '● verbunden · Opus 5.5 · ' + (S.sleep ? 'schläft' : 'wach') : '○ Server nicht erreichbar';
-  pollTimer = setTimeout(poll, S.sleep ? 500 : (S.busy || S.mode !== 'idle' ? 120 : 250));
+  pollTimer = setTimeout(poll, S.sleep || document.hidden ? 600 : (S.busy || ['denkt', 'auftrag', 'wartet'].includes(S.mode) ? 120 : 280));
 }
-const fastPoll = () => setTimeout(poll, 60);
+const fastPoll = () => { clearTimeout(pollTimer); pollTimer = setTimeout(poll, 60); };
 let typeTimer;
 function typeTo(el, text) {
   clearInterval(typeTimer); let i = 0; el.textContent = '';
@@ -1143,7 +1154,7 @@ function onState(st, first) {
   if (st.wake_req && st.wake_req !== lastWakeReq) { const fresh = lastWakeReq !== null; lastWakeReq = st.wake_req; if (fresh) wake(); }
   if (!first) {
     if (m === 'denkt' && prevMode !== 'denkt' && prevMode !== 'auftrag') ripple(.8);
-    if (m === 'auftrag' && log.length !== prevLogLen) {
+    if (m === 'auftrag' && (st.tool_n ?? log.length) !== prevLogLen) {
       toolSound(log[log.length - 1]); burst(16); ripple(.35);
       const last = log[log.length - 1]; if (last) { actLog.push(hhmm(new Date()) + '  ' + last); actLog = actLog.slice(-20); try { localStorage.setItem('orbAct', JSON.stringify(actLog)); } catch (e) {} }
     }
@@ -1165,7 +1176,7 @@ function onState(st, first) {
   renderActLog();
   setTyping(busy && !first && !(st.aid && st.parts && st.parts.length && st.aid !== mutedAid));
   onParts(st, first);
-  prevMode = m; prevLogLen = log.length;
+  prevMode = m; prevLogLen = st.tool_n ?? log.length;
 }
 
 /* ================= Uhr, Wetter, System, Vorschläge ================= */
@@ -1199,7 +1210,7 @@ function countTo(el, to, suffix = '%') {
     el.textContent = Math.round(from + (to - from) * e) + suffix; if (k < 1) requestAnimationFrame(step); })(t0);
 }
 async function loadSys() {
-  if (S.sleep || document.hidden) return;
+  if (S.sleep || document.hidden || hiddenW.includes('system')) return;
   try {
     const s = await (await fetch('/sys')).json();
     if (s.cpu != null) { gauge('cpu', s.cpu); countTo($('v_cpu'), s.cpu); }
@@ -1317,6 +1328,7 @@ tick(); setInterval(tick, 1000); loadWeather(); setInterval(loadWeather, 600000)
 
 /* ================= Termine & Spotify ================= */
 async function loadTermine() {
+  if (S.sleep || document.hidden || hiddenW.includes('termine')) return;
   try {
     const { termine } = await (await fetch('/termine', { cache:'no-store' })).json();
     const key = JSON.stringify(termine); if (key === loadTermine._k) return; loadTermine._k = key;
@@ -1330,6 +1342,7 @@ async function loadTermine() {
   } catch (e) {}
 }
 async function loadSpotify() {
+  if (S.sleep || document.hidden || hiddenW.includes('spotify')) return;
   try {
     const s = await (await fetch('/spotify', { cache:'no-store' })).json();
     $('spot').classList.toggle('off', !s.laeuft);
@@ -1703,7 +1716,7 @@ $('s_elvid').onchange = e => {
 };
 for (const [id, key] of Object.entries(segs)) $(id).querySelectorAll('button').forEach(b => b.onclick = () => { saveCfg({ [key]:b.dataset.v }); SFX.click(); });
 function fillRange(el) { el.style.setProperty('--p', (el.value - el.min) / (el.max - el.min) * 100 + '%'); }
-const CHK = { s_klatsch:'klatschen', s_dauer:'dauerzuhoeren', s_unterbrechen:'unterbrechen', s_gruss:'begruessung', s_voll:'vollbild', s_auto:'autostart', s_schliessen:'schlaf_schliessen', s_unter:'untertitel', s_sfx:'sfx', s_amb:'ambient' };
+const CHK = { s_klatsch:'klatschen', s_dauer:'dauerzuhoeren', s_unterbrechen:'unterbrechen', s_gruss:'begruessung', s_voll:'vollbild', s_auto:'autostart', s_schliessen:'schlaf_schliessen', s_screen:'bildschirm', s_unter:'untertitel', s_sfx:'sfx', s_amb:'ambient' };
 function syncSettingsUI() {
   const set = (id, v) => { const el = $(id); if (el && document.activeElement !== el) el.value = v; };
   set('s_stimme', cfg.stimme); set('s_tempo', parseInt(cfg.tempo) || 0); set('s_hoehe', parseInt(cfg.hoehe) || 0);

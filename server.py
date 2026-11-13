@@ -15,6 +15,8 @@ import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlparse
 
+import secrets
+
 from hook import clean, split_sentences  # Markdown -> vorlesbarer Text, Text -> Sprech-Stücke
 
 RES = os.path.dirname(os.path.abspath(__file__))  # Seite & Stimme liegen neben server.py (nicht in der exe)
@@ -25,6 +27,11 @@ PAGE = os.path.join(RES, "index.html")
 TTS_PS = os.path.join(RES, "tts.ps1")
 PORT = int(os.environ.get("ORB_PORT", "8766"))  # ORB_PORT nur für Tests (update.ps1 prüft auf 8799)
 NO_WINDOW = 0x08000000
+# Schutz gegen fremde Webseiten: nur Anfragen mit diesem Token (steht nur in ORBs eigener Seite und in einer
+# Datei im Benutzerordner) dürfen etwas tun.
+TOKEN = secrets.token_hex(16)
+TOKEN_FILE = os.path.join(os.environ.get("LOCALAPPDATA", os.path.expanduser("~")), "ORB", "token.txt")
+ERLAUBTE_HOSTS = ("127.0.0.1:%d" % PORT, "localhost:%d" % PORT)
 
 STIMMEN = [
     ["de-DE-FlorianMultilingualNeural", "Florian (männlich, sehr natürlich)"],
@@ -41,13 +48,13 @@ DEFAULT_CFG = {
     "steuerung": "taste", "wakeword": "Jarvis", "unterbrechen": True,
     "tts_anbieter": "edge", "el_key": "", "el_voice": "", "el_modell": "eleven_flash_v2_5",
     "klatschen": True, "dauerzuhoeren": True, "empfindlichkeit": 6, "begruessung": True, "ort": "", "name": "",
-    "schlafen": 5, "vollbild": True, "autostart": True, "schlaf_schliessen": True,
+    "schlafen": 5, "vollbild": True, "autostart": True, "schlaf_schliessen": True, "bildschirm": False,
     "modell": "claude-opus-5-5", "laenge": "kurz", "rechte": "auto", "tempo_claude": "low",
     "ordner": os.path.join(os.path.expanduser("~"), "Documents", "Jarvis"), "sitzung": "",
 }
 # Damit ORB immer dein Claude-Code-Login (Max-Abo) nutzt und nie einen API-Schlüssel
 CLAUDE_ENV_DROP = ("ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "ANTHROPIC_BASE_URL")
-VERSION = "28"
+VERSION = "29"
 ORB_UI = ("Deine Oberfläche (die Larsen gerade sieht): in der Mitte du als flüssige leuchtende Kugel mit Tropfen, "
           "Orbit-Ringen und Sternenhimmel; links eine Uhr und darunter der Gesprächsverlauf mit Eingabefeld; rechts "
           "Karten für System (CPU, RAM, Akku), Wetter mit Stundenvorschau, Aktivität (was du gerade tust) und Vorschläge; "
@@ -77,7 +84,8 @@ KURZ_PROMPT = ("Du sprichst gerade über ORB, eine Sprachoberfläche; deine Antw
                "Tabellen, Emojis oder Code. Arbeite Aufträge trotzdem vollständig ab.")
 
 _cache, _lock, _cfg_lock = {}, threading.Lock(), threading.Lock()
-LAST_POLL = [0.0]  # wann das Fenster zuletzt nachgefragt hat
+LAST_POLL = [0.0]
+LAST_ACTIVE = [0.0]   # wann das Fenster zuletzt gesprochen/zugehört hat  # wann das Fenster zuletzt nachgefragt hat
 ON_SHOW = [None]    # wird von orb_app gesetzt: öffnet/zeigt das Fenster
 ON_HIDE = [None]    # schließt das Fenster (Schlaf spart Speicher)
 ON_UPDATE = [None]  # neuesten Stand von GitHub holen und neu starten
@@ -92,16 +100,30 @@ def read_state():
         return {"seq": 0, "mode": "idle"}
 
 
+_state_lock = threading.Lock()
+
+
 def write_state(**kw):
-    st = read_state()
-    st.update(kw)
-    st["seq"] = int(st.get("seq", 0)) + 1
-    st["time"] = time.time()
-    os.makedirs(HOME, exist_ok=True)
-    tmp = STATE + ".srv.tmp"
-    with open(tmp, "w", encoding="utf-8") as f:
-        json.dump(st, f, ensure_ascii=False)
-    os.replace(tmp, STATE)
+    """Zustand schreiben – mit Lock (mehrere Threads) und Wiederholung, falls Windows die Datei kurz sperrt."""
+    with _state_lock:
+        st = read_state()
+        st.update(kw)
+        st["seq"] = int(st.get("seq", 0)) + 1
+        st["time"] = time.time()
+        os.makedirs(HOME, exist_ok=True)
+        tmp = "%s.%d.%d.tmp" % (STATE, os.getpid(), threading.get_ident())
+        with open(tmp, "w", encoding="utf-8") as f:
+            json.dump(st, f, ensure_ascii=False)
+        for i in range(20):
+            try:
+                os.replace(tmp, STATE)
+                return
+            except PermissionError:
+                time.sleep(.02 * (i + 1))
+        try:
+            os.remove(tmp)
+        except OSError:
+            pass
 
 
 def load_cfg():
@@ -123,6 +145,8 @@ def save_cfg(patch):
         os.makedirs(HOME, exist_ok=True)
         with open(CONFIG, "w", encoding="utf-8") as f:
             json.dump(cfg, f, ensure_ascii=False, indent=2)
+    if "el_key" in patch or "el_voice" in patch:
+        EL_FAIL[0] = 0.0   # neuer Schlüssel/neue Stimme → sofort wieder versuchen
     if "autostart" in patch:
         set_autostart(bool(cfg["autostart"]))
     # Claude mit neuen Einstellungen neu starten (passiert beim nächsten Auftrag)
@@ -175,6 +199,9 @@ def write_answer(text, **kw):
 
 
 # ---------- Sprachausgabe ----------
+EL_FAIL = [0.0]   # Zeitpunkt der letzten Ablehnung (ungültiger Schlüssel)
+
+
 def synth_eleven(text, cfg):
     """ElevenLabs – sehr natürliche Stimme (braucht eigenen API-Schlüssel)."""
     body = json.dumps({"text": text, "model_id": cfg.get("el_modell") or "eleven_flash_v2_5",
@@ -197,10 +224,13 @@ def el_voices(key):
 def synth(text, cfg=None):
     """ElevenLabs (falls eingerichtet) → Microsoft-Neural-Stimme (online) → Windows-Stimme (offline)."""
     cfg = cfg or load_cfg()
-    if cfg.get("tts_anbieter") == "elevenlabs" and cfg.get("el_key") and cfg.get("el_voice"):
+    if (cfg.get("tts_anbieter") == "elevenlabs" and cfg.get("el_key") and cfg.get("el_voice")
+            and time.time() - EL_FAIL[0] > 600):   # nach Ablehnung 10 Min. nicht erneut versuchen (spart Zeit pro Satz)
         try:
             return synth_eleven(text, cfg)
         except Exception as e:
+            if "401" in str(e) or "403" in str(e):
+                EL_FAIL[0] = time.time()
             print("ElevenLabs-Fehler, nutze Microsoft-Stimme:", e)
     try:
         import asyncio
@@ -535,6 +565,14 @@ class Brain:
             self.buf, self.full, self.spoken, self.aid = "", "", [], new_aid()
             self.last_used = time.time()
             write_state(mode="denkt", heard=text, log=[], task="", detail="", say="", parts=[], aid=self.aid, final=False, holo=None)
+            if load_cfg().get("bildschirm"):
+                try:   # aktueller Bildschirm für ORB (nur ansehen, wenn die Frage ihn betrifft)
+                    subprocess.run(["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File",
+                                    os.path.join(RES, "bildschirm.ps1")], capture_output=True, timeout=8, creationflags=NO_WINDOW)
+                    text = ("[Bildschirm-Modus: aktueller Screenshot liegt unter %s – nur ansehen, wenn die Frage den "
+                            "Bildschirm betrifft.]\n" % os.path.join(os.environ.get("LOCALAPPDATA", ""), "ORB", "screen", "bildschirm.png")) + text
+                except Exception as e:
+                    print("Screenshot:", e)
             msg = {"type": "user", "message": {"role": "user", "content": [{"type": "text", "text": text}]}}
             try:
                 self.proc.stdin.write((json.dumps(msg, ensure_ascii=False) + "\n").encode("utf-8"))
@@ -555,7 +593,8 @@ class Brain:
             ready, rest = t, ""
         else:
             m = None
-            for m in re.finditer(r"[.!?…:;](?=\s)", t):
+            ende = r"[.!?…:;,](?=\s)" if not self.spoken and len(t) >= 25 else r"[.!?…:;](?=\s)"   # erstes Stück früher
+            for m in re.finditer(ende, t):
                 pass
             if not m:
                 return
@@ -584,10 +623,31 @@ class Brain:
 
     def reader(self, proc):
         for raw in proc.stdout:
+            if proc is not self.proc:
+                break   # alter Prozess (nach Neustart/„Neue Unterhaltung“) – nichts mehr anfassen
             try:
                 o = json.loads(raw.decode("utf-8", "ignore"))
             except Exception:
                 continue
+            try:
+                self.handle(o)
+            except Exception as e:
+                print("Gehirn-Ausgabe:", e)
+        if proc is not self.proc:
+            return
+        # Prozess beendet
+        if self.busy:
+            self.busy = False
+            if self.stopped:
+                write_answer("Okay, abgebrochen.")
+            elif self.started_with_session and not self.spoken:
+                save_cfg({"sitzung": ""})  # alte Unterhaltung unbrauchbar -> nächstes Mal frisch
+                write_answer("Ich musste neu starten. Sag es bitte noch einmal.")
+            else:
+                write_answer("Da ist leider etwas schiefgelaufen.")
+
+    def handle(self, o):
+        if True:
             typ = o.get("type")
             if typ == "system" and o.get("subtype") == "init" and o.get("session_id"):
                 save_cfg({"sitzung": o["session_id"]})
@@ -607,16 +667,6 @@ class Brain:
                     self.finish_turn("Da ist leider etwas schiefgelaufen.")
                 else:
                     self.finish_turn("Erledigt.")
-        # Prozess beendet
-        if self.busy:
-            self.busy = False
-            if self.stopped:
-                write_answer("Okay, abgebrochen.")
-            elif self.started_with_session and not self.spoken:
-                save_cfg({"sitzung": ""})  # alte Unterhaltung unbrauchbar -> nächstes Mal frisch
-                write_answer("Ich musste neu starten. Sag es bitte noch einmal.")
-            else:
-                write_answer("Da ist leider etwas schiefgelaufen.")
 
     def err_reader(self, proc):
         for raw in proc.stderr:
@@ -738,10 +788,10 @@ def media_key(cmd):
 
 
 def idle_reaper():
-    """Claude nach 5 Minuten ohne Frage beenden, damit es keinen Speicher belegt (~250 MB)."""
+    """Claude nach 15 Minuten ohne Frage beenden, damit es keinen Speicher belegt (~250 MB)."""
     while True:
         time.sleep(30)
-        if BRAIN.alive() and not BRAIN.busy and time.time() - BRAIN.last_used > 300:
+        if BRAIN.alive() and not BRAIN.busy and time.time() - BRAIN.last_used > 900:
             BRAIN.kill()
 
 
@@ -774,14 +824,32 @@ class Handler(BaseHTTPRequestHandler):
         except Exception:
             return {}
 
+    def erlaubt(self, braucht_token=True):
+        """Host prüfen (gegen DNS-Rebinding) und Token prüfen (gegen Anfragen fremder Webseiten)."""
+        if self.headers.get("Host", "") not in ERLAUBTE_HOSTS:
+            self.send(403, b"", "text/plain")
+            return False
+        if braucht_token and self.headers.get("X-ORB-Token", "") != TOKEN:
+            self.send(403, b"", "text/plain")
+            return False
+        return True
+
     def do_GET(self):
         u = urlparse(self.path)
+        if not self.erlaubt(braucht_token=u.path not in ("/", "/index.html", "/version")):
+            return
         q = {k: v[0] for k, v in parse_qs(u.query).items()}
         if u.path in ("/", "/index.html"):
             with open(PAGE, "rb") as f:
-                self.send(200, f.read(), "text/html; charset=utf-8")
+                page = f.read()
+            # Token in die eigene Seite einbetten; alle fetch()-Aufrufe der Seite senden es automatisch mit
+            inject = ("<script>(()=>{const T='%s',f=window.fetch;window.fetch=(u,o={})=>{o.headers=Object.assign({},"
+                      "o.headers||{},{'X-ORB-Token':T});return f(u,o)}})()</script>" % TOKEN).encode()
+            self.send(200, page.replace(b"<head>", b"<head>" + inject, 1), "text/html; charset=utf-8")
         elif u.path == "/state":
             LAST_POLL[0] = time.time()
+            if q.get("aktiv") == "1":
+                LAST_ACTIVE[0] = time.time()
             st = read_state()
             st["busy"] = BRAIN.busy
             st["version"] = VERSION   # Fenster lädt sich neu, wenn eine neue Version läuft
@@ -790,7 +858,11 @@ class Handler(BaseHTTPRequestHandler):
             self.send(200, st)
         elif u.path == "/tts":
             st = read_state()
-            aid, i = q.get("aid", ""), int(q.get("i", "-1") or -1)
+            aid = q.get("aid", "")
+            try:
+                i = int(q.get("i", "-1") or -1)
+            except ValueError:
+                i = -1
             parts = st.get("parts") or []
             if aid != st.get("aid") or not (0 <= i < len(parts)):
                 return self.send(404, b"", "text/plain")
@@ -837,6 +909,8 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_POST(self):
         u = urlparse(self.path)
+        if not self.erlaubt():
+            return
         b = self.body()
         if u.path == "/ask":
             text = str(b.get("text", "")).strip()
@@ -863,7 +937,9 @@ class Handler(BaseHTTPRequestHandler):
         elif u.path == "/selfupdate":  # „Nach Updates suchen“ bzw. update.ps1 nach dem Hochladen
             self.send(200, {"ok": bool(ON_UPDATE[0])})
             if ON_UPDATE[0]:
-                sha = str(b.get("sha", "")).strip() or None   # update.ps1 schickt den genauen Stand mit
+                sha = str(b.get("sha", "")).strip().lower() or None
+                if sha and not re.fullmatch(r"[0-9a-f]{40}", sha):
+                    sha = None   # nur echte Commit-Kennungen   # update.ps1 schickt den genauen Stand mit
                 threading.Thread(target=lambda: (time.sleep(.3), ON_UPDATE[0](sha)), daemon=True).start()
         elif u.path == "/announce":  # z. B. update.ps1: „Update fertig“ laut sagen
             text = str(b.get("text", "")).strip()
@@ -885,6 +961,7 @@ class Handler(BaseHTTPRequestHandler):
             BRAIN.kill()
             threading.Thread(target=lambda: (time.sleep(.3), os._exit(0)), daemon=True).start()
         elif u.path == "/new":
+            BRAIN.stopped, BRAIN.busy = True, False
             BRAIN.kill()
             save_cfg({"sitzung": ""})
             write_state(mode="idle", heard="", say="", parts=[], aid="", log=[])
@@ -904,6 +981,15 @@ class ExclusiveServer(ThreadingHTTPServer):
         super().server_bind()
 
 
+def write_token():
+    try:
+        os.makedirs(os.path.dirname(TOKEN_FILE), exist_ok=True)
+        with open(TOKEN_FILE, "w") as f:
+            f.write(TOKEN)
+    except Exception as e:
+        print("Token-Datei:", e)
+
+
 def make_server():
     """Gibt den Server zurück, oder None wenn ORB schon läuft."""
     try:
@@ -911,6 +997,7 @@ def make_server():
     except OSError:
         return None
     srv.daemon_threads = True
+    write_token()
     threading.Thread(target=load_apps, daemon=True).start()  # App-Liste vorab laden
     threading.Thread(target=idle_reaper, daemon=True).start()
     return srv

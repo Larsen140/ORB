@@ -1,12 +1,15 @@
 ﻿# Wird von entwickler.ps1 losgelöst gestartet: lässt Claude Code den Auftrag umsetzen.
 param([string]$Art = 'orb')
+# Umlaute sauber an Claude übergeben und zurücklesen (Windows PowerShell nutzt sonst ASCII/OEM)
+$OutputEncoding = [Console]::OutputEncoding = New-Object Text.UTF8Encoding $false
 $o    = 'C:\Users\larse\Orb'
 $job  = "$env:LOCALAPPDATA\ORB\entwickler\$Art"
 $log  = "$job\protokoll.txt"
 $auftrag = [IO.File]::ReadAllText("$job\auftrag.txt", [Text.Encoding]::UTF8)
+$tokHdr = @{ 'X-ORB-Token' = (Get-Content "$env:LOCALAPPDATA\ORB\token.txt" -ErrorAction SilentlyContinue) }
 function Ansage($t) {
     try { $b = [Text.Encoding]::UTF8.GetBytes((@{ text = $t } | ConvertTo-Json))
-          Invoke-WebRequest http://127.0.0.1:8766/announce -Method Post -ContentType 'application/json; charset=utf-8' -Body $b -UseBasicParsing | Out-Null } catch {}
+          Invoke-WebRequest http://127.0.0.1:8766/announce -Method Post -Headers $tokHdr -ContentType 'application/json; charset=utf-8' -Body $b -UseBasicParsing | Out-Null } catch {}
 }
 if ($Art -eq 'projekt') {
     $ordner = 'C:\Users\larse\Projekte'

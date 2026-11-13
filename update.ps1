@@ -16,14 +16,17 @@ function Log($t) { $l = (Get-Date -Format 'HH:mm:ss') + '  ' + $t; Add-Content $
 function Ver { [regex]::Match((Get-Content "$o\server.py" -Raw -Encoding UTF8), '(?m)^VERSION = "(\d+)"').Groups[1].Value }
 function LaufendeVer { try { return (Invoke-RestMethod http://127.0.0.1:8766/version -TimeoutSec 2).version } catch { return $null } }
 function Git { $ErrorActionPreference = 'Continue'; $r = & $git -C $o @args 2>&1 | Out-String; $code = $LASTEXITCODE; $ErrorActionPreference = 'Stop'; if ($code -ne 0) { throw "git $($args -join ' '): $r" }; $r }
+$tokHdr = @{ 'X-ORB-Token' = (Get-Content "$env:LOCALAPPDATA\ORB\token.txt" -ErrorAction SilentlyContinue) }
 function Ansage($t) {
     try { $b = [Text.Encoding]::UTF8.GetBytes((@{ text = $t } | ConvertTo-Json))
-          Invoke-WebRequest http://127.0.0.1:8766/announce -Method Post -ContentType 'application/json; charset=utf-8' -Body $b -UseBasicParsing | Out-Null } catch {}
+          Invoke-WebRequest http://127.0.0.1:8766/announce -Method Post -Headers $tokHdr -ContentType 'application/json; charset=utf-8' -Body $b -UseBasicParsing | Out-Null } catch {}
 }
 Set-Content $log '' -Encoding UTF8
 try {
     Log 'Prüfe Code und Oberfläche …'
+    $ErrorActionPreference = 'Continue'   # Warnungen auf stderr sind kein Abbruchgrund
     $out = & py -3 "$o\check.py" 2>&1 | Out-String
+    $ErrorActionPreference = 'Stop'
     if ($LASTEXITCODE -ne 0) { Log "ABBRUCH – Fehler gefunden, nichts wurde geändert:`n$out"; exit 1 }
     Log 'Prüfung ok.'
 
@@ -64,13 +67,13 @@ try {
         Log 'Sage ORB, dass er sich aktualisieren soll …'
         if ($Exe -and (Test-Path "$work\dist\ORB.exe")) {
             # neuer Starter: ORB beenden, Starter ersetzen, neu starten
-            try { Invoke-WebRequest http://127.0.0.1:8766/quit -Method Post -Body '{}' -UseBasicParsing -TimeoutSec 3 | Out-Null } catch {}
+            try { Invoke-WebRequest http://127.0.0.1:8766/quit -Method Post -Headers $tokHdr -Body '{}' -UseBasicParsing -TimeoutSec 3 | Out-Null } catch {}
             Start-Sleep 3; Get-Process ORB -ErrorAction SilentlyContinue | ForEach-Object { try { Stop-Process -Id $_.Id -Force } catch {} }; Start-Sleep 1
             Copy-Item "$work\dist\ORB.exe" $inst -Force
             Start-Process $inst -ArgumentList '--neustart','--update'
         } else {
             $sha = (Git rev-parse HEAD).Trim()
-            Invoke-WebRequest http://127.0.0.1:8766/selfupdate -Method Post -Body (@{ sha = $sha } | ConvertTo-Json) -ContentType 'application/json' -UseBasicParsing -TimeoutSec 5 | Out-Null
+            Invoke-WebRequest http://127.0.0.1:8766/selfupdate -Method Post -Headers $tokHdr -Body (@{ sha = $sha } | ConvertTo-Json) -ContentType 'application/json' -UseBasicParsing -TimeoutSec 5 | Out-Null
         }
     }
     # Nicht warten: ORB holt sich den Stand selbst (spätestens nach einer Minute), sichert vorher

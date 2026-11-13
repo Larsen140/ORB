@@ -176,8 +176,13 @@ def other_instance():
 
 def post(path, data=None):
     try:
+        try:
+            with open(server.TOKEN_FILE) as f:
+                tok = f.read().strip()   # Token der laufenden ORB-Instanz
+        except Exception:
+            tok = ""
         urllib.request.urlopen(urllib.request.Request(URL + path, data=json.dumps(data or {}).encode(), method="POST",
-                                                      headers={"Content-Type": "application/json"}), timeout=3)
+                                                      headers={"Content-Type": "application/json", "X-ORB-Token": tok}), timeout=3)
     except Exception:
         pass
 
@@ -190,7 +195,11 @@ def restart(update=False):
     exe = os.environ.get("ORB_EXE") or sys.executable
     args = [exe, "--neustart"] + (["--update"] if update else [])
     if getattr(sys, "frozen", False) or exe.lower().endswith(".exe") and "python" not in exe.lower():
-        subprocess.Popen(args, creationflags=0x00000008 | 0x00000200)  # DETACHED_PROCESS | NEW_PROCESS_GROUP
+        # Wichtig: frische Umgebung für die neue exe – sonst übernimmt sie den Temp-Ordner dieser Instanz,
+        # der beim Beenden gelöscht wird, und stürzt sofort ab (ORB war nach Updates „weg“).
+        env = {k: v for k, v in os.environ.items() if not k.startswith("_PYI") and k not in ("_MEIPASS2", "_MEIPASS")}
+        env["PYINSTALLER_RESET_ENVIRONMENT"] = "1"
+        subprocess.Popen(args, env=env, creationflags=0x00000008 | 0x00000200)  # DETACHED_PROCESS | NEW_PROCESS_GROUP
     else:
         subprocess.Popen([sys.executable, os.path.abspath(__file__), "--neustart"], creationflags=0x00000008 | 0x00000200)
     server.BRAIN.kill()
@@ -238,11 +247,12 @@ def update_loop():
         time.sleep(60)
         try:
             sha = github_head()
-            if not sha or sha == launcher.local_sha():
+            if not sha or sha == launcher.local_sha() or sha in getattr(launcher, "bad_shas", lambda: [])():
                 continue
             st = server.read_state()
             ruhig = (not server.BRAIN.busy and st.get("mode") not in ("denkt", "auftrag", "wartet")
-                     and time.time() - float(st.get("time", 0)) > 12)   # gerade nichts gesagt/getan
+                     and time.time() - float(st.get("time", 0)) > 12
+                     and time.time() - server.LAST_ACTIVE[0] > 60)   # nicht mitten im Sprechen/Zuhören   # gerade nichts gesagt/getan
             if ruhig:
                 apply_update(sha)
         except Exception as e:
