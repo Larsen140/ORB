@@ -851,20 +851,20 @@ async function ensureMic() {
 let clapAn = null, clapBuf = null, clapTimer = null, claps = [], floorRms = .0003, cand = null, lastClap = 0;
 function startClap() {
   if (clapTimer || !micSrc) return;
-  clapAn = ac.createAnalyser(); clapAn.fftSize = 512; clapAn.smoothingTimeConstant = 0;
-  clapBuf = new Float32Array(clapAn.fftSize); micSrc.connect(clapAn);
-  clapTimer = setInterval(clapTick, 25);
+  // Lückenlos jeden 10-ms-Block prüfen (vorher wurde nur alle 25 ms ein Ausschnitt angesehen – kurze Schnipser fielen durch)
+  clapTimer = ac.createScriptProcessor(512, 1, 1);
+  const mute = ac.createGain(); mute.gain.value = 0;
+  micSrc.connect(clapTimer); clapTimer.connect(mute); mute.connect(ac.destination);
+  clapTimer.onaudioprocess = e => { clapBuf = e.inputBuffer.getChannelData(0); clapTick(); };
 }
 let fBuf = null, snapT = 0, clapPk = [];
 // Schnipsen klingt hell (Energie um 2–5 kHz), Klatschen voll (viel Energie unter 1,5 kHz)
 function snapRatio() {
-  if (!fBuf) fBuf = new Float32Array(clapAn.frequencyBinCount);
-  clapAn.getFloatFrequencyData(fBuf);
-  const hz = ac.sampleRate / clapAn.fftSize; let lo = 0, hi = 0;
-  for (let i = 1; i < fBuf.length; i++) {
-    const f = i * hz, p = Math.pow(10, fBuf[i] / 10);
-    if (f >= 150 && f < 1500) lo += p; else if (f >= 2000 && f < 5500) hi += p;
-  }
+  const pw = f => { const w = 2 * Math.cos(2 * Math.PI * f / ac.sampleRate); let a = 0, b = 0;
+    for (const v of clapBuf) { const n = v + w * a - b; b = a; a = n; } return a * a + b * b - w * a * b; };   // Goertzel
+  let lo = 0, hi = 0;
+  for (let f = 200; f < 1500; f += 200) lo += pw(f) / 7;
+  for (let f = 2000; f < 5500; f += 400) hi += pw(f) / 9;
   return hi / (lo || 1e-12);
 }
 function onSnap() {
@@ -884,12 +884,11 @@ function toBack(ms) {
 }
 function clapTick() {
   if (!cfg.klatschen && !cfg.schnipsen) return;
-  clapAn.getFloatTimeDomainData(clapBuf);
   let pk = 0, s = 0;
   for (const v of clapBuf) { const a = Math.abs(v); if (a > pk) pk = a; s += v * v; }
   const rms = Math.sqrt(s / clapBuf.length), now = performance.now();
-  const hist = clapTick.h || (clapTick.h = []); const pre = hist.length >= 6 ? hist.slice(-6, -1).reduce((a, b) => a + b, 0) / 5 : 1;
-  hist.push(rms); if (hist.length > 8) hist.shift();
+  const hist = clapTick.h || (clapTick.h = []); const pre = hist.length >= 14 ? hist.slice(-14, -2).reduce((a, b) => a + b, 0) / 12 : 1;   // ~30–150 ms vorher
+  hist.push(rms); if (hist.length > 16) hist.shift();
   const ownSpeak = speakingNow() || now < lastSfx + 500;   // eigene Stimme/Sounds
   const own = ownSpeak || listening || convoRec;
   const mouse = now - lastMouse < 400;   // Klickgeräusch der Maus ist kein Klatschen
@@ -914,10 +913,10 @@ function clapTick() {
       // Klatschen ist breitbandig, ein Mausklick fast nur hohes Klicken: Anteil hoher Frequenzen prüfen
       let d = 0; for (let i = 1; i < clapBuf.length; i++) { const q = clapBuf[i] - clapBuf[i - 1]; d += q * q; }
       const hf = d / (s || 1), hfMax = 2 - 2 * Math.cos(2 * Math.PI * 4800 / ac.sampleRate);
-      const snapHf = 2 - 2 * Math.cos(2 * Math.PI * 7000 / ac.sampleRate);   // Schwerpunkt über ~7 kHz
+      const snapHf = 2 - 2 * Math.cos(2 * Math.PI * 5500 / ac.sampleRate);   // Schwerpunkt über ~5,5 kHz
       if (window.ORB_DEBUG) console.log('Knall', 'pk', pk.toFixed(3), 'hf', hf.toFixed(2), 'crest', (pk / rms).toFixed(1));
-      const still = pre < rms * .3;   // davor (25–150 ms) war es deutlich leiser – bei Sprache fast nie
-      if (hf > snapHf && pk > Math.max(thr * 2, .04) && pk / rms < 14 && still) cand = { t:now, rms, pk, snap:true };
+      const still = pre < rms * .3;   // davor (30–150 ms) war es deutlich leiser – bei Sprache fast nie
+      if (hf > snapHf && pk > Math.max(thr * 1.5, .02) && pk / rms < 16 && pre < rms * .4) cand = { t:now, rms, pk, snap:true };
       else if (hf < hfMax && pk / rms < 18 && still) cand = { t:now, rms, pk, snap:snapRatio() > 1.4 };
     }
   }
