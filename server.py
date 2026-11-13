@@ -56,7 +56,7 @@ STIMMEN = [
     ["de-DE-AmalaNeural", "Amala (weiblich)"],
 ]
 DEFAULT_CFG = {
-    "stimme": "de-DE-FlorianMultilingualNeural", "tempo": "+12%", "hoehe": "+0Hz", "lautstaerke": 90,
+    "stimme": "de-DE-FlorianMultilingualNeural", "tempo": "+12%", "hoehe": "+0Hz", "lautstaerke": 160, "laut_v": 2,
     "farbe": "rot", "effekte": "mittel", "untertitel": True,
     "sfx": True, "sfxlaut": 60, "ambient": False,
     "steuerung": "wort", "wakeword": "Jarvis", "schnipsen": True, "unterbrechen": True, "nur_jarvis": True, "musik_schutz": True, "ducking": True,
@@ -68,7 +68,7 @@ DEFAULT_CFG = {
 }
 # Damit ORB immer dein Claude-Code-Login (Max-Abo) nutzt und nie einen API-Schlüssel
 CLAUDE_ENV_DROP = ("ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "ANTHROPIC_BASE_URL")
-VERSION = "59"
+VERSION = "60"
 ORB_UI = ("Deine Oberfläche (die Larsen gerade sieht): in der Mitte du als flüssige leuchtende Kugel mit Tropfen, "
           "Orbit-Ringen und Sternenhimmel; links eine Uhr und darunter der Gesprächsverlauf mit Eingabefeld; rechts "
           "Karten für System (CPU, RAM, Akku), Wetter mit Stundenvorschau, Aktivität (was du gerade tust) und Vorschläge; "
@@ -563,9 +563,14 @@ def load_cfg():
     cfg = dict(DEFAULT_CFG)
     try:
         with open(CONFIG, encoding="utf-8") as f:
-            cfg.update(json.load(f))
+            data = json.load(f)
+        if data.get("laut_v", 1) < 2:   # einmalig: Stimme deutlich lauter (Regler geht jetzt bis 200 %)
+            data["lautstaerke"] = max(160, int(data.get("lautstaerke", 90) or 0))
+            data["laut_v"] = 2
+        cfg.update(data)
     except Exception:
         pass
+    cfg["lautstaerke"] = max(0, min(200, int(cfg.get("lautstaerke", 160) or 0)))
     return cfg
 
 

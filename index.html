@@ -629,7 +629,7 @@
     <div class="row col">Sprecher<select id="s_stimme"></select></div>
     <div class="row col"><div class="lbl">Sprechtempo<span class="v" id="v_tempo"></span></div><input type="range" id="s_tempo" min="-20" max="50" step="5"></div>
     <div class="row col"><div class="lbl">Tonhöhe<span class="v" id="v_hoehe"></span></div><input type="range" id="s_hoehe" min="-20" max="20" step="2"></div>
-    <div class="row col"><div class="lbl">Lautstärke<span class="v" id="v_laut"></span></div><input type="range" id="s_laut" min="0" max="100" step="5"></div>
+    <div class="row col"><div class="lbl">Lautstärke<span class="v" id="v_laut"></span></div><input type="range" id="s_laut" min="0" max="200" step="5"></div>
     <div class="row">Stimme an<input type="checkbox" class="sw" id="s_voice"></div>
   </div><div style="margin-top:9px"><button class="btn" id="probe">▶ Probe hören</button></div></div>
   <div class="grp"><h4>Gehirn · Opus 5.5</h4><div class="card">
@@ -692,7 +692,7 @@ let BASE = THEMES.rot[0], BASE2 = THEMES.rot[1], BASE3 = THEMES.rot[2], BASE4 = 
 const CALM = true;   // ruhiges Design: weniger Effekte, mehr Platz für die Kugel
 const PAL = () => [BASE, BASE2, BASE3, BASE4];
 const pcol = (i, a, k = 0) => `rgba(${rgb(mix(PAL()[i % 4], [255,255,255], k))},${a})`;
-let cfg = { farbe:'rot', effekte:'mittel', untertitel:true, lautstaerke:90, sfx:true, sfxlaut:60, ambient:false,
+let cfg = { farbe:'rot', effekte:'mittel', untertitel:true, lautstaerke:160, sfx:true, sfxlaut:60, ambient:false,
   steuerung:'wort', schnipsen:true, wakeword:'Jarvis', stimme:'', tempo:'+15%', hoehe:'+0Hz', laenge:'kurz', rechte:'auto', tempo_claude:'low', ordner:'',
   schlaf_schliessen:true, bildschirm:false, klatschen:true, dauerzuhoeren:true, unterbrechen:true, nur_jarvis:true, musik_schutz:true, ducking:true, empfindlichkeit:6, schnips_empf:6, begruessung:true, ort:'', name:'', schlafen:5, vollbild:true, autostart:true };
 const S = { mode:'idle', seq:-1, busy:false, energy:.12, holo:0, think:0, speakVis:0, listenVis:0, level:0, warn:0, boot:0, sleep:false, sleepVis:0, px:0, py:0 };
@@ -887,7 +887,14 @@ function initAudio() {
     ac = new (window.AudioContext || window.webkitAudioContext)({ latencyHint:'interactive' });
     analyser = ac.createAnalyser(); analyser.fftSize = 256; analyser.smoothingTimeConstant = .55;
     freq = new Uint8Array(analyser.frequencyBinCount); tdata = new Uint8Array(analyser.fftSize);
-    outGain = ac.createGain(); analyser.connect(outGain); outGain.connect(ac.destination);
+    // Stimme: Vorverstärkung -> Kompressor (gleicht leise Stellen an) -> Lautstärke (bis 200 %) -> Limiter gegen Übersteuern
+    const pre = ac.createGain(); pre.gain.value = 1.6;
+    const comp = ac.createDynamicsCompressor();
+    comp.threshold.value = -24; comp.knee.value = 12; comp.ratio.value = 4; comp.attack.value = .004; comp.release.value = .2;
+    const lim = ac.createDynamicsCompressor();
+    lim.threshold.value = -2; lim.knee.value = 0; lim.ratio.value = 20; lim.attack.value = .001; lim.release.value = .08;
+    outGain = ac.createGain();
+    analyser.connect(pre); pre.connect(comp); comp.connect(outGain); outGain.connect(lim); lim.connect(ac.destination);
     sfxGain = ac.createGain(); sfxGain.connect(ac.destination);
     applyAudio();
   }
