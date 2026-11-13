@@ -68,7 +68,7 @@ DEFAULT_CFG = {
 }
 # Damit ORB immer dein Claude-Code-Login (Max-Abo) nutzt und nie einen API-Schlüssel
 CLAUDE_ENV_DROP = ("ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "ANTHROPIC_BASE_URL")
-VERSION = "77"
+VERSION = "78"
 ORB_UI = ("Deine Oberfläche (die Larsen gerade sieht): in der Mitte du als flüssige leuchtende Kugel mit Tropfen, "
           "Orbit-Ringen und Sternenhimmel; links eine Uhr und darunter der Gesprächsverlauf mit Eingabefeld; rechts "
           "Karten für System (CPU, RAM, Akku), Wetter mit Stundenvorschau, Aktivität (was du gerade tust) und Vorschläge; "
@@ -1567,7 +1567,24 @@ BG_REGELN = ("Du erledigst für ORB, Larsens Sprachassistenten, eine Aufgabe im 
              "Kein Markdown.")
 
 
+def umlaute(v):
+    """Falsch kodierte Umlaute reparieren (UTF-8 als Windows-1252 gelesen: „Ã¤“ → „ä“) – auch in Listen/Objekten."""
+    if isinstance(v, str):
+        if re.search("[ÂÃâ][-¿ŒœŠšŸŽžƒˆ˜–-›€™]", v):
+            try:
+                return v.encode("cp1252").decode("utf-8")
+            except UnicodeError:
+                pass
+        return v
+    if isinstance(v, list):
+        return [umlaute(x) for x in v]
+    if isinstance(v, dict):
+        return {k: umlaute(x) for k, x in v.items()}
+    return v
+
+
 def task_set(tid, **kw):
+    kw = {k: umlaute(v) for k, v in kw.items()}
     with _tasks_lock:
         t = TASKS.setdefault(tid, {"id": tid, "titel": "Aufgabe", "art": "hintergrund", "status": "laeuft",
                                    "schritt": "", "schritte": 0, "start": time.time(), "ende": 0, "ergebnis": ""})
@@ -1753,6 +1770,7 @@ def karte_setzen(b):
     """Neues/aktualisiertes Hologramm. b: {id?, titel, groesse: klein|mittel|gross, breite?, hoehe?, farbe?,
     inhalt: [{typ:text|titel|liste|zahl|fortschritt|bild|web|tabelle|trenner, ...}], dauer: Sekunden (0 = bleibt),
     anhaengen: true (Inhalte anfügen statt ersetzen)} – oder {id, zu: true} / {alle_zu: true}."""
+    b = umlaute(b)
     with _karten_lock:
         if b.get("alle_zu"):
             KARTEN.clear()

@@ -13,6 +13,11 @@ if ((Test-Path $lock) -and ((Get-Date) - (Get-Item $lock).LastWriteTime).TotalMi
     exit 1
 }
 $text = ($Auftrag -join ' ').Trim()
+# Umlaute reparieren, falls der Auftrag falsch kodiert ankam (UTF-8 als Windows-1252 gelesen: „Ã¤“ statt „ä“)
+if ($text -match '[ÂÃâ][\u0080-¿ŒœŠšŸŽžƒˆ˜–-›€™]') {
+    $neuText = [Text.Encoding]::UTF8.GetString([Text.Encoding]::GetEncoding(1252).GetBytes($text))
+    if ($neuText -notmatch '�' -and ($neuText.Split('?').Count -eq $text.Split('?').Count)) { $text = $neuText }
+}
 [IO.File]::WriteAllText("$job\auftrag.txt", $text, (New-Object Text.UTF8Encoding $false))
 Set-Content $lock (Get-Date -Format s)
 Invoke-CimMethod -ClassName Win32_Process -MethodName Create -Arguments @{

@@ -316,49 +316,84 @@
   #act:not(.busy) { display:none; }
   #act.busy { animation:cardIn .7s var(--spring) both; }
   /* ===== Holo-Projektion (Pepper's Ghost: schräge, durchsichtige Projektionsfläche über der Kugel) ===== */
-  #holo { --hl:var(--c3); position:fixed; left:50%; top:30%; z-index:4; pointer-events:none; min-width:200px; max-width:420px;
-    padding:14px 26px 13px; border-radius:16px; text-align:center; color:rgb(var(--hl)); opacity:0;
-    transform:translate(-50%,-100%) perspective(700px) rotateX(24deg) scale(.55); transform-origin:50% 100%;
-    transition:opacity .45s, transform .75s var(--spring);
-    background:linear-gradient(180deg, rgba(var(--hl),.13), rgba(var(--hl),.03) 70%, rgba(var(--hl),.1));
-    border:1px solid rgba(var(--hl),.5); box-shadow:0 0 34px rgba(var(--hl),.28), inset 0 0 26px rgba(var(--hl),.14);
-    text-shadow:-1.5px 0 rgba(255,60,110,.55), 1.5px 0 rgba(60,190,255,.55), 0 0 14px rgba(var(--hl),.9); mix-blend-mode:screen; }
-  #holo.on { opacity:1; transform:translate(-50%,-100%) perspective(700px) rotateX(12deg) scale(1); animation:holoFlick 3.4s steps(1) infinite; }
-  #holo::before { content:''; position:absolute; inset:0; border-radius:inherit; pointer-events:none;
-    background:repeating-linear-gradient(0deg, rgba(var(--hl),.16) 0 1px, transparent 1px 3px); animation:holoScan 2.2s linear infinite; }
-  #holo::after { content:''; position:absolute; left:0; right:0; height:26%; top:-30%; pointer-events:none;
-    background:linear-gradient(180deg, transparent, rgba(var(--hl),.22), transparent); animation:holoSweep 2.6s var(--ease) infinite; }
+  /* ===== Hologramme im Liquid-Glass-Stil: echtes Glas, feine helle Kante, weicher Schatten, dezentes Leuchten, leichter Holo-Schimmer ===== */
+  /* Gemeinsame Basis (Farbton je Hologramm über --hg als „r,g,b“ bzw. Farbwert) */
+  #holo, .karte, .th:not(.devmini), #bildh, #webh, #goldh { isolation:isolate;
+    background:linear-gradient(160deg, rgba(255,255,255,.13) 0%, rgba(255,255,255,.05) 36%, rgba(255,255,255,.025) 64%, var(--hgt, rgba(255,255,255,.04)) 100%), rgba(14,16,26,.56);
+    backdrop-filter:blur(30px) saturate(190%) brightness(1.04); -webkit-backdrop-filter:blur(30px) saturate(190%) brightness(1.04);
+    border:0; box-shadow:inset 0 1px 0 rgba(255,255,255,.42), inset 0 0 0 1px rgba(255,255,255,.1), inset 0 -1px 0 rgba(255,255,255,.05),
+      0 2px 4px rgba(0,0,0,.22), 0 26px 60px rgba(0,0,0,.46), 0 0 46px var(--hgg, transparent); }
+  /* Glanzlicht oben links + Farbschein unten rechts */
+  #holo::before, .karte::before, .th:not(.devmini)::before, #bildh::before, #webh::before, #goldh::before {
+    content:''; position:absolute; inset:0; border-radius:inherit; pointer-events:none; z-index:-1; opacity:1; animation:none;
+    background:radial-gradient(85% 55% at 18% -10%, rgba(255,255,255,.2), transparent 62%), radial-gradient(75% 60% at 100% 112%, var(--hgt, transparent), transparent 70%); }
+  /* Holo-Schimmer: ein feiner, langsam wandernder Lichtzug auf der Kante */
+  #holo::after, .karte::after, .th:not(.devmini)::after, #bildh::after, #webh::after, #goldh::after {
+    content:''; position:absolute; inset:0; top:0; height:auto; border-radius:inherit; padding:1px; pointer-events:none; z-index:3; animation:rim 9s linear infinite;
+    background:conic-gradient(from var(--a), transparent 0deg, rgba(255,255,255,.55) 26deg, var(--hgk, rgba(255,255,255,.4)) 52deg, transparent 96deg,
+      transparent 190deg, rgba(150,220,255,.22) 225deg, rgba(255,150,230,.22) 250deg, transparent 290deg);
+    -webkit-mask:linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite:xor; mask-composite:exclude; opacity:.75; }
+  body.lite :is(#holo, .karte, .th:not(.devmini), #bildh, #webh, #goldh) { backdrop-filter:none; -webkit-backdrop-filter:none; background-color:rgba(18,20,28,.93); }
+  body.lite :is(#holo, .karte, .th:not(.devmini), #bildh, #webh, #goldh)::after { animation:none; }
+  /* sanftes Einblenden: leicht wachsen + einblenden – Ausblenden umgekehrt */
+  @keyframes glasAuf { 0% { opacity:0; scale:.94; translate:0 10px; } 100% { opacity:1; scale:1; translate:0 0; } }
+  @keyframes glasAb { 0% { opacity:1; scale:1; translate:0 0; } 100% { opacity:0; scale:.95; translate:0 8px; } }
+  /* kleiner runder Schließen-Knopf */
+  .karte .kh button, .th:not(.devmini) .x, #bildh .x, #goldh .x, #webh .wk .x { width:26px; height:26px; padding:0; border-radius:50%; display:grid; place-items:center;
+    font-size:11px; line-height:1; color:rgba(255,255,255,.78); opacity:1; background:rgba(255,255,255,.08); box-shadow:inset 0 0 0 1px rgba(255,255,255,.1);
+    backdrop-filter:blur(10px); -webkit-backdrop-filter:blur(10px); transition:background .25s, color .25s, transform .35s var(--spring); }
+  .karte .kh button:hover, .th:not(.devmini) .x:hover, #bildh .x:hover, #goldh .x:hover, #webh .wk .x:hover { background:rgba(255,255,255,.18); color:#fff; transform:scale(1.08); }
+
+  #holo { --hg:var(--c3); --hgt:rgba(var(--hg),.1); --hgg:rgba(var(--hg),.14); --hgk:rgba(var(--hg),.7);
+    position:fixed; left:50%; top:30%; z-index:4; pointer-events:none; min-width:200px; max-width:420px;
+    padding:16px 28px 15px; border-radius:24px; text-align:center; color:#fff; opacity:0;
+    transform:translate(-50%,-100%) scale(.94); transform-origin:50% 100%; transition:opacity .45s var(--ease), transform .6s var(--ease); }
+  #holo.on { opacity:1; transform:translate(-50%,-100%) scale(1); }
   /* Freie Hologramme (holo.ps1): beliebig viele, verschiebbar, Größe per Ecke */
   #karten { position:fixed; inset:0; z-index:6; pointer-events:none; }
-  .karte { --hl:var(--c3); position:absolute; pointer-events:auto; display:flex; flex-direction:column; border-radius:18px; color:#eaf6ff;
-    background:linear-gradient(165deg, color-mix(in srgb, var(--hl) 16%, transparent), rgba(8,12,26,.72));
-    border:1px solid color-mix(in srgb, var(--hl) 65%, transparent); backdrop-filter:blur(8px);
-    box-shadow:0 0 30px color-mix(in srgb, var(--hl) 30%, transparent), inset 0 0 22px color-mix(in srgb, var(--hl) 14%, transparent);
-    resize:both; overflow:hidden; min-width:200px; min-height:110px; max-width:96vw; max-height:90vh;
-    animation:thIn .7s var(--spring) backwards; }
-  .karte::before { content:''; position:absolute; inset:0; pointer-events:none; opacity:.22; border-radius:inherit;
-    background:repeating-linear-gradient(0deg, transparent 0 2px, color-mix(in srgb, var(--hl) 45%, transparent) 2px 3px); }
-  .karte::after { content:''; position:absolute; left:0; right:0; height:22%; top:-30%; pointer-events:none;
-    background:linear-gradient(transparent, color-mix(in srgb, var(--hl) 22%, transparent), transparent); animation:thScan 3.4s linear infinite; }
-  .karte .kh { display:flex; align-items:center; gap:8px; padding:10px 12px 8px 14px; cursor:grab; user-select:none; flex:none;
-    font-size:11.5px; font-weight:700; letter-spacing:.16em; text-transform:uppercase; border-bottom:1px solid color-mix(in srgb, var(--hl) 25%, transparent); }
-  .karte .kh::before { content:''; width:7px; height:7px; border-radius:50%; background:var(--hl); box-shadow:0 0 8px var(--hl); }
-  .karte .kh span { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-  .karte .kh button { border:0; background:none; color:inherit; opacity:.6; cursor:pointer; font-size:14px; padding:0 2px; }
-  .karte .kh button:hover { opacity:1; }
-  .karte .kb { flex:1; overflow:auto; padding:10px 14px 14px; display:flex; flex-direction:column; gap:10px; font-size:14px; line-height:1.45; }
-  .karte .b-titel { font-size:17px; font-weight:700; }
-  .karte .b-liste { margin:0; padding-left:18px; } .karte .b-liste li { margin:2px 0; }
-  .karte .b-liste li::marker { color:var(--hl); }
-  .karte .b-zahl { display:flex; align-items:baseline; gap:8px; } .karte .b-zahl b { font-size:30px; font-weight:300; color:#fff; text-shadow:0 0 14px var(--hl); }
-  .karte .b-zahl i { font-style:normal; opacity:.7; font-size:12.5px; }
-  .karte .b-fort .bar { height:6px; border-radius:6px; background:color-mix(in srgb, var(--hl) 18%, transparent); overflow:hidden; margin-top:5px; }
-  .karte .b-fort .bar i { display:block; height:100%; background:var(--hl); box-shadow:0 0 10px var(--hl); transition:width .6s var(--spring); }
-  .karte .b-bild img { width:100%; border-radius:10px; display:block; }
-  .karte .b-web { flex:1; min-height:220px; border:0; border-radius:10px; background:#fff; }
-  .karte table { border-collapse:collapse; width:100%; font-size:13px; } .karte th { text-align:left; color:var(--hl); font-weight:600; }
-  .karte td, .karte th { padding:4px 8px; border-bottom:1px solid color-mix(in srgb, var(--hl) 18%, transparent); }
-  .karte hr { border:0; border-top:1px solid color-mix(in srgb, var(--hl) 30%, transparent); margin:2px 0; width:100%; }
+  .karte { --hl:rgb(var(--c3)); --hgt:color-mix(in srgb, var(--hl) 11%, transparent); --hgg:color-mix(in srgb, var(--hl) 13%, transparent); --hgk:color-mix(in srgb, var(--hl) 75%, transparent);
+    position:absolute; pointer-events:auto; display:flex; flex-direction:column; border-radius:26px; color:rgba(255,255,255,.88);
+    resize:both; overflow:hidden; min-width:220px; min-height:120px; max-width:96vw; max-height:90vh;
+    animation:glasAuf .6s var(--ease) backwards; }
+  .karte > * { position:relative; }
+  .karte .kh { display:flex; align-items:center; gap:10px; padding:16px 14px 10px 22px; cursor:grab; user-select:none; flex:none; }
+  .karte .kh::before { content:''; width:8px; height:8px; border-radius:50%; flex:none; background:var(--hl);
+    box-shadow:0 0 0 3px color-mix(in srgb, var(--hl) 18%, transparent), 0 0 10px color-mix(in srgb, var(--hl) 55%, transparent); }
+  .karte .kh span { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:14.5px; font-weight:600; letter-spacing:.005em; color:#fff; }
+  .karte .kb { flex:1; overflow:auto; padding:6px 22px 22px; display:flex; flex-direction:column; gap:14px; font-size:14.5px; line-height:1.55;
+    scrollbar-width:thin; scrollbar-color:rgba(255,255,255,.18) transparent;
+    -webkit-mask:linear-gradient(#000 calc(100% - 18px), transparent); mask:linear-gradient(#000 calc(100% - 18px), transparent); }
+  .karte .b-titel { font-size:21px; font-weight:600; letter-spacing:-.015em; line-height:1.25; color:#fff; }
+  .karte .b-text { color:rgba(255,255,255,.76); }
+  .karte .b-liste { margin:0; padding:0; list-style:none; display:flex; flex-direction:column; gap:2px; }
+  .karte .b-liste li { position:relative; padding:5px 0 5px 20px; }
+  .karte .b-liste li + li { border-top:1px solid rgba(255,255,255,.06); }
+  .karte .b-liste li::before { content:''; position:absolute; left:2px; top:calc(.775em + 5px - 3px); width:6px; height:6px; border-radius:50%;
+    background:var(--hl); box-shadow:0 0 8px color-mix(in srgb, var(--hl) 60%, transparent); }
+  .karte .b-zahl { display:flex; flex-direction:column; gap:4px; padding:12px 14px 13px; border-radius:16px; min-width:0;
+    background:rgba(255,255,255,.05); box-shadow:inset 0 1px 0 rgba(255,255,255,.08), inset 0 0 0 1px rgba(255,255,255,.05); }
+  .karte .b-zahl i { order:-1; font-style:normal; font-size:11px; font-weight:600; letter-spacing:.12em; text-transform:uppercase; color:rgba(255,255,255,.5);
+    overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .karte .b-zahl b { font-size:32px; font-weight:300; line-height:1.05; letter-spacing:-.02em; color:#fff; font-variant-numeric:tabular-nums; white-space:nowrap; }
+  .karte .b-zahl b small { font-size:15px !important; font-weight:500; color:rgba(255,255,255,.55); letter-spacing:0; }
+  .karte .b-fort .fk { display:flex; justify-content:space-between; align-items:baseline; gap:12px; font-size:13.5px; color:rgba(255,255,255,.78); }
+  .karte .b-fort .fk b { font-weight:600; color:#fff; font-variant-numeric:tabular-nums; }
+  .karte .b-fort .bar { position:relative; height:8px; border-radius:8px; margin-top:8px; overflow:hidden;
+    background:rgba(255,255,255,.08); box-shadow:inset 0 1px 2px rgba(0,0,0,.3); }
+  .karte .b-fort .bar i { position:relative; display:block; height:100%; border-radius:inherit; overflow:hidden; transition:width .8s var(--ease);
+    background:linear-gradient(90deg, color-mix(in srgb, var(--hl) 45%, rgb(var(--c4))), var(--hl) 70%, color-mix(in srgb, var(--hl) 55%, #fff));
+    box-shadow:0 0 12px color-mix(in srgb, var(--hl) 45%, transparent); }
+  .karte .b-fort .bar i::after { content:''; position:absolute; inset:0; background:linear-gradient(90deg, transparent, rgba(255,255,255,.4), transparent);
+    background-size:40% 100%; background-repeat:no-repeat; animation:glasGlanz 2.8s ease-in-out infinite; }
+  @keyframes glasGlanz { 0% { background-position:-60% 0; } 60%, 100% { background-position:160% 0; } }
+  .karte .b-bild img { width:100%; border-radius:16px; display:block; box-shadow:0 0 0 1px rgba(255,255,255,.1), 0 10px 30px rgba(0,0,0,.35); }
+  .karte .b-web { flex:1; min-height:220px; border:0; border-radius:16px; background:#fff; box-shadow:0 0 0 1px rgba(255,255,255,.12); }
+  .karte table { border-collapse:collapse; width:100%; font-size:13.5px; font-variant-numeric:tabular-nums; }
+  .karte th { text-align:left; font-size:11px; font-weight:600; letter-spacing:.12em; text-transform:uppercase; color:rgba(255,255,255,.5); }
+  .karte td, .karte th { padding:8px 10px; border-bottom:1px solid rgba(255,255,255,.07); }
+  .karte td.n, .karte th.n { text-align:right; }
+  .karte tr:last-child td { border-bottom:0; }
+  .karte hr { border:0; height:1px; margin:2px 0; width:100%; background:linear-gradient(90deg, transparent, rgba(255,255,255,.24), transparent); }
   .karte .reihe { display:grid; grid-template-columns:repeat(auto-fit, minmax(120px, 1fr)); gap:10px; }
   /* Aufgaben-Hologramme: eins pro laufender Aufgabe (Multitasking) */
   /* Platz wird laufend berechnet (holoPlatz): unter der Kugel, zwischen den Widget-Spalten, über Untertitel und Dock */
@@ -407,6 +442,23 @@
   .th .stop { position:absolute !important; top:6px; right:30px; z-index:2; border:0; background:none; color:inherit; opacity:0; cursor:pointer; font-size:11px; transition:opacity .2s; }
   .th.laeuft:not(.dev):hover .stop { opacity:.7; }
   .th .tt { padding-right:18px; }
+  /* Aufgaben-Hologramme im Glas-Stil (das lila Entwickler-Mini-Hologramm behält bewusst seinen eigenen Look) */
+  .th:not(.devmini) { --hgt:color-mix(in srgb, var(--hl) 10%, transparent); --hgg:color-mix(in srgb, var(--hl) 12%, transparent); --hgk:color-mix(in srgb, var(--hl) 75%, transparent);
+    width:244px; padding:15px 16px 15px; border-radius:22px; color:rgba(255,255,255,.9); transform:none; animation:glasAuf .55s var(--ease) backwards; }
+  .th:not(.devmini) .tt { gap:9px; font-size:13px; font-weight:600; letter-spacing:.005em; text-transform:none; color:#fff; padding-right:30px; }
+  .th:not(.devmini) .ring { width:13px; height:13px; border-width:1.8px; border-color:rgba(255,255,255,.14); border-top-color:var(--hl); }
+  .th:not(.devmini).fertig .ring, .th:not(.devmini).fehler .ring, .th:not(.devmini).abgebrochen .ring { border-color:var(--hl); background:var(--hl); box-shadow:0 0 8px color-mix(in srgb, var(--hl) 60%, transparent); }
+  .th:not(.devmini) .zt { font-size:11.5px; font-weight:500; color:rgba(255,255,255,.5); opacity:1; }
+  .th:not(.devmini) .st { margin-top:9px; font-size:13px; line-height:1.5; color:rgba(255,255,255,.72); opacity:1; text-shadow:none; }
+  .th:not(.devmini) .pw { margin-top:12px; }
+  .th:not(.devmini) .bar { height:4px; border-radius:4px; background:rgba(255,255,255,.08); }
+  .th:not(.devmini) .bar i { border-radius:4px; background:linear-gradient(90deg, transparent, var(--hl), transparent); box-shadow:none; }
+  .th:not(.devmini).pro .bar i, .th:not(.devmini).fertig .bar i, .th:not(.devmini).fehler .bar i, .th:not(.devmini).abgebrochen .bar i {
+    background:linear-gradient(90deg, rgb(var(--c4)), var(--hl)); box-shadow:0 0 10px color-mix(in srgb, var(--hl) 40%, transparent); }
+  .th:not(.devmini) .pz { font-size:11.5px; font-weight:600; color:#fff; text-shadow:none; }
+  .th:not(.devmini) .x { top:11px; right:11px; width:24px; height:24px; font-size:10px; }
+  .th:not(.devmini) .stop { top:14px; right:40px; }
+  .th:not(.devmini).weg { animation:glasAb .38s var(--ease) forwards; }
   /* Mini-Hologramm Entwickler */
   .th.devmini { width:236px; padding:9px 12px 9px; border-radius:14px; }
   .devmini .tt { font-size:10px; }
@@ -422,7 +474,7 @@
   .devmini .de { font-size:10px; letter-spacing:.04em; opacity:.8; margin-top:3px; font-variant-numeric:tabular-nums; }
   .th.ziehen { transition:none; }
   .th.wisch { opacity:0 !important; transition:opacity .35s, transform .35s; }
-  .karte.weg { opacity:0; transform:scale(.92) rotateX(20deg); transition:opacity .45s, transform .45s; }
+  .karte.weg { animation:glasAb .4s var(--ease) forwards; pointer-events:none; }
   .th.weg { animation:holoAb .42s cubic-bezier(.5,0,.75,0) forwards; pointer-events:none; }
   /* Einblenden wie eine Projektion: erst eine Lichtlinie, die sich weich zur Karte öffnet – Ausblenden umgekehrt */
   @keyframes holoAuf { 0% { opacity:0; clip-path:inset(49% 8% 49% 8% round 16px); filter:blur(4px) brightness(2.2); }
@@ -436,46 +488,30 @@
   @keyframes spin { to { transform:rotate(360deg); } }
   /* Bild-Hologramm: neu erstellte Bilder (Bilder/ORB Bilder) – Klick vergrößert, ✕ schließt */
   /* Position/Größe setzt holoPlatz: neben der Kugel (oder darunter, wenn es zu eng ist) – nie über Kugel oder Widgets */
-  #bildh { --hl:var(--c3); position:fixed; left:var(--bx,50%); top:var(--by,60%); z-index:6; width:var(--bw,300px); padding:10px 10px 9px; border-radius:18px;
-    color:#f2f9ff; cursor:zoom-in; overflow:hidden; opacity:0; pointer-events:none; visibility:hidden;
-    background:linear-gradient(160deg, rgba(var(--hl),.14), rgba(8,12,26,.78));
-    border:1px solid rgba(var(--hl),.62); backdrop-filter:blur(14px) saturate(1.3); -webkit-backdrop-filter:blur(14px) saturate(1.3);
-    box-shadow:0 14px 40px rgba(0,0,0,.5), 0 0 30px rgba(var(--hl),.32), inset 0 1px 0 rgba(255,255,255,.14), inset 0 0 22px rgba(var(--hl),.14);
-    transform:translate(-50%, var(--bty,-50%)); transition:left .6s var(--spring), top .6s var(--spring), width .6s var(--spring), transform .6s var(--spring), box-shadow .5s; }
-  #bildh.on { opacity:1; visibility:visible; pointer-events:auto; animation:holoAuf .8s cubic-bezier(.2,.9,.25,1) backwards; }
-  #bildh.zu { animation:holoAb .4s cubic-bezier(.5,0,.75,0) forwards; pointer-events:none; }
+  #bildh { --hl:var(--c3); --hgt:rgba(var(--hl),.1); --hgg:rgba(var(--hl),.12); --hgk:rgba(var(--hl),.75);
+    position:fixed; left:var(--bx,50%); top:var(--by,60%); z-index:6; width:var(--bw,300px); padding:10px 10px 12px; border-radius:26px;
+    color:#fff; cursor:zoom-in; overflow:hidden; opacity:0; pointer-events:none; visibility:hidden;
+    transform:translate(-50%, var(--bty,-50%)); transition:left .6s var(--ease), top .6s var(--ease), width .6s var(--ease), transform .6s var(--ease), box-shadow .5s; }
+  #bildh.on { opacity:1; visibility:visible; pointer-events:auto; animation:glasAuf .6s var(--ease) backwards; }
+  #bildh.zu { animation:glasAb .38s var(--ease) forwards; pointer-events:none; }
   #bildh.gross { left:var(--mid,50%); top:50%; width:min(calc(100vw - 80px), 980px); cursor:zoom-out; transform:translate(-50%, -50%); z-index:60;
-    box-shadow:0 0 0 100vmax rgba(2,4,12,.62), 0 24px 70px rgba(0,0,0,.6), 0 0 40px rgba(var(--hl),.35), inset 0 1px 0 rgba(255,255,255,.14); }
-  #bildh img { position:relative; z-index:0; display:block; width:100%; max-height:var(--bimg, min(52vh, 420px)); object-fit:contain; border-radius:11px;
-    filter:drop-shadow(0 0 12px rgba(var(--hl),.35)); }
+    box-shadow:0 0 0 100vmax rgba(2,4,12,.62), inset 0 1px 0 rgba(255,255,255,.42), inset 0 0 0 1px rgba(255,255,255,.1), 0 30px 80px rgba(0,0,0,.6); }
+  #bildh img { position:relative; z-index:0; display:block; width:100%; max-height:var(--bimg, min(52vh, 420px)); object-fit:contain; border-radius:17px;
+    box-shadow:0 0 0 1px rgba(255,255,255,.08); }
   #bildh.gross img { max-height:78vh; }
-  #bildh::before { content:''; position:absolute; inset:0; pointer-events:none; z-index:1; opacity:.1;
-    background:repeating-linear-gradient(0deg, transparent 0 2px, rgba(var(--hl),.40) 2px 3px); }
-  #bildh::after { content:''; position:absolute; left:0; right:0; height:30%; top:-35%; pointer-events:none; z-index:1;
-    background:linear-gradient(transparent, rgba(var(--hl),.28), transparent); animation:thScan 2.6s linear infinite; }
-  #bildh .tt { position:relative; z-index:2; display:flex; align-items:center; gap:8px; margin:8px 4px 0; font-size:11px; font-weight:700; letter-spacing:.14em; text-transform:uppercase;
-    text-shadow:0 0 10px rgba(var(--hl),.80); }
-  #bildh .tt i { width:8px; height:8px; border-radius:50%; flex:none; background:rgb(var(--hl)); box-shadow:0 0 10px rgb(var(--hl)); }
+  #bildh .tt { position:relative; z-index:2; display:flex; align-items:center; gap:9px; margin:11px 8px 0; font-size:13.5px; font-weight:600; letter-spacing:.005em; }
+  #bildh .tt i { width:7px; height:7px; border-radius:50%; flex:none; background:rgb(var(--hl)); box-shadow:0 0 0 3px rgba(var(--hl),.18), 0 0 10px rgba(var(--hl),.5); }
   #bildh .tt span { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-  #bildh .x { position:absolute; top:8px; right:10px; z-index:2; border:0; background:rgba(10,14,30,.5); color:inherit; border-radius:50%;
-    width:26px; height:26px; cursor:pointer; font-size:13px; opacity:.75; display:grid; place-items:center;
-    box-shadow:inset 0 0 0 1px rgba(var(--hl),.45); transition:opacity .2s, transform .3s var(--spring), background .2s; }
-  #bildh .x:hover { opacity:1; transform:scale(1.12); background:rgba(var(--hl),.3); }
+  #bildh .x { position:absolute; top:18px; right:18px; z-index:4; background:rgba(12,14,22,.5); cursor:pointer; }
   /* Gold-Hologramm auf Zuruf („Jarvis, Gold“): XAU/USD live, ~45 s, dann blendet es sich aus */
   #goldh { --hl:255,196,70; --up:70,230,140; --dn:255,90,90; --tk:var(--hl); position:fixed; left:var(--gx,50%); top:var(--gy,60%); z-index:6; width:var(--gw,270px);
-    padding:12px 14px 10px; border-radius:18px; color:#fff6e0; overflow:hidden; opacity:0; pointer-events:none; visibility:hidden;
-    background:linear-gradient(160deg, rgba(var(--hl),.17), rgba(14,10,4,.8) 70%);
-    border:1px solid rgba(var(--hl),.62); backdrop-filter:blur(14px) saturate(1.3); -webkit-backdrop-filter:blur(14px) saturate(1.3);
-    box-shadow:0 14px 40px rgba(0,0,0,.5), 0 0 30px rgba(var(--hl),.3), inset 0 1px 0 rgba(255,255,255,.16), inset 0 0 22px rgba(var(--hl),.14);
-    transform:translate(-50%, var(--gty,-50%)); transition:left .6s var(--spring), top .6s var(--spring), width .6s var(--spring), transform .6s var(--spring); }
-  #goldh.on { opacity:1; visibility:visible; pointer-events:auto; animation:holoAuf .8s cubic-bezier(.2,.9,.25,1) backwards; }
-  #goldh.zu { animation:holoAb .4s cubic-bezier(.5,0,.75,0) forwards; pointer-events:none; }
-  #goldh::before { content:''; position:absolute; inset:0; pointer-events:none; opacity:.1;
-    background:repeating-linear-gradient(0deg, transparent 0 2px, rgba(var(--hl),.4) 2px 3px); }
-  #goldh::after { content:''; position:absolute; left:0; right:0; height:30%; top:-35%; pointer-events:none;
-    background:linear-gradient(transparent, rgba(var(--hl),.22), transparent); animation:thScan 3s linear infinite; }
+    padding:16px 18px 14px; border-radius:24px; color:#fff6e0; overflow:hidden; opacity:0; pointer-events:none; visibility:hidden;
+    --hgt:rgba(var(--hl),.12); --hgg:rgba(var(--hl),.13); --hgk:rgba(var(--hl),.8);
+    transform:translate(-50%, var(--gty,-50%)); transition:left .6s var(--ease), top .6s var(--ease), width .6s var(--ease), transform .6s var(--ease); }
+  #goldh.on { opacity:1; visibility:visible; pointer-events:auto; animation:glasAuf .6s var(--ease) backwards; }
+  #goldh.zu { animation:glasAb .38s var(--ease) forwards; pointer-events:none; }
   #goldh > * { position:relative; z-index:1; }
-  #goldh .gk { display:flex; align-items:center; gap:8px; font-size:11px; font-weight:700; letter-spacing:.16em; text-transform:uppercase; text-shadow:0 0 10px rgba(var(--hl),.8); }
+  #goldh .gk { display:flex; align-items:center; gap:8px; font-size:11px; font-weight:650; letter-spacing:.14em; text-transform:uppercase; }
   #goldh .gk i { width:8px; height:8px; border-radius:50%; background:rgb(var(--hl)); box-shadow:0 0 10px rgb(var(--hl)); animation:goldPuls 1.6s ease-in-out infinite; }
   #goldh .gk b { font-weight:600; opacity:.6; letter-spacing:.1em; }
   @keyframes goldPuls { 50% { opacity:.35; } }
@@ -505,52 +541,44 @@
   #goldh svg circle { fill:rgb(var(--tk)); filter:drop-shadow(0 0 5px rgb(var(--tk))); }
   #goldh .gz { height:2px; border-radius:2px; background:rgba(var(--hl),.15); overflow:hidden; }
   #goldh .gz i { display:block; height:100%; width:100%; background:rgb(var(--hl)); box-shadow:0 0 8px rgb(var(--hl)); transform-origin:left; }
-  #goldh .x { position:absolute; top:9px; right:10px; z-index:2; border:0; background:rgba(14,10,4,.5); color:inherit; border-radius:50%;
-    width:24px; height:24px; cursor:pointer; font-size:12px; opacity:.75; display:grid; place-items:center;
-    box-shadow:inset 0 0 0 1px rgba(var(--hl),.45); transition:opacity .2s, transform .3s var(--spring), background .2s; }
-  #goldh .x:hover { opacity:1; transform:scale(1.12); background:rgba(var(--hl),.3); }
+  #goldh .x { position:absolute; top:12px; right:12px; z-index:2; width:24px; height:24px; cursor:pointer; }
   /* Web-Hologramm: echte, bedienbare Webseite (iframe – oder echte Webansicht darüber, wenn die Seite Einbetten verbietet) */
-  #webh { --hl:var(--c3); position:fixed; left:var(--mid,50%); top:50%; z-index:55; width:min(calc(100vw - 80px), 1240px); height:min(calc(100vh - 150px), 880px);
-    display:flex; flex-direction:column; gap:7px; padding:8px 8px 8px; border-radius:20px; color:#f2f9ff; overflow:hidden;
+  #webh { --hl:var(--c3); --hgt:rgba(var(--hl),.08); --hgg:rgba(var(--hl),.1); --hgk:rgba(var(--hl),.7);
+    position:fixed; left:var(--mid,50%); top:50%; z-index:55; width:min(calc(100vw - 80px), 1240px); height:min(calc(100vh - 150px), 880px);
+    display:flex; flex-direction:column; gap:10px; padding:10px; border-radius:28px; color:#fff; overflow:hidden;
     opacity:0; visibility:hidden; pointer-events:none; transform:translate(-50%, -50%);
-    background:linear-gradient(160deg, rgba(var(--hl),.16), rgba(8,12,26,.82) 60%);
-    border:1px solid rgba(var(--hl),.62); backdrop-filter:blur(16px) saturate(1.3); -webkit-backdrop-filter:blur(16px) saturate(1.3);
-    box-shadow:0 0 0 100vmax rgba(2,4,12,.5), 0 24px 70px rgba(0,0,0,.6), 0 0 40px rgba(var(--hl),.35), inset 0 1px 0 rgba(255,255,255,.14), inset 0 0 24px rgba(var(--hl),.14); }
-  #webh.on { opacity:1; visibility:visible; pointer-events:auto; animation:holoAuf .8s cubic-bezier(.2,.9,.25,1) backwards; }
-  #webh.zu { animation:holoAb .4s cubic-bezier(.5,0,.75,0) forwards; pointer-events:none; }
-  #webh::after { content:''; position:absolute; left:0; right:0; height:30%; top:-35%; pointer-events:none; z-index:3;
-    background:linear-gradient(180deg, transparent, rgba(var(--hl),.22), transparent); }
-  #webh.on::after { animation:holoSweep 1.4s var(--ease) 1; }
-  #webh .wk { position:relative; display:flex; align-items:center; gap:9px; padding:3px 4px 2px 8px; font-size:11px; font-weight:700; letter-spacing:.14em;
-    text-transform:uppercase; text-shadow:0 0 10px rgba(var(--hl),.8); flex:none; }
-  #webh .wk::before { content:''; position:absolute; inset:-8px -8px -3px; pointer-events:none; opacity:.14;
-    background:repeating-linear-gradient(0deg, rgba(var(--hl),.9) 0 1px, transparent 1px 3px); animation:holoScan 2.2s linear infinite; }
-  #webh .wk i { width:8px; height:8px; border-radius:50%; flex:none; background:rgb(var(--hl)); box-shadow:0 0 10px rgb(var(--hl)); }
+    box-shadow:0 0 0 100vmax rgba(2,4,12,.5), inset 0 1px 0 rgba(255,255,255,.42), inset 0 0 0 1px rgba(255,255,255,.1), 0 30px 80px rgba(0,0,0,.6), 0 0 50px var(--hgg); }
+  #webh.on { opacity:1; visibility:visible; pointer-events:auto; animation:glasAuf .6s var(--ease) backwards; }
+  #webh.zu { animation:glasAb .38s var(--ease) forwards; pointer-events:none; }
+  #webh .wk { position:relative; display:flex; align-items:center; gap:10px; padding:4px 4px 0 14px; flex:none; font-size:14px; font-weight:600; letter-spacing:.005em; }
+  #webh .wk i { width:7px; height:7px; border-radius:50%; flex:none; background:rgb(var(--hl)); box-shadow:0 0 0 3px rgba(var(--hl),.18), 0 0 10px rgba(var(--hl),.5); }
   #webh.laedt .wk i { animation:goldPuls .7s ease-in-out infinite; }
   #webh .wk span { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-  #webh .wk small { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:10.5px; font-weight:600; opacity:.55; letter-spacing:.06em; text-transform:none; }
-  #webh .wk button { position:relative; z-index:1; height:28px; min-width:28px; padding:0 10px; border:1px solid rgba(var(--hl),.35); border-radius:14px; cursor:pointer;
-    background:rgba(10,14,30,.5); color:inherit; font:inherit; font-size:10.5px; letter-spacing:.1em; opacity:.85; transition:transform .25s var(--spring), background .25s, opacity .25s; }
-  #webh .wk button:hover { opacity:1; transform:scale(1.06); background:rgba(var(--hl),.3); }
-  #webh .wk .x { padding:0; width:28px; font-size:13px; }
-  #webh .wb { position:relative; flex:1; min-height:0; border-radius:13px; overflow:hidden; background:rgba(4,6,14,.6);
-    box-shadow:0 0 0 1px rgba(var(--hl),.35), 0 0 18px rgba(var(--hl),.25); }
+  #webh .wk small { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:12px; font-weight:500; color:rgba(255,255,255,.5); }
+  #webh .wk button { position:relative; z-index:1; height:30px; min-width:30px; padding:0 13px; border:0; border-radius:15px; cursor:pointer;
+    background:rgba(255,255,255,.08); box-shadow:inset 0 0 0 1px rgba(255,255,255,.1); color:rgba(255,255,255,.85); font:inherit; font-size:12px; font-weight:600;
+    transition:transform .35s var(--spring), background .25s, color .25s; }
+  #webh .wk button:hover { color:#fff; transform:scale(1.05); background:rgba(255,255,255,.17); }
+  #webh .wk .x { width:30px; height:30px; padding:0; }
+  #webh .wb { position:relative; flex:1; min-height:0; border-radius:19px; overflow:hidden; background:rgba(4,6,14,.6);
+    box-shadow:0 0 0 1px rgba(255,255,255,.1), 0 8px 26px rgba(0,0,0,.3); }
   #webh .wb::before { content:''; position:absolute; left:0; right:0; top:0; height:2px; z-index:2; pointer-events:none; opacity:0;
     background:linear-gradient(90deg, transparent, rgb(var(--hl)), transparent); background-size:40% 100%; background-repeat:no-repeat; }
   #webh.laedt .wb::before { opacity:1; animation:webLaden 1.1s linear infinite; }
   @keyframes webLaden { 0% { background-position:-40% 0; } 100% { background-position:140% 0; } }
   #webh iframe { display:block; width:100%; height:100%; border:0; background:#fff; }
-  #webh .wf { position:absolute; inset:0; display:none; flex-direction:column; align-items:center; justify-content:center; gap:14px; text-align:center;
-    font-size:13px; letter-spacing:.06em; color:rgba(242,249,255,.75); }
+  #webh .wf { position:absolute; inset:0; display:none; flex-direction:column; align-items:center; justify-content:center; gap:16px; text-align:center;
+    font-size:14px; color:rgba(255,255,255,.72); }
   #webh.fenster iframe { display:none; } #webh.fenster .wf { display:flex; }
-  #webh .wf button { padding:9px 18px; border-radius:18px; border:1px solid rgba(var(--hl),.6); background:rgba(var(--hl),.2); color:inherit; font:inherit;
-    font-weight:700; letter-spacing:.1em; cursor:pointer; box-shadow:0 0 18px rgba(var(--hl),.3); }
+  #webh .wf button { padding:10px 20px; border-radius:20px; border:0; background:rgba(255,255,255,.1); color:#fff; font:inherit; font-weight:600; cursor:pointer;
+    box-shadow:inset 0 1px 0 rgba(255,255,255,.3), inset 0 0 0 1px rgba(255,255,255,.12), 0 8px 24px rgba(0,0,0,.3); transition:background .25s, transform .35s var(--spring); }
+  #webh .wf button:hover { background:rgba(255,255,255,.18); transform:scale(1.04); }
   /* „Echte Farben“: Bild-/Web-Hologramm ohne Effekte (keine Scanlines, kein Flackern, keine Tönung) – Inhalt wie auf Handy/PC */
   #bildh .ef, #webh .ef { display:flex; align-items:center; gap:6px; white-space:nowrap; }
-  #bildh .ef { position:absolute; top:8px; right:42px; z-index:2; height:26px; padding:0 10px; border:0; border-radius:13px; cursor:pointer;
-    background:rgba(10,14,30,.5); color:inherit; font:inherit; font-size:10px; font-weight:700; letter-spacing:.1em; text-transform:uppercase; opacity:.75;
-    box-shadow:inset 0 0 0 1px rgba(var(--hl),.45); transition:opacity .2s, transform .3s var(--spring), background .2s; }
-  #bildh .ef:hover { opacity:1; transform:scale(1.06); background:rgba(var(--hl),.3); }
+  #bildh .ef { position:absolute; top:18px; right:50px; z-index:4; height:26px; padding:0 11px; border:0; border-radius:13px; cursor:pointer;
+    background:rgba(12,14,22,.5); color:rgba(255,255,255,.85); font:inherit; font-size:11.5px; font-weight:600;
+    box-shadow:inset 0 0 0 1px rgba(255,255,255,.12); backdrop-filter:blur(10px); -webkit-backdrop-filter:blur(10px); transition:background .25s, color .25s, transform .35s var(--spring); }
+  #bildh .ef:hover { color:#fff; transform:scale(1.05); background:rgba(255,255,255,.18); }
   #bildh .ef b, #webh .ef b { width:7px; height:7px; border-radius:50%; flex:none; box-shadow:inset 0 0 0 1.5px currentColor; transition:background .2s; }
   #bildh .ef.an b, #webh .ef.an b { background:currentColor; }
   #bildh .ef.an, #webh .ef.an { opacity:1; }
@@ -562,20 +590,16 @@
   #webh.rein { box-shadow:0 0 0 100vmax rgba(2,4,12,.5), 0 24px 70px rgba(0,0,0,.6); }
   #bildh.rein.on, #webh.rein.on { animation:reinAuf .3s ease backwards; }
   #bildh.rein.zu, #webh.rein.zu { animation:reinAb .3s ease forwards; }
-  #bildh.rein::before, #bildh.rein::after, #webh.rein::after, #webh.rein .wk::before { display:none; }
+  #bildh.rein::before, #bildh.rein::after, #webh.rein::before, #webh.rein::after { display:none; }
   #bildh.rein img { filter:none; }
   #bildh.rein .tt, #webh.rein .wk { text-shadow:none; }
   #webh.rein .wb { box-shadow:0 0 0 1px rgba(255,255,255,.12); background:#fff; }
-  #holo.glitch { animation:holoGlitch .45s steps(2) 1; }
-  #holo .ico { font-size:38px; line-height:1.1; filter:grayscale(1) brightness(1.8) drop-shadow(0 0 10px rgb(var(--hl))); }
-  #holo .big { font-size:46px; font-weight:250; line-height:1.05; letter-spacing:-.01em; }
-  #holo .big.lang { font-size:22px; font-weight:600; letter-spacing:.01em; }
-  #holo .sub { margin-top:6px; font-size:12px; letter-spacing:.22em; text-transform:uppercase; opacity:.85; }
-  @keyframes holoScan { to { background-position:0 30px; } }
-  @keyframes holoSweep { 0% { top:-30%; } 100% { top:110%; } }
-  @keyframes holoFlick { 0%,100% { opacity:1; } 31% { opacity:.82; } 32% { opacity:.55; } 33% { opacity:.95; } 71% { opacity:.88; } 72% { opacity:.7; } 73% { opacity:1; } }
-  @keyframes holoGlitch { 0% { clip-path:inset(0 0 60% 0); transform:translate(-48%,-100%) perspective(700px) rotateX(12deg); }
-    50% { clip-path:inset(40% 0 0 0); transform:translate(-52%,-100%) perspective(700px) rotateX(12deg); } 100% { clip-path:none; } }
+  #holo .ico { font-size:30px; line-height:1.15; margin-bottom:2px; }
+  #holo .ico:empty { display:none; }
+  #holo .big { font-size:42px; font-weight:250; line-height:1.08; letter-spacing:-.02em; }
+  #holo .big.lang { font-size:21px; font-weight:600; letter-spacing:-.005em; line-height:1.25; }
+  #holo .sub { margin-top:7px; font-size:11.5px; font-weight:600; letter-spacing:.14em; text-transform:uppercase; color:rgba(255,255,255,.55); }
+  #holo .sub:empty { display:none; }
   /* gleicher Innenabstand für alle Karten – egal in welcher Spalte sie liegen */
   .col > [data-w] { padding:16px 18px; flex:none; }
   /* Drag & Drop der Widgets */
@@ -2085,12 +2109,14 @@ function blockHtml(b, kid, i) {
     case 'titel': return `<div class="b-titel">${t(b.text)}</div>`;
     case 'text': return `<div class="b-text">${t(b.text).replace(/\n/g, '<br>')}</div>`;
     case 'liste': return `<ul class="b-liste">${(b.punkte || []).slice(0, 50).map(p => `<li>${t(p)}</li>`).join('')}</ul>`;
-    case 'zahl': return `<div class="b-zahl"><b>${t(b.wert)}${b.einheit ? `<small style="font-size:16px"> ${t(b.einheit)}</small>` : ''}</b><i>${t(b.label)}</i></div>`;
+    case 'zahl': return `<div class="b-zahl"><b>${t(b.wert)}${b.einheit ? `<small> ${t(b.einheit)}</small>` : ''}</b>${b.label ? `<i>${t(b.label)}</i>` : ''}</div>`;
     case 'fortschritt': { const p = Math.max(0, Math.min(100, +b.prozent || 0));
-      return `<div class="b-fort"><div style="display:flex;justify-content:space-between"><span>${t(b.label)}</span><span>${p} %</span></div><div class="bar"><i style="width:${p}%"></i></div></div>`; }
+      return `<div class="b-fort"><div class="fk"><span>${t(b.label)}</span><b>${p} %</b></div><div class="bar"><i style="width:${p}%"></i></div></div>`; }
     case 'bild': return `<div class="b-bild"><img data-k="${t(kid)}" data-i="${i}" alt=""></div>`;
     case 'web': return /^https?:\/\//i.test(b.url || '') ? `<iframe class="b-web" src="${t(b.url)}" sandbox="allow-scripts allow-same-origin allow-forms allow-popups"></iframe>` : '';
-    case 'tabelle': return `<table>${(b.kopf || []).length ? `<tr>${b.kopf.map(k => `<th>${t(k)}</th>`).join('')}</tr>` : ''}${(b.zeilen || []).slice(0, 80).map(z => `<tr>${(z || []).map(c => `<td>${t(c)}</td>`).join('')}</tr>`).join('')}</table>`;
+    case 'tabelle': { const zl = (b.zeilen || []).slice(0, 80), zahl = c => /^[\s+−\-–]*[\d.,]+\s*[%€$°a-zA-Z/]{0,4}$/.test(String(c ?? '').trim());
+      const n = j => zl.length && zl.every(z => !String((z || [])[j] ?? '').trim() || zahl((z || [])[j])) ? ' class="n"' : '';   // Zahlenspalten rechtsbündig
+      return `<table>${(b.kopf || []).length ? `<tr>${b.kopf.map((k, j) => `<th${n(j)}>${t(k)}</th>`).join('')}</tr>` : ''}${zl.map(z => `<tr>${(z || []).map((c, j) => `<td${n(j)}>${t(c)}</td>`).join('')}</tr>`).join('')}</table>`; }
     case 'trenner': return '<hr>';
   }
   return '';
@@ -2361,7 +2387,7 @@ function holoShow(d, ms) {
   h.querySelector('.ico').textContent = d.ico || '';
   const big = h.querySelector('.big'); big.textContent = d.titel || ''; big.classList.toggle('lang', (d.titel || '').length > 7);
   h.querySelector('.sub').textContent = d.sub || '';
-  if (!h.classList.contains('on')) { h.classList.add('on', 'glitch'); setTimeout(() => h.classList.remove('glitch'), 460); SFX.holo(); }
+  if (!h.classList.contains('on')) { h.classList.add('on'); SFX.holo(); }
   holoUntil = ms ? performance.now() + ms : Infinity;
   holoBox = null;
 }
