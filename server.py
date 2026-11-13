@@ -68,7 +68,7 @@ DEFAULT_CFG = {
 }
 # Damit ORB immer dein Claude-Code-Login (Max-Abo) nutzt und nie einen API-Schlüssel
 CLAUDE_ENV_DROP = ("ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "ANTHROPIC_BASE_URL")
-VERSION = "58"
+VERSION = "59"
 ORB_UI = ("Deine Oberfläche (die Larsen gerade sieht): in der Mitte du als flüssige leuchtende Kugel mit Tropfen, "
           "Orbit-Ringen und Sternenhimmel; links eine Uhr und darunter der Gesprächsverlauf mit Eingabefeld; rechts "
           "Karten für System (CPU, RAM, Akku), Wetter mit Stundenvorschau, Aktivität (was du gerade tust) und Vorschläge; "
@@ -1504,6 +1504,57 @@ def dev_fortschritt(t):
         t["phase"] = str(d.get("schritt") or "")[:40]
     except (OSError, ValueError, TypeError, AttributeError):
         pass
+    t["fertig_ca"] = dev_schaetzung(t)
+
+
+_DAUER = {}
+
+
+def dev_durchschnitt(art):
+    """Durchschnittliche Dauer früherer Entwickler-Aufträge (Sekunden) aus dem Protokoll, None ohne Daten."""
+    f = os.path.join(DEV_DIR, art, "protokoll.txt")
+    try:
+        mt = os.path.getmtime(f)
+    except OSError:
+        return None
+    if _DAUER.get(art, (0, None))[0] == mt:
+        return _DAUER[art][1]
+    import re
+    try:
+        with open(f, encoding="utf-8-sig", errors="ignore") as fh:
+            txt = fh.read()
+    except OSError:
+        return None
+    werte = [int(x) for x in re.findall(r"^Dauer: (\d+) s", txt, re.M)]
+    if len(werte) < 3:   # ältere Protokolle ohne Dauer: Abstand zwischen aufeinanderfolgenden Aufträgen (plausible nur)
+        st = []
+        for m in re.findall(r"^=== (\d\d\.\d\d\.\d{4} \d\d:\d\d) ", txt, re.M):
+            try:
+                st.append(time.mktime(time.strptime(m, "%d.%m.%Y %H:%M")))
+            except ValueError:
+                pass
+        werte += [b - a for a, b in zip(st, st[1:]) if 120 <= b - a <= 2700]
+    werte = werte[-12:]
+    ds = sum(werte) / len(werte) if werte else None
+    _DAUER[art] = (mt, ds)
+    return ds
+
+
+def dev_schaetzung(t):
+    """Voraussichtliche Fertig-Zeit (Epoche): bisheriges Tempo je Prozent, gemischt mit dem Durchschnitt früherer Aufträge."""
+    if t["status"] != "laeuft":
+        return 0
+    seit, pz = time.time() - t["start"], t.get("prozent") or 0
+    ds = dev_durchschnitt(str(t["id"])[4:])
+    if pz >= 10 and seit >= 45:
+        tempo = seit * 100 / pz
+        w = pz / 100   # je weiter, desto mehr zählt das eigene Tempo
+        gesamt = tempo * w + ds * (1 - w) if ds else tempo
+    elif ds:
+        gesamt = ds
+    else:
+        return 0
+    return t["start"] + max(gesamt, seit + 30)
 
 
 def tasks_list():

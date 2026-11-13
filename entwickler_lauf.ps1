@@ -77,6 +77,7 @@ $claude = (Get-Command claude -ErrorAction SilentlyContinue).Source
 if (-not $claude) { $claude = "$env:USERPROFILE\.local\bin\claude.exe" }
 Set-Location $ordner
 "=== $(Get-Date -Format 'dd.MM.yyyy HH:mm') Auftrag: $auftrag" | Add-Content $log -Encoding UTF8
+$t0 = Get-Date
 try {
     $res = $null
     $auftrag | & $claude -p --output-format stream-json --verbose --model claude-opus-5-5 --permission-mode auto --append-system-prompt $regeln 2>>$log | ForEach-Object {
@@ -94,6 +95,7 @@ try {
     }
     $satz = ("$($res.result)" -split "`n" | Where-Object { $_.Trim() } | Select-Object -Last 1).Trim()
     "Ergebnis: $($res.result)" | Add-Content $log -Encoding UTF8
+    if ($res -and -not $res.is_error) { "Dauer: $([int]((Get-Date) - $t0).TotalSeconds) s" | Add-Content $log -Encoding UTF8 }   # für ORBs Restzeit-Schätzung
     if (-not $res -or $res.is_error -or -not $satz) { Melde 'fehler' $null 'Nicht fertig geworden – siehe Protokoll.'; Ansage 'Der Entwickler ist mit deinem Auftrag nicht fertig geworden. Details stehen im Entwickler-Protokoll.' }
     else { Melde 'fertig' $null $satz; Ansage ("Entwickler fertig: " + $satz) }
 } catch {

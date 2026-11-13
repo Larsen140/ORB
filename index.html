@@ -1808,12 +1808,16 @@ function renderTasks(list) {
     el.querySelector('.st').textContent = t.status === 'laeuft' ? (t.schritt || 'Arbeitet …') : (t.ergebnis || '');
     // Entwickler: Auftrag, Startzeit und Fortschritt in Prozent (aus seiner Statusdatei)
     const dev = t.art === 'entwickler', pz = typeof t.prozent === 'number' ? t.prozent : null;
-    const ab = new Date((t.jetzt - t.laeuft_seit) * 1000).toLocaleTimeString('de-DE', { hour:'2-digit', minute:'2-digit' });
+    const uhr = s => new Date(s * 1000).toLocaleTimeString('de-DE', { hour:'2-digit', minute:'2-digit' });
+    const ab = uhr(t.jetzt - t.laeuft_seit);
+    // geschätzte Fertig-Uhrzeit (Server: Tempo + Durchschnitt früherer Aufträge), am Ende die echte
+    const eta = t.status === 'laeuft' && t.fertig_ca ? ' · fertig ca. ' + uhr(t.fertig_ca) + ' (noch ~' + Math.max(1, Math.round((t.fertig_ca - t.jetzt) / 60)) + ' min)'
+              : t.status === 'fertig' && t.ende ? ' · Fertig um ' + uhr(t.ende) : '';
     el.querySelector('.au').textContent = dev && t.auftrag ? t.auftrag : '';
-    el.querySelector('.au').dataset.ab = dev ? 'Start ' + ab : '';
+    el.querySelector('.au').dataset.ab = dev ? 'Start ' + ab + eta : '';
     el.classList.toggle('pro', dev && pz !== null);
     el.querySelector('.bar i').style.width = dev && pz !== null ? pz + '%' : '';
-    el.querySelector('.pz').textContent = dev && pz !== null ? (t.status === 'fertig' ? 'Fertig' : pz + ' %' + (t.phase ? ' · ' + t.phase : '')) : '';
+    el.querySelector('.pz').textContent = dev && pz !== null ? (t.status === 'fertig' ? (t.ende ? 'Fertig um ' + uhr(t.ende) : 'Fertig') : pz + ' %' + (t.phase ? ' · ' + t.phase : '')) : '';
     // fertige Hologramme nach 45 s ausblenden
     if (t.status !== 'laeuft' && t.jetzt - t.ende > 45) { el._weg = true; el.classList.add('weg'); }
   }
