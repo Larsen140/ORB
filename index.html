@@ -314,13 +314,6 @@
   #holo .ico { font-size:38px; line-height:1.1; filter:grayscale(1) brightness(1.8) drop-shadow(0 0 10px rgb(var(--hl))); }
   #holo .big { font-size:46px; font-weight:250; line-height:1.05; letter-spacing:-.01em; }
   #holo .big.lang { font-size:22px; font-weight:600; letter-spacing:.01em; }
-  #holo.table { max-width:460px; min-width:340px; }
-  #holo .rows { margin-top:10px; font-size:15px; text-align:left; }
-  #holo .hrow { display:grid; grid-template-columns:1fr auto 70px; gap:14px; padding:5px 2px; border-top:1px solid rgba(var(--hl),.25);
-    animation:cardIn .6s var(--spring) both; text-shadow:0 0 8px rgba(var(--hl),.8); }
-  #holo .hrow b { font-weight:600; font-variant-numeric:tabular-nums; text-align:right; }
-  #holo .hrow i { font-style:normal; font-size:12px; text-align:right; opacity:.9; }
-  #holo .hrow i.up { color:#5dffb0; } #holo .hrow i.dn { color:#ff6b8a; }
   #holo .sub { margin-top:6px; font-size:12px; letter-spacing:.22em; text-transform:uppercase; opacity:.85; }
   @keyframes holoScan { to { background-position:0 30px; } }
   @keyframes holoSweep { 0% { top:-30%; } 100% { top:110%; } }
@@ -408,7 +401,7 @@
 <div id="island" class="glass rim"><div id="wave"><i></i><i></i><i></i><i></i><i></i></div><span id="status">Bereit</span></div>
 <div id="hint" class="glass"></div>
 <div id="caption"></div>
-<div id="holo"><div class="ico"></div><div class="big"></div><div class="sub"></div><div class="rows"></div></div>
+<div id="holo"><div class="ico"></div><div class="big"></div><div class="sub"></div></div>
 <div id="dock" class="glass rim">
   <button class="ic" id="kb" title="Tippen (T)"><svg viewBox="0 0 24 24"><path d="M20 5H4a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2zm-9 3h2v2h-2V8zm0 3h2v2h-2v-2zM8 8h2v2H8V8zm0 3h2v2H8v-2zM5 8h2v2H5V8zm0 3h2v2H5v-2zm11 5H8v-2h8v2zm0-3h-2v-2h2v2zm0-3h-2V8h2v2zm3 3h-2v-2h2v2zm0-3h-2V8h2v2z"/></svg></button>
   <button class="ic" id="mic" title="Halten zum Sprechen (Leertaste) · 2× klatschen · „Jarvis“"><svg viewBox="0 0 24 24"><path d="M12 15a3 3 0 0 0 3-3V6a3 3 0 0 0-6 0v6a3 3 0 0 0 3 3zm5-3a5 5 0 0 1-10 0H5a7 7 0 0 0 6 6.9V22h2v-3.1a7 7 0 0 0 6-6.9z"/></svg></button>
@@ -807,7 +800,7 @@ function onParts(st, first) {
     sched = []; endTime = 0;
     if (first) { partsQueued = nextIdx = st.parts.length; return; }
     if (st.parts.length) { SFX.msgIn(); ripple(1.1); burst(30); setHum(false); }
-    if (st.holo && st.holo.titel) holoShow({ ico:st.holo.typ === 'wetter' ? WX(st.holo.code) : st.holo.typ === 'geld' ? '💱' : '🚀', titel:st.holo.titel, sub:st.holo.sub, rows:st.holo.rows }, st.holo.rows ? 20000 : 7000);
+    if (st.holo && st.holo.titel) holoShow({ ico:st.holo.typ === 'wetter' ? WX(st.holo.code) : '🚀', titel:st.holo.titel, sub:st.holo.sub }, 7000);
   }
   if (st.say) { curSay = st.say; orbMsg(st.aid, st.say, st.final); caption(st.say); }
   while (partsQueued < st.parts.length) { fetchPart(st.aid, partsQueued, st.parts[partsQueued]); partsQueued++; }
@@ -1229,9 +1222,6 @@ function holoShow(d, ms) {
   h.querySelector('.ico').textContent = d.ico || '';
   const big = h.querySelector('.big'); big.textContent = d.titel || ''; big.classList.toggle('lang', (d.titel || '').length > 7);
   h.querySelector('.sub').textContent = d.sub || '';
-  h.querySelector('.rows').innerHTML = (d.rows || []).map((r, i) => `<div class="hrow" style="animation-delay:${.15 + i * .07}s"><span>${esc(r.name)}</span><b>${esc(r.wert)}</b>`
-    + (r.chg == null ? '<i></i>' : `<i class="${r.chg >= 0 ? 'up' : 'dn'}">${r.chg >= 0 ? '▲' : '▼'} ${Math.abs(r.chg).toFixed(1).replace('.', ',')}%</i>`) + '</div>').join('');
-  h.classList.toggle('table', !!(d.rows && d.rows.length));
   if (!h.classList.contains('on')) { h.classList.add('on', 'glitch'); setTimeout(() => h.classList.remove('glitch'), 460); SFX.holo(); }
   holoUntil = ms ? performance.now() + ms : Infinity;
   holoBox = null;
