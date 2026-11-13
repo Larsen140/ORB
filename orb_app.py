@@ -201,7 +201,7 @@ def clap_loop():
         return
     sr, block = 16000, 400  # 25 ms
     while True:
-        if window_open() or not server.load_cfg().get("klatschen", True):
+        if window_open():   # Klatschen ist nie abschaltbar
             time.sleep(1)
             continue
         floor, cand, last, claps, cfg_t, thr_base = .0003, None, 0.0, [], 0.0, .0024
@@ -210,9 +210,6 @@ def clap_loop():
             with sd.RawInputStream(samplerate=sr, channels=1, dtype="int16", blocksize=block) as st:
                 while not window_open():
                     raw, _ = st.read(block)
-                    if server.in_call():
-                        cand, claps = None, []
-                        continue   # während eines Meetings nicht auf Klatschen reagieren
                     x = array.array("h", bytes(raw))
                     now = time.time()
                     if now - cfg_t > 3:

@@ -604,8 +604,7 @@
 <aside id="set" class="glass">
   <div class="sh"><span>Einstellungen</span><button class="done" id="setx">Fertig</button></div>
   <div class="grp"><h4>Wecken &amp; Gespräch</h4><div class="card">
-    <div class="row">Zweimal klatschen weckt ORB<input type="checkbox" class="sw" id="s_klatsch"></div>
-    <div class="row">Schnipsen schickt ORB in den Hintergrund<input type="checkbox" class="sw" id="s_schnipsen"></div>
+    <div class="row">2× klatschen weckt ORB · Schnipsen schickt ihn weg<span class="v">immer an</span></div>
     <div class="row">„Jarvis“ rufen – ORB hört jederzeit zu<input type="checkbox" class="sw" id="s_jarvis"></div>
     <div class="row col"><div class="lbl">Klatsch-Empfindlichkeit<span class="v" id="v_empf"></span></div><input type="range" id="s_empf" min="1" max="10" step="1"></div>
     <div class="row col"><div class="lbl">Schnips-Empfindlichkeit<span class="v" id="v_sempf"></span></div><input type="range" id="s_sempf" min="1" max="10" step="1"></div>
@@ -726,6 +725,7 @@ async function loadCfg() {
   try {
     const d = await (await fetch('/config')).json();
     Object.assign(cfg, d.config);
+    cfg.klatschen = cfg.schnipsen = true;   // Klatschen & Schnipsen sind nie abschaltbar
     $('s_stimme').innerHTML = d.stimmen.map(([v, n]) => `<option value="${v}">${n}</option>`).join('');
   } catch (e) {}
   applyCfg();
@@ -1114,7 +1114,7 @@ function toBack(ms, grund = 'unbekannt') {
 }
 function clapTick() {
   const testet = performance.now() < snapTest;
-  if ((!cfg.klatschen && !cfg.schnipsen && !testet) || S.call) return;   // im Meeting nicht reagieren
+  // Klatschen & Schnipsen laufen IMMER – auch bei Stopp, im Schlaf, im Meeting, bei Musik und während ORB spricht
   let pk = 0, s = 0;
   for (const v of clapBuf) { const a = Math.abs(v); if (a > pk) pk = a; s += v * v; }
   const rms = Math.sqrt(s / clapBuf.length), now = performance.now();
@@ -1126,13 +1126,12 @@ function clapTick() {
   const sEmpf = +cfg.schnips_empf || 6;
   if (snapT && now - snapT > 150 && rms > snapRms * (.2 + .05 * sEmpf) && ++snapLaut > 4) { snapT = 0; snapInfo('Knall gehört – danach war es nicht still (Hintergrundgeräusch)'); }
   const ownSpeak = speakingNow() || now < lastSfx + 500;   // eigene Stimme/Sounds
-  const own = ownSpeak || listening || convoRec;
   const mouse = now - lastMouse < 400;   // Klickgeräusch der Maus ist kein Klatschen
   if (cand) {
     if (now - cand.t >= 75) {
       const knall = rms < cand.rms * (cand.snap ? .5 : .35);
       if (knall && cand.snap && !cand.ruhig && testet) snapInfo('Knall gehört – aber zu viel Hintergrundgeräusch');
-      if (knall && cand.snap && cand.ruhig && !ownSpeak && !mouse && (testet || (cfg.schnipsen && !S.sleep && !S.busy))) {
+      if (knall && cand.snap && cand.ruhig && !mouse && (testet || !verborgen || !S.sleep)) {   // auch im Schlaf (Fenster sichtbar), beim Arbeiten und Sprechen
         // Schnipser: kurz warten – bleibt es still und kommt kein zweiter Knall, verschwindet ORB
         const t = cand.t; snapT = t; snapRms = cand.rms; snapLaut = 0; claps = [];
         setTimeout(() => { if (snapT !== t) return;
@@ -1142,13 +1141,13 @@ function clapTick() {
           fetch('/mouse').then(r => r.json()).then(j => { if (j.eingabe > 1 && j.ago > 1) onSnap(); else snapInfo('Knall gehört – aber Maus/Tastatur war gerade in Benutzung'); }).catch(() => {}); }, 900);
       }
       else if (knall && !cand.snap && testet) snapInfo('Knall gehört – klang eher dumpf wie Klatschen');
-      else if (knall && !cand.snap && !own && !mouse && cfg.klatschen) { snapT = 0; clapPk.push([cand.t, cand.pk]); checkSysMouse(cand.t); }
+      else if (knall && !cand.snap && !mouse) { snapT = 0; clapPk.push([cand.t, cand.pk]); checkSysMouse(cand.t); }
       else if (!knall) claps = [];   // Dauergeräusch statt Knall
       cand = null;
     }
   }
-  else if (!ownSpeak && !mouse && now - lastClap > 140) {
-    const mf = musikAn() ? 2.5 : 1;   // läuft Musik: nur deutliche Knalle zählen
+  else if (!mouse && now - lastClap > 140) {
+    const mf = (musikAn() ? 2.5 : 1) * (ownSpeak ? 2 : 1);   // läuft Musik oder spricht ORB: nur deutliche Knalle zählen
     const base = .0006 * (11 - (+cfg.empfindlichkeit || 6)) * mf, thr = Math.max(base, floorRms * 40);
     if (pk > thr && rms > Math.max(floorRms * 10, base * .2)) {
       // Klatschen ist breitbandig, ein Mausklick fast nur hohes Klicken: Anteil hoher Frequenzen prüfen
@@ -1182,6 +1181,7 @@ function registerClap(t) {
   }
 }
 function onDoubleClap() {
+  if (speakingNow()) stopAudio();   // Klatschen unterbricht ORB und er hört zu
   SFX.clap(); setStumm(false);
   verborgen = false; fetch('/show', { method:'POST' }).catch(() => {});   // Klatschen holt ORB immer in den Vordergrund
   if (S.sleep) return wake();
@@ -2434,7 +2434,7 @@ document.querySelectorAll('.swc').forEach(el => el.onclick = () => { saveCfg({ f
 const segs = { seg_eff:'tempo_claude', seg_len:'laenge', seg_rechte:'rechte', seg_fx:'effekte' };
 for (const [id, key] of Object.entries(segs)) $(id).querySelectorAll('button').forEach(b => b.onclick = () => { saveCfg({ [key]:b.dataset.v }); SFX.click(); });
 function fillRange(el) { el.style.setProperty('--p', (el.value - el.min) / (el.max - el.min) * 100 + '%'); }
-const CHK = { s_klatsch:'klatschen', s_schnipsen:'schnipsen', s_dauer:'dauerzuhoeren', s_unterbrechen:'unterbrechen', s_nurjarvis:'nur_jarvis', s_musik:'musik_schutz', s_duck:'ducking', s_gruss:'begruessung', s_voll:'vollbild', s_auto:'autostart', s_schliessen:'schlaf_schliessen', s_screen:'bildschirm', s_unter:'untertitel', s_sfx:'sfx', s_amb:'ambient' };
+const CHK = { s_dauer:'dauerzuhoeren', s_unterbrechen:'unterbrechen', s_nurjarvis:'nur_jarvis', s_musik:'musik_schutz', s_duck:'ducking', s_gruss:'begruessung', s_voll:'vollbild', s_auto:'autostart', s_schliessen:'schlaf_schliessen', s_screen:'bildschirm', s_unter:'untertitel', s_sfx:'sfx', s_amb:'ambient' };
 function syncSettingsUI() {
   const set = (id, v) => { const el = $(id); if (el && document.activeElement !== el) el.value = v; };
   set('s_stimme', cfg.stimme); set('s_tempo', parseInt(cfg.tempo) || 0); set('s_hoehe', parseInt(cfg.hoehe) || 0);
