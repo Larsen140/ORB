@@ -71,19 +71,7 @@ try {
             Invoke-WebRequest http://127.0.0.1:8766/selfupdate -Method Post -Body (@{ sha = $sha } | ConvertTo-Json) -ContentType 'application/json' -UseBasicParsing -TimeoutSec 5 | Out-Null
         }
     }
-    $ok = $false
-    for ($i = 0; $i -lt 60; $i++) { Start-Sleep 1; if ((LaufendeVer) -eq "$v") { $ok = $true; break } }
-    if ($ok) {
-        Log "Version $v läuft."
-        Ansage "Update fertig, Version $v läuft."
-    } else {
-        Log "FEHLER – Version $v meldet sich nicht. Setze auf die letzte Sicherung zurück …"
-        Get-Process ORB -ErrorAction SilentlyContinue | ForEach-Object { try { Stop-Process -Id $_.Id -Force } catch {} }
-        Start-Sleep 1
-        Start-Process $inst -ArgumentList '--neustart','--zurueck'
-        Start-Sleep 10
-        Ansage 'Das Update hat nicht geklappt. Ich habe die letzte funktionierende Version wiederhergestellt.'
-        Log 'Zurückgesetzt. Der fehlerhafte Stand liegt noch auf GitHub – bitte korrigieren und erneut update.ps1 ausführen.'
-        exit 1
-    }
+    # Nicht warten: ORB holt sich den Stand selbst (spätestens nach einer Minute), sichert vorher
+    # und setzt sich bei einem Fehler beim Start automatisch auf die letzte Sicherung zurück.
+    Log "Version $v ist auf GitHub. ORB spielt sie gleich selbst ein und sagt Bescheid."
 } catch { Log ("FEHLER: " + $_.Exception.Message); exit 1 }
