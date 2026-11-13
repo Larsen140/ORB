@@ -280,6 +280,19 @@
   #caption { font-size:23px; font-weight:500; text-shadow:0 2px 6px rgba(0,0,0,.95), 0 0 24px rgba(0,0,0,.8); }
   #caption.me { color:rgba(255,255,255,.75); }
   #txt { font-size:15.5px; }
+  /* FIX: Nachrichten nie zusammenquetschen (sonst werden Zeilen und Uhrzeit abgeschnitten) */
+  #msgs > * { flex-shrink:0; }
+  .msg { overflow:visible; }
+  .msg::after { display:none; }
+  .msg.shine { overflow:hidden; } .msg.shine::after { display:block; }
+  :root { --L:400px; }
+  /* Speicher sparen: Karten nur beim Darüberfahren als eigene 3D-Ebene, Einstellungen ohne Unschärfe solange zu */
+  .tilt { transform:none; transition:transform .6s var(--ease); }
+  .tilt:hover { transform:perspective(900px) rotateX(var(--rx,0deg)) rotateY(var(--ry,0deg)); }
+  #set:not(.on) { backdrop-filter:none; -webkit-backdrop-filter:none; visibility:hidden; transition:transform .75s var(--spring), opacity .35s, filter .4s, visibility 0s .75s; }
+  #set.on { visibility:visible; transition:transform .75s var(--spring), opacity .35s, filter .4s; }
+  #g_cpu, #g_ram, #g_bat { filter:none; }
+  body.sleeping .glass { backdrop-filter:none; -webkit-backdrop-filter:none; }
   /* gleicher Innenabstand für alle Karten – egal in welcher Spalte sie liegen */
   .col > [data-w] { padding:16px 18px; flex:none; }
   /* Drag & Drop der Widgets */
@@ -861,6 +874,18 @@ async function ask(text) {
   text = text.trim(); if (!text) return;
   lastAct = performance.now();
   if (S.sleep) { S.sleep = false; document.body.classList.remove('sleeping'); }
+  const t0 = text.replace(/[.!?,]+$/g, '').trim();
+  // „Schließ dich komplett“ → ORB ganz beenden (auch der Hintergrund-Lauscher ist dann aus)
+  if (/^((orb|jarvis),?\s*)?(schlie(ß|ss)e? dich (komplett|ganz|vollständig)|beende dich( komplett| ganz)?|(komplett|ganz) (beenden|schlie(ß|ss)en)|mach dich (komplett|ganz) aus)$/i.test(t0)) {
+    addMsg('me', text); SFX.sleep(); hint('ORB wird komplett beendet', 2000);
+    setTimeout(() => { fetch('/quit', { method:'POST' }).catch(() => {}); setTimeout(() => window.close(), 300); }, 900);
+    return;
+  }
+  // „Schließ dich“ → nur das Fenster zu, ORB wartet im Hintergrund weiter auf Klatschen
+  if (/^((orb|jarvis),?\s*)?(schlie(ß|ss)e? dich|geh in den hintergrund|versteck dich|minimier(e)? dich|fenster zu)$/i.test(t0)) {
+    addMsg('me', text); goSleep(true); SFX.sleep(); setTimeout(() => fetch('/hide', { method:'POST' }).catch(() => {}), 700);
+    return;
+  }
   if (/^((orb|jarvis),?\s*)?(schlaf|geh schlafen|gute nacht|ruhemodus|schlafmodus)\b/i.test(text)) { addMsg('me', text); return goSleep(); }
   if (STOP_RE.test(text.replace(/[.!?,]+$/g, ''))) { stopAudio(); return convo ? stopConvo() : hint('Okay'); }
   liveMsg(null); addMsg('me', text); stopAudio(); SFX.send(); ripple(1.1); caption('');
@@ -999,7 +1024,9 @@ function renderHistory() {
 function addMsg(who, text) {
   const m = $('msgs'); m.querySelector('.empty')?.remove();
   history.push({ who, text, t:Date.now() }); saveHistory();
-  const el = msgEl(who, text); m.insertBefore(el, typingEl && typingEl.parentNode ? typingEl : null); scrollChat(); return el;
+  const el = msgEl(who, text); m.insertBefore(el, typingEl && typingEl.parentNode ? typingEl : null); scrollChat();
+  el.classList.add('shine'); setTimeout(() => el.classList.remove('shine'), 1800);   // Glanzwelle nur kurz beim Erscheinen
+  return el;
 }
 function liveMsg(text) {
   if (!text) { if (liveEl) { liveEl.remove(); liveEl = null; } if (!speakingNow()) caption(''); return; }
