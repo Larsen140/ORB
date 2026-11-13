@@ -52,7 +52,12 @@ try {
 
     if (-not (LaufendeVer)) {
         Log 'ORB läuft nicht – starte ihn mit dem neuen Stand.'
-        if (Test-Path $inst) { Start-Process $inst -ArgumentList '--hintergrund','--update' }
+        if (($Exe -or -not (Test-Path $inst)) -and (Test-Path "$work\dist\ORB.exe")) {
+            New-Item -ItemType Directory -Force (Split-Path $inst) | Out-Null
+            Copy-Item "$work\dist\ORB.exe" $inst -Force
+        }
+        if (-not (Test-Path $inst)) { throw "ORB ist nicht installiert ($inst fehlt) – update.ps1 -Exe ausführen" }
+        Start-Process $inst -ArgumentList '--hintergrund','--update'
     } else {
         Log 'Sage ORB, dass er sich aktualisieren soll …'
         if ($Exe -and (Test-Path "$work\dist\ORB.exe")) {

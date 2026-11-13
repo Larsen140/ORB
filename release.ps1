@@ -1,20 +1,16 @@
-﻿# Stellt die ORB.exe als Download auf GitHub bereit (Release „installer“, immer dieselbe Datei wird ersetzt).
-# Nutzt die GitHub-Anmeldung, die Git bereits gespeichert hat.
+﻿# Stellt die ORB.exe als Download auf GitHub bereit (Release „installer“, die Datei wird jedes Mal ersetzt).
+# Braucht eine einmalige Anmeldung:  gh auth login
 param([string]$Datei)
-$ErrorActionPreference = 'Stop'
 $repo = 'Larsen140/ORB'
-$git = 'C:\Program Files\Git\cmd\git.exe'
-$cred = "protocol=https`nhost=github.com`n`n" | & $git credential fill 2>$null
-$token = ($cred | Where-Object { $_ -like 'password=*' }) -replace '^password=', ''
-if (-not $token) { Write-Output 'Keine GitHub-Anmeldung gefunden – Release übersprungen.'; exit 1 }
-$h = @{ Authorization = "Bearer $token"; Accept = 'application/vnd.github+json'; 'User-Agent' = 'ORB' }
-try { $rel = Invoke-RestMethod "https://api.github.com/repos/$repo/releases/tags/installer" -Headers $h }
-catch {
-    $body = @{ tag_name = 'installer'; name = 'ORB – Installer'; target_commitish = 'main'
-               body = "ORB.exe herunterladen und starten. ORB installiert sich selbst und holt sich Updates automatisch von GitHub." } | ConvertTo-Json
-    $rel = Invoke-RestMethod "https://api.github.com/repos/$repo/releases" -Method Post -Headers $h -Body ([Text.Encoding]::UTF8.GetBytes($body)) -ContentType 'application/json'
+$gh = 'C:\Program Files\GitHub CLI\gh.exe'
+if (-not (Test-Path $gh)) { Write-Output 'GitHub-Werkzeug (gh) fehlt – Release übersprungen.'; exit 1 }
+& $gh auth status 2>$null | Out-Null
+if ($LASTEXITCODE -ne 0) { Write-Output 'Nicht bei GitHub angemeldet – einmal „gh auth login“ ausführen. Release übersprungen.'; exit 1 }
+& $gh release view installer -R $repo 2>$null | Out-Null
+if ($LASTEXITCODE -ne 0) {
+    & $gh release create installer -R $repo --title 'ORB – Installer' `
+        --notes 'ORB.exe herunterladen und starten. ORB installiert sich selbst und holt sich Updates automatisch von GitHub.' 2>&1 | Out-Null
 }
-foreach ($a in $rel.assets) { if ($a.name -eq 'ORB.exe') { Invoke-RestMethod $a.url -Method Delete -Headers $h | Out-Null } }
-$up = ($rel.upload_url -replace '\{.*\}$', '') + '?name=ORB.exe'
-Invoke-RestMethod $up -Method Post -Headers $h -InFile $Datei -ContentType 'application/octet-stream' | Out-Null
-Write-Output "Installer bereit: https://github.com/$repo/releases/download/installer/ORB.exe"
+& $gh release upload installer $Datei --clobber -R $repo 2>&1 | Out-Null
+if ($LASTEXITCODE -eq 0) { Write-Output "Installer bereit: https://github.com/$repo/releases/download/installer/ORB.exe" }
+else { Write-Output 'Hochladen des Installers fehlgeschlagen.'; exit 1 }
