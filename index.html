@@ -1499,8 +1499,16 @@ function interrupt() {
 }
 
 /* ---------- Aktivierungswort ---------- */
-function startWake() {
+// Hör-Protokoll (hoeren.log): wann die „Jarvis“-Erkennung startet, endet oder fehlt
+let hlogLast = '', hlogT = 0;
+function hlog(t) {
+  const n = performance.now(); if (t === hlogLast && n - hlogT < 30000) return; hlogLast = t; hlogT = n;
+  fetch('/hoerlog', { method:'POST', headers:{ 'Content-Type':'application/json' }, body:JSON.stringify({ t }), keepalive:true }).catch(() => {});
+}
+let wakeErr = 0, wakeFehler = 0;
+function startWake(warum) {
   if (S.call || !SR || cfg.steuerung !== 'wort' || wakeRec || listening || convoRec || bargeRec) return;
+  if (typeof warum === 'string') hlog('Jarvis-Erkennung fehlte im Zustand ' + (S.sleep ? 'Schlaf' : convo ? 'Gespräch' : 'Bereit') + ' → neu gestartet (' + warum + ')');
   wakeRec = new SR(); wakeRec.lang = 'de-DE'; wakeRec.continuous = true; wakeRec.interimResults = true; wakeRec.maxAlternatives = 3;
   wakeRec.onresult = e => {
     for (let i = e.resultIndex; i < e.results.length; i++) {
@@ -1512,9 +1520,23 @@ function startWake() {
       if (NAME_RE().test(t) && !speakingNow()) return nameHeard(wakeRec);   // sofort übernehmen – der Rest des Satzes läuft im selben Erkenner weiter
     }
   };
-  wakeRec.onend = () => { const was = wakeRec; wakeRec = null; if (was && !was._stopped && cfg.steuerung === 'wort') setTimeout(startWake, 300); };
-  try { wakeRec.start(); } catch (e) { wakeRec = null; }
+  const me = wakeRec;
+  wakeRec.onerror = e => { if (e.error !== 'no-speech' && e.error !== 'aborted') { wakeErr = performance.now(); wakeFehler++; hlog('Jarvis-Erkennung Fehler: ' + e.error); } };
+  wakeRec.onstart = () => { wakeFehler = 0; };
+  // nur den eigenen Erkenner aufräumen – nicht einen inzwischen neu gestarteten
+  wakeRec.onend = () => { if (wakeRec === me) wakeRec = null; if (!me._stopped && cfg.steuerung === 'wort') setTimeout(startWake, wakeFehler > 3 ? 5000 : 300); };
+  try { wakeRec.start(); } catch (e) { if (wakeRec === me) wakeRec = null; hlog('Jarvis-Erkennung startet nicht: ' + (e && e.message || e)); }
 }
+// Wächter: Steht ORB auf „Bereit“ (oder schläft), muss immer ein Erkenner auf „Jarvis“ hören.
+// Nach Antworten, abgelaufenem Nachfrage-Fenster, „Stopp“ oder Erkenner-Fehlern startete ihn sonst niemand neu.
+let wakeWatchT = 0;
+setInterval(() => {
+  const now = performance.now();
+  if (S.call || !SR || !started || cfg.steuerung !== 'wort' || wakeRec || listening || convoRec || bargeRec) { wakeWatchT = now; return; }
+  if (convo && !S.sleep) { wakeWatchT = now; return; }   // Gespräch: convoListen übernimmt
+  if (now - wakeWatchT < 1200 || now - wakeErr < (wakeFehler > 3 ? 5000 : 1000)) return;   // kurz warten – oft startet gerade ein anderer Erkenner
+  wakeWatchT = now; startWake('Wächter');
+}, 500);
 function stopWake() { if (wakeRec) { wakeRec._stopped = true; try { wakeRec.abort(); } catch (e) {} wakeRec = null; } }
 function onWake(t, r) {
   const m = t.match(NAME_RE());

@@ -68,7 +68,7 @@ DEFAULT_CFG = {
 }
 # Damit ORB immer dein Claude-Code-Login (Max-Abo) nutzt und nie einen API-Schlüssel
 CLAUDE_ENV_DROP = ("ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "ANTHROPIC_BASE_URL")
-VERSION = "62"
+VERSION = "63"
 ORB_UI = ("Deine Oberfläche (die Larsen gerade sieht): in der Mitte du als flüssige leuchtende Kugel mit Tropfen, "
           "Orbit-Ringen und Sternenhimmel; links eine Uhr und darunter der Gesprächsverlauf mit Eingabefeld; rechts "
           "Karten für System (CPU, RAM, Akku), Wetter mit Stundenvorschau, Aktivität (was du gerade tust) und Vorschläge; "
@@ -386,18 +386,21 @@ CLOSE_LOG = os.path.join(HOME, "schliessen.log")   # warum ORB sich geschlossen/
 RUN_MARK = os.path.join(HOME, "laeuft.txt")        # fehlt beim sauberen Beenden – liegt er beim Start noch da, war es ein Absturz
 
 
-def log_close(grund):
+HOER_LOG = os.path.join(HOME, "hoeren.log")       # Spracherkennung: welcher Erkenner wann startet/endet (Fehlersuche „hört nicht“)
+
+
+def log_close(grund, path=CLOSE_LOG):
     """Grund fürs Schließen/Ausblenden mit Uhrzeit protokollieren (Datei bleibt klein)."""
     if os.environ.get("ORB_PORT"):
         return   # Test-Server
     try:
         os.makedirs(HOME, exist_ok=True)
-        if os.path.exists(CLOSE_LOG) and os.path.getsize(CLOSE_LOG) > 200000:
-            with open(CLOSE_LOG, encoding="utf-8", errors="ignore") as f:
+        if os.path.exists(path) and os.path.getsize(path) > 200000:
+            with open(path, encoding="utf-8", errors="ignore") as f:
                 rest = f.readlines()[-500:]
-            with open(CLOSE_LOG, "w", encoding="utf-8") as f:
+            with open(path, "w", encoding="utf-8") as f:
                 f.writelines(rest)
-        with open(CLOSE_LOG, "a", encoding="utf-8") as f:
+        with open(path, "a", encoding="utf-8") as f:
             f.write("%s  %s\n" % (time.strftime("%Y-%m-%d %H:%M:%S"), str(grund)[:300]))
     except Exception:
         pass
@@ -1857,6 +1860,9 @@ class Handler(BaseHTTPRequestHandler):
             self.send(200, {"ok": True})
         elif u.path == "/warm":
             threading.Thread(target=BRAIN.start, daemon=True).start()
+            self.send(200, {"ok": True})
+        elif u.path == "/hoerlog":
+            log_close(str(b.get("t") or ""), HOER_LOG)
             self.send(200, {"ok": True})
         elif u.path == "/sleep":
             log_close("Schlaf: " + str(b.get("grund") or "unbekannt"))
