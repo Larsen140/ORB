@@ -68,7 +68,7 @@ DEFAULT_CFG = {
 }
 # Damit ORB immer dein Claude-Code-Login (Max-Abo) nutzt und nie einen API-Schlüssel
 CLAUDE_ENV_DROP = ("ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "ANTHROPIC_BASE_URL")
-VERSION = "42"
+VERSION = "43"
 ORB_UI = ("Deine Oberfläche (die Larsen gerade sieht): in der Mitte du als flüssige leuchtende Kugel mit Tropfen, "
           "Orbit-Ringen und Sternenhimmel; links eine Uhr und darunter der Gesprächsverlauf mit Eingabefeld; rechts "
           "Karten für System (CPU, RAM, Akku), Wetter mit Stundenvorschau, Aktivität (was du gerade tust) und Vorschläge; "
@@ -119,6 +119,64 @@ ON_UPDATE = [None]  # neuesten Stand von GitHub holen und neu starten
 ON_CHECK = [None]   # liefert den neueren GitHub-Stand (sha) oder None, wenn ORB aktuell ist
 
 _mouse = {"t": 0.0, "on": False}
+
+
+_call = {"t": 0.0, "v": False}
+CALL_TITLES = ("google meet", "meet – ", "meet - ", "zoom meeting", "zoom-meeting", "microsoft teams", "webex", "discord")
+CALL_APPS = ("opera.exe", "chrome.exe", "firefox.exe", "brave.exe", "discord.exe", "teams.exe", "ms-teams.exe",
+             "zoom.exe", "ciscocollabhost.exe", "webex.exe", "skype.exe")
+
+
+def in_call():
+    """Läuft gerade ein Anruf/Meeting (Google Meet, Teams, Zoom, Discord …)? Dann hört ORB nicht hin.
+    Erkennung über Fenstertitel und darüber, ob eine Anruf-App gerade das Mikrofon benutzt. 2 s zwischengespeichert."""
+    now = time.time()
+    if now - _call["t"] < 2:
+        return _call["v"]
+    found = False
+    try:
+        import ctypes
+        from ctypes import wintypes
+        u = ctypes.windll.user32
+        titles = []
+
+        @ctypes.WINFUNCTYPE(wintypes.BOOL, wintypes.HWND, wintypes.LPARAM)
+        def cb(h, _):
+            if u.IsWindowVisible(h):
+                n = u.GetWindowTextLengthW(h)
+                if n:
+                    b = ctypes.create_unicode_buffer(n + 1)
+                    u.GetWindowTextW(h, b, n + 1)
+                    titles.append(b.value.replace("\xa0", " ").lower())
+            return True
+        u.EnumWindows(cb, 0)
+        found = any(k in t for t in titles for k in CALL_TITLES if not t.startswith("orb"))
+    except Exception:
+        pass
+    if not found:
+        try:
+            import winreg
+            base = r"Software\Microsoft\Windows\CurrentVersion\CapabilityAccessManager\ConsentStore\microphone\NonPackaged"
+            with winreg.OpenKey(winreg.HKEY_CURRENT_USER, base) as k:
+                i = 0
+                while True:
+                    try:
+                        name = winreg.EnumKey(k, i)
+                    except OSError:
+                        break
+                    i += 1
+                    if name.lower().rsplit("#", 1)[-1] in CALL_APPS:
+                        with winreg.OpenKey(k, name) as sk:
+                            try:
+                                if winreg.QueryValueEx(sk, "LastUsedTimeStop")[0] == 0:   # 0 = Mikrofon gerade in Benutzung
+                                    found = True
+                                    break
+                            except OSError:
+                                pass
+        except Exception:
+            pass
+    _call.update(t=now, v=found)
+    return found
 
 
 def input_ago():
@@ -938,6 +996,7 @@ class Handler(BaseHTTPRequestHandler):
                 write_state(mode="idle", task="", detail="", log=[])
                 st = read_state()
             st["busy"] = BRAIN.busy
+            st["anruf"] = in_call()   # während Meet/Teams/Zoom nicht zuhören
             st["version"] = VERSION   # Fenster lädt sich neu, wenn eine neue Version läuft
             for i, p in enumerate(st.get("parts") or []):   # Stimme für alle Stücke vorbereiten
                 ensure((st.get("aid"), i), p)

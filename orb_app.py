@@ -195,6 +195,9 @@ def clap_loop():
             with sd.RawInputStream(samplerate=sr, channels=1, dtype="int16", blocksize=block) as st:
                 while not window_open():
                     raw, _ = st.read(block)
+                    if server.in_call():
+                        cand, claps = None, []
+                        continue   # während eines Meetings nicht auf Klatschen reagieren
                     x = array.array("h", bytes(raw))
                     now = time.time()
                     if now - cfg_t > 3:

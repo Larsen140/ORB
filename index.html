@@ -884,7 +884,7 @@ function toBack(ms) {
   }, ms);
 }
 function clapTick() {
-  if (!cfg.klatschen && !cfg.schnipsen) return;
+  if ((!cfg.klatschen && !cfg.schnipsen) || S.call) return;   // im Meeting nicht reagieren
   let pk = 0, s = 0;
   for (const v of clapBuf) { const a = Math.abs(v); if (a > pk) pk = a; s += v * v; }
   const rms = Math.sqrt(s / clapBuf.length), now = performance.now();
@@ -1062,7 +1062,7 @@ function stopConvo(silent) {
 }
 function killConvoRec() { if (convoRec) { const r = convoRec; convoRec = null; try { r.abort(); } catch (e) {} } }
 function convoCanListen() {
-  return convo && !S.sleep && !S.busy && !listening && !speakingNow() && performance.now() >= askGap && !['denkt', 'auftrag', 'wartet'].includes(S.mode);
+  return !S.call && convo && !S.sleep && !S.busy && !listening && !speakingNow() && performance.now() >= askGap && !['denkt', 'auftrag', 'wartet'].includes(S.mode);
 }
 function convoListen() {
   if (convoRec || !convoCanListen() || performance.now() - convoLastStart < 500) return;
@@ -1098,7 +1098,7 @@ function handleConvo(t) {
 /* ---------- Unterbrechen mit „Jarvis“ ---------- */
 let bargeRec = null, bargeLast = 0;
 function killBarge() { if (bargeRec) { const r = bargeRec; bargeRec = null; try { r.abort(); } catch (e) {} } }
-function bargeWanted() { return SR && !S.sleep && !listening && !convoRec && (speakingNow() || S.busy); }   // hört auf „Jarvis“ (falls an) und „Stopp“
+function bargeWanted() { return !S.call && SR && !S.sleep && !listening && !convoRec && (speakingNow() || S.busy); }   // hört auf „Jarvis“ (falls an) und „Stopp“
 function bargeListen() {
   if (bargeRec || !bargeWanted() || performance.now() - bargeLast < 600) return;
   bargeLast = performance.now(); stopWake();
@@ -1127,7 +1127,7 @@ function interrupt() {
 
 /* ---------- Aktivierungswort ---------- */
 function startWake() {
-  if (!SR || cfg.steuerung !== 'wort' || wakeRec || listening || convoRec || bargeRec) return;
+  if (S.call || !SR || cfg.steuerung !== 'wort' || wakeRec || listening || convoRec || bargeRec) return;
   wakeRec = new SR(); wakeRec.lang = 'de-DE'; wakeRec.continuous = true; wakeRec.interimResults = false;
   wakeRec.onresult = e => { for (let i = e.resultIndex; i < e.results.length; i++) if (e.results[i].isFinal) onWake(e.results[i][0].transcript); };
   wakeRec.onend = () => { const was = wakeRec; wakeRec = null; if (was && !was._stopped && cfg.steuerung === 'wort') setTimeout(startWake, 300); };
@@ -1210,6 +1210,7 @@ async function poll() {
   try {
     const aktiv = speakingNow() || listening || !!convoRec ? '1' : '0';
     const st = await (await fetch('/state?aktiv=' + aktiv, { cache:'no-store' })).json(); lastOk = performance.now(); S.busy = !!st.busy;
+    if (!!st.anruf !== !!S.call) { S.call = !!st.anruf; if (S.call) { stopWake(); killConvoRec(); killBarge(); hint('Meeting erkannt – ich höre nicht zu', 3500); } else if (cfg.steuerung === 'wort') startWake(); }
     // neue ORB-Version läuft → Seite neu laden (sonst sieht man Änderungen erst nach Fenster-Neustart)
     if (st.version) { if (!poll._v) poll._v = st.version; else if (st.version !== poll._v) { location.replace(S.sleep ? '/#schlaf' : '/#wake'); location.reload(); return; } }
     if (st.seq !== S.seq && (S.seq === -1 || st.seq > S.seq || st.seq < S.seq - 1000)) { const first = S.seq === -1; S.seq = st.seq; onState(st, first); }
