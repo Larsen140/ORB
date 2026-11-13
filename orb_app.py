@@ -121,7 +121,7 @@ def clap_loop():
         if window_open() or not server.load_cfg().get("klatschen", True):
             time.sleep(1)
             continue
-        floor, cand, last, claps, cfg_t, thr_base = .002, None, 0.0, [], 0.0, .16
+        floor, cand, last, claps, cfg_t, thr_base = .0003, None, 0.0, [], 0.0, .0024
         try:
             with sd.RawInputStream(samplerate=sr, channels=1, dtype="int16", blocksize=block) as st:
                 while not window_open():
@@ -131,22 +131,22 @@ def clap_loop():
                     if now - cfg_t > 3:
                         cfg_t = now
                         # Empfindlichkeit 1..10 -> Schwelle 0.31..0.04 (leises Laptop-Mikro)
-                        thr_base = .04 + (10 - float(server.load_cfg().get("empfindlichkeit", 6))) * .03
+                        thr_base = .0006 * (11 - float(server.load_cfg().get("empfindlichkeit", 6)))   # leise Laptop-Mikros: Klatscher kommen nur mit ~0,003–0,01 an
                     pk = max(max(x), -min(x)) / 32768.0
                     rms = math.sqrt(sum(v * v for v in x) / len(x)) / 32768.0
                     if cand:
                         if now - cand[0] >= .075:
                             if rms < cand[1] * .35:
                                 last = cand[0]
-                                claps = [c for c in claps if last - c < 1.0] + [last]
-                                if len(claps) >= 2 and .15 < claps[-1] - claps[-2] < .9:
+                                claps = [c for c in claps if last - c < 1.3] + [last]
+                                if len(claps) >= 2 and .15 < claps[-1] - claps[-2] < 1.2:
                                     claps = []
                                     show(wake=True)
                                     break
                             cand = None
-                    elif now - last > .14 and pk > max(thr_base, floor * 25) and rms > floor * 6:
+                    elif now - last > .14 and pk > max(thr_base, floor * 40) and rms > floor * 6:
                         cand = (now, rms)
-                    floor = floor * .995 + min(rms, .2) * .005
+                    floor = rms if rms < floor else floor * .995 + min(rms, .2) * .005   # Stille sofort übernehmen
         except Exception as e:
             print("Mikrofon:", e)
             time.sleep(5)

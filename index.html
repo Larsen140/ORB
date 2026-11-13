@@ -809,7 +809,7 @@ async function ensureMic() {
     micSrc = ac.createMediaStreamSource(st); micSrc.connect(micAn);
   } catch (e) { hint('Kein Mikrofon-Zugriff', 5000); }
 }
-let clapAn = null, clapBuf = null, clapTimer = null, claps = [], floorRms = .01, cand = null, lastClap = 0;
+let clapAn = null, clapBuf = null, clapTimer = null, claps = [], floorRms = .0003, cand = null, lastClap = 0;
 function startClap() {
   if (clapTimer || !micSrc) return;
   clapAn = ac.createAnalyser(); clapAn.fftSize = 512; clapAn.smoothingTimeConstant = 0;
@@ -825,14 +825,14 @@ function clapTick() {
   const own = speakingNow() || listening || convoRec || now < lastSfx + 500;
   if (cand) { if (now - cand.t >= 75) { if (rms < cand.rms * .35 && !own) registerClap(cand.t); cand = null; } }
   else if (!own && now - lastClap > 140) {
-    const thr = Math.max(.04 + (10 - (+cfg.empfindlichkeit || 6)) * .03, floorRms * 25);
+    const thr = Math.max(.0006 * (11 - (+cfg.empfindlichkeit || 6)), floorRms * 40);
     if (pk > thr && rms > floorRms * 6) cand = { t:now, rms };
   }
-  floorRms = floorRms * .995 + Math.min(rms, .2) * .005;
+  floorRms = rms < floorRms ? rms : floorRms * .995 + Math.min(rms, .2) * .005;   // Stille sofort übernehmen
 }
 function registerClap(t) {
-  lastClap = t; claps = claps.filter(c => t - c < 1000); claps.push(t); ripple(.4);
-  if (claps.length >= 2) { const gap = claps[claps.length - 1] - claps[claps.length - 2]; if (gap > 150 && gap < 900) { claps = []; onDoubleClap(); } }
+  lastClap = t; claps = claps.filter(c => t - c < 1300); claps.push(t); ripple(.4);
+  if (claps.length >= 2) { const gap = claps[claps.length - 1] - claps[claps.length - 2]; if (gap > 150 && gap < 1200) { claps = []; onDoubleClap(); } }
 }
 function onDoubleClap() {
   SFX.clap();
