@@ -41,7 +41,9 @@ try {
         Log 'Baue den Installer (ORB.exe) neu …'
         New-Item -ItemType Directory -Force $work | Out-Null
         $ErrorActionPreference = 'Continue'
+        # ORB-Code (orb_app/server/hook) darf NICHT in die exe – sonst läuft immer der alte Stand statt dem von GitHub
         $a = "-3 -m PyInstaller --noconfirm --onefile --windowed --name ORB --icon `"$o\orb.ico`" --exclude-module numpy " +
+             "--exclude-module orb_app --exclude-module server --exclude-module hook --exclude-module check " +
              "--collect-data sounddevice --collect-binaries sounddevice --collect-data certifi --collect-submodules edge_tts " +
              "--distpath `"$work\dist`" --workpath `"$work\tmp`" --specpath `"$work`" `"$o\orb_launcher.py`""
         Start-Process py -ArgumentList $a -Wait -WindowStyle Hidden -RedirectStandardError "$work\build.log" -RedirectStandardOutput "$work\build.out"

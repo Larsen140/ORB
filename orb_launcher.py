@@ -146,14 +146,26 @@ def main():
         update_if_needed(first_run)
     sys.path.insert(0, APP)
     os.environ["ORB_EXE"] = sys.executable
+
+    def load_code():
+        """ORB-Code ausdrücklich aus dem App-Ordner laden – nie eine in die exe eingebaute alte Kopie."""
+        import importlib.util
+        for m in ("hook", "server", "orb_app"):
+            sys.modules.pop(m, None)
+        mod = None
+        for name in ("hook", "server", "orb_app"):
+            spec = importlib.util.spec_from_file_location(name, os.path.join(APP, name + ".py"))
+            mod = importlib.util.module_from_spec(spec)
+            sys.modules[name] = mod
+            spec.loader.exec_module(mod)
+        return mod
+
     try:
-        import orb_app
+        orb_app = load_code()
     except Exception as e:
         if restore_latest():
-            for m in ("orb_app", "server", "hook", "updater"):
-                sys.modules.pop(m, None)
             message("Die neue ORB-Version hatte einen Fehler (%s).\nIch habe die letzte funktionierende Version wiederhergestellt." % e)
-            import orb_app
+            orb_app = load_code()
         else:
             message("ORB kann nicht starten: %s" % e)
             sys.exit(1)

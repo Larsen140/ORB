@@ -73,8 +73,22 @@ def bring_front():
         print("Fenster nach vorne:", e)
 
 
+def window_process_running():
+    """Läuft schon ein ORB-Fenster (egal ob die Seite gerade lädt)? Verhindert, dass mehrere Fenster aufgehen."""
+    try:
+        import psutil
+        for p in psutil.process_iter(["name", "cmdline"]):
+            if (p.info["name"] or "").lower() == "msedge.exe":
+                cl = " ".join(p.info["cmdline"] or [])
+                if "ORB\\fenster" in cl and "--app=" in cl:
+                    return True
+    except Exception:
+        pass
+    return False
+
+
 def show(wake=False):
-    if window_open():
+    if window_open() or window_process_running():
         bring_front()
         if wake:
             server.write_state(wake_req=time.time())
