@@ -68,7 +68,7 @@ DEFAULT_CFG = {
 }
 # Damit ORB immer dein Claude-Code-Login (Max-Abo) nutzt und nie einen API-Schlüssel
 CLAUDE_ENV_DROP = ("ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "ANTHROPIC_BASE_URL")
-VERSION = "80"
+VERSION = "81"
 ORB_UI = ("Deine Oberfläche (die Larsen gerade sieht): in der Mitte du als flüssige leuchtende Kugel mit Tropfen, "
           "Orbit-Ringen und Sternenhimmel; links eine Uhr und darunter der Gesprächsverlauf mit Eingabefeld; rechts "
           "Karten für System (CPU, RAM, Akku), Wetter mit Stundenvorschau, Aktivität (was du gerade tust) und Vorschläge; "
@@ -1392,7 +1392,7 @@ def _eigene_pids():
         try:
             import psutil
             for p in psutil.process_iter(["pid", "name", "cmdline"]):
-                if (p.info["name"] or "").lower() == "msedge.exe" and any("ORB\fenster" in (c or "") for c in p.info["cmdline"] or []):
+                if (p.info["name"] or "").lower() == "msedge.exe" and any(r"ORB\fenster" in (c or "") for c in p.info["cmdline"] or []):
                     pids.add(p.info["pid"])
         except Exception:
             pass

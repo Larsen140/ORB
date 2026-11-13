@@ -160,7 +160,7 @@ def hide_window(keep=False):
 
 def window_watch():
     """Fragt das Fenster plötzlich nicht mehr nach (ohne dass ORB es geschlossen hat), Grund protokollieren."""
-    gemeldet = False
+    gemeldet, geheilt = False, 0.0
     while True:
         time.sleep(3)
         lp = server.LAST_POLL[0]
@@ -168,6 +168,21 @@ def window_watch():
             if not gemeldet:
                 server.log_close("Fenster meldet sich nicht mehr (abgestürzt oder von Hand geschlossen)")
                 gemeldet = True
+            # Fenster läuft noch, meldet sich aber 30 s nicht (z. B. Fehlerseite nach Update-Neustart):
+            # neu öffnen, sonst sind Schnipsen und Klatschen im Fenster tot (höchstens alle 2 Min.)
+            if time.time() - lp > 30 and time.time() - geheilt > 120 and window_process_running():
+                geheilt = time.time()
+                try:
+                    sichtbar = any(ctypes.windll.user32.IsWindowVisible(h) for h in orb_windows())
+                except Exception:
+                    sichtbar = True
+                server.log_close("Fenster hing → neu geöffnet")
+                hide_window()
+                for _ in range(20):   # warten, bis Edge wirklich weg ist – sonst öffnet show() nichts
+                    time.sleep(.5)
+                    if not window_process_running():
+                        break
+                show(hidden=not sichtbar)
         else:
             gemeldet = False
 

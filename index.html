@@ -1809,7 +1809,9 @@ function startWake(warum) {
   if (typeof warum === 'string') hlog('Jarvis-Erkennung fehlte im Zustand ' + (S.sleep ? 'Schlaf' : convo ? 'Gespräch' : 'Bereit') + ' → neu gestartet (' + warum + ')');
   wakeRec = mkSR(); wakeRec.lang = 'de-DE'; wakeRec.continuous = true; wakeRec.interimResults = true; wakeRec.maxAlternatives = 3;
   wakeRec.onresult = e => {
-    stimmeT = performance.now(); snapAbbruch('Sprache erkannt');   // Sprache ist kein Schnipsen – und bricht den Schnips-Countdown ab
+    // Sprache ist kein Schnipsen – und bricht den Schnips-Countdown ab (leere „Ergebnisse“ auf einen Knall zählen nicht)
+    let wort = ''; for (let i = e.resultIndex; i < e.results.length; i++) wort += e.results[i][0].transcript;
+    if (wort.trim().length > 1) { stimmeT = performance.now(); snapAbbruch('Sprache erkannt: ' + wort.trim().slice(0, 30)); }
     for (let i = e.resultIndex; i < e.results.length; i++) {
       const r = e.results[i];
       // alle Alternativen prüfen – oft steht „Jarvis“ nur in der zweiten oder dritten
@@ -1917,10 +1919,12 @@ try { actLog = JSON.parse(localStorage.getItem('orbAct') || '[]'); } catch (e) {
 async function poll() {
   clearTimeout(pollTimer);
   if (poll._busy) return;   // nie zwei Abfragen gleichzeitig (sonst können ältere Zustände gewinnen)
-  poll._busy = true;
+  poll._busy = true; poll._t = performance.now();
+  // hängt eine Abfrage (z. B. direkt nach dem Update-Neustart), nach 5 s abbrechen – sonst stirbt der Herzschlag für immer
+  const ctl = new AbortController(), abbruch = setTimeout(() => ctl.abort(), 5000);
   try {
     const aktiv = speakingNow() || listening || !!convoRec ? '1' : '0';
-    const resp = await fetch('/state?aktiv=' + aktiv, { cache:'no-store' });
+    const resp = await fetch('/state?aktiv=' + aktiv, { cache:'no-store', signal:ctl.signal });
     if (resp.status === 403 && !poll._reload) { poll._reload = true; setTimeout(() => location.reload(), 300); }   // ORB neu gestartet → neues Token
     const st = await resp.json(); lastOk = performance.now(); S.busy = !!st.busy; renderTasks(st.aufgaben);
     if (st.karten_v !== undefined && st.karten_v !== kartenV) { kartenV = st.karten_v; ladeKarten(); } if (st.bild) bildHolo(st.bild); if (st.gold !== undefined) goldHolo(st.gold); if (st.web) webHolo(st.web);
@@ -1929,11 +1933,13 @@ async function poll() {
     if (st.version) { if (!poll._v) poll._v = st.version; else if (st.version !== poll._v) { location.replace(S.sleep ? '/#schlaf' : '/#wake'); location.reload(); return; } }
     if (st.seq !== S.seq && (S.seq === -1 || st.seq > S.seq || st.seq < S.seq - 1000)) { const first = S.seq === -1; S.seq = st.seq; onState(st, first); }
   } catch (e) {}
-  poll._busy = false;
+  clearTimeout(abbruch); poll._busy = false;
   $('conn').textContent = performance.now() - lastOk < 2000 ? '● verbunden · Opus 5.5 · ' + (S.sleep ? 'schläft' : 'wach') : '○ Server nicht erreichbar';
   pollTimer = setTimeout(poll, S.sleep || document.hidden ? 600 : (S.busy || ['denkt', 'auftrag', 'wartet'].includes(S.mode) ? 120 : 280));
 }
 const fastPoll = () => { clearTimeout(pollTimer); pollTimer = setTimeout(poll, 60); };
+// Herzschlag-Wächter: ist die Abfrage-Kette abgerissen, neu anstoßen (der Server hält das Fenster sonst für tot)
+setInterval(() => { if (poll._t && performance.now() - poll._t > 8000) { hlog('Verbindung zum Server hing → neu verbunden'); poll._busy = false; poll(); } }, 4000);
 let typeTimer;
 function typeTo(el, text) {
   clearInterval(typeTimer); let i = 0; el.textContent = '';
