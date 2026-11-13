@@ -42,7 +42,9 @@ NO_WINDOW = 0x08000000
 # Schutz gegen fremde Webseiten: nur Anfragen mit diesem Token (steht nur in ORBs eigener Seite und in einer
 # Datei im Benutzerordner) dürfen etwas tun.
 TOKEN = secrets.token_hex(16)
-TOKEN_FILE = os.path.join(os.environ.get("LOCALAPPDATA", os.path.expanduser("~")), "ORB", "token.txt")
+# Test-Server (andere Ports) dürfen den Token des echten ORB nicht überschreiben
+TOKEN_FILE = os.path.join(os.environ.get("LOCALAPPDATA", os.path.expanduser("~")), "ORB",
+                          "token.txt" if PORT == 8766 else "token_%d.txt" % PORT)
 ERLAUBTE_HOSTS = ("127.0.0.1:%d" % PORT, "localhost:%d" % PORT)
 
 STIMMEN = [
@@ -66,7 +68,7 @@ DEFAULT_CFG = {
 }
 # Damit ORB immer dein Claude-Code-Login (Max-Abo) nutzt und nie einen API-Schlüssel
 CLAUDE_ENV_DROP = ("ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "ANTHROPIC_BASE_URL")
-VERSION = "34"
+VERSION = "35"
 ORB_UI = ("Deine Oberfläche (die Larsen gerade sieht): in der Mitte du als flüssige leuchtende Kugel mit Tropfen, "
           "Orbit-Ringen und Sternenhimmel; links eine Uhr und darunter der Gesprächsverlauf mit Eingabefeld; rechts "
           "Karten für System (CPU, RAM, Akku), Wetter mit Stundenvorschau, Aktivität (was du gerade tust) und Vorschläge; "
@@ -81,12 +83,11 @@ LANG_REGELN = ("Antworte immer auf Deutsch. Du sprichst über ORB, eine Sprachob
 
 KALENDER_REGELN = (
     "Larsens Kalender ist sein iCloud-Kalender (iPhone); das Termine-Widget links zeigt ihn. Termine trägst du NICHT in "
-    "termine.md ein, sondern per Bash-Befehl über ORB ein, liest oder löschst sie so: "
-    "curl -s -X POST http://127.0.0.1:%d/kalender -H \"X-ORB-Token: $(cat \"$LOCALAPPDATA/ORB/token.txt\")\" "
-    "-H \"Content-Type: application/json\" -d '<JSON>'. JSON: neu = {\"aktion\":\"neu\",\"titel\":\"Zahnarzt\","
-    "\"start\":\"2026-11-20T15:00\"} (optional \"ende\", \"ort\", \"notiz\", \"kalender\"; nur Datum = ganztägig, "
-    "Ende sonst +1 Stunde); lesen = {\"aktion\":\"liste\",\"von\":\"2026-11-13\",\"bis\":\"2026-11-20\"}; "
-    "löschen = erst lesen, dann {\"aktion\":\"loeschen\",\"id\":\"<id aus der Liste>\"}. Zeiten sind Ortszeit.")
+    "termine.md ein, sondern über ORBs Kalender-Skript (es kümmert sich selbst um die Anmeldung): "
+    "powershell -NoProfile -ExecutionPolicy Bypass -File \"$env:LOCALAPPDATA\\ORB\\app\\kalender.ps1\" <aktion>. "
+    "Aktionen: status; liste -Von 2026-11-13 -Bis 2026-11-20 (ohne Angabe heute + 7 Tage); "
+    "neu -Titel \"Zahnarzt\" -Start 2026-11-20T15:00 (optional -Ende, -Ort, -Notiz, -Kalender; nur Datum = ganztägig, "
+    "Ende sonst +1 Stunde); löschen = erst liste, dann loeschen -Id \"<id aus der Liste>\". Zeiten sind Ortszeit.")
 
 
 def system_prompt(cfg):
@@ -97,7 +98,12 @@ def system_prompt(cfg):
             persona = f.read()[:5000]
     except Exception:
         pass
-    return (persona + "\n\n" if persona else "") + ORB_UI + "\n\n" + (KURZ_REGELN if cfg.get("laenge") == "kurz" else LANG_REGELN)
+    try:
+        kal = "\n\n" + KALENDER_REGELN if icloud.verbunden() else ""
+    except Exception:
+        kal = ""
+    return ((persona + "\n\n" if persona else "") + ORB_UI + "\n\n"
+            + (KURZ_REGELN if cfg.get("laenge") == "kurz" else LANG_REGELN) + kal)
 
 
 KURZ_PROMPT = ("Du sprichst gerade über ORB, eine Sprachoberfläche; deine Antwort wird laut vorgelesen. "
