@@ -1229,6 +1229,7 @@ async function startClap() {
   src.connect(clapTimer); clapTimer.connect(mute);
   clapStarting = false;
 }
+let snapPk = 0;
 let fBuf = null, snapT = 0, snapRms = 0, snapLaut = 0, clapPk = [], slowRms = 1, snapTest = 0, snapTestT = 0;   // slowRms: Lautstärke der letzten ~1–2 s
 // Schnipsen klingt hell (Energie um 2–5 kHz), Klatschen voll (viel Energie unter 1,5 kHz)
 function snapRatio() {
@@ -1269,7 +1270,7 @@ function clapTick(tBlock) {
   const rms = Math.sqrt(s / clapBuf.length), now = tBlock ?? performance.now();
   const hist = clapTick.h || (clapTick.h = []); const pre = hist.length >= 14 ? hist.slice(-14, -2).reduce((a, b) => a + b, 0) / 12 : 1;   // ~30–150 ms vorher
   hist.push(rms); if (hist.length > 16) hist.shift();
-  const slow = slowRms; slowRms = slowRms * .99 + rms * .01;
+  const slow = slowRms; slowRms = slowRms * .97 + rms * .03;   // ~0,3 s Gedächtnis (vorher ~1 s: nach einem Klatscher war Schnipsen lange blockiert)
   // Nach einem Schnipser muss es still bleiben – Hämmern, Gespräche, Klicken gehen weiter → kein Schnipser
   // (einzelne Nachhall-Blöcke zählen nicht – erst anhaltender Lärm bricht ab)
   const sEmpf = +cfg.schnips_empf || 6;
@@ -1280,9 +1281,11 @@ function clapTick(tBlock) {
     if (now - cand.t >= 75) {
       const knall = rms < cand.rms * (cand.snap ? .5 : .35);
       if (knall && cand.snap && !cand.ruhig && testet) snapInfo('Knall gehört – aber zu viel Hintergrundgeräusch');
-      if (knall && cand.snap && cand.ruhig && !mouse && (testet || !verborgen || !S.sleep)) {   // auch im Schlaf (Fenster sichtbar), beim Arbeiten und Sprechen
+      const nachKlatscher = lastClap > 0 && cand.t - lastClap < 1100 && cand.t - lastClap > 150;
+      if (knall && cand.snap && nachKlatscher && !mouse) { snapT = 0; clapPk.push([cand.t, cand.pk]); clapPk = clapPk.slice(-4); checkSysMouse(cand.t); }
+      else if (knall && cand.snap && cand.ruhig && !mouse && !ownSpeak && (testet || !verborgen || !S.sleep)) {   // auch im Schlaf (Fenster sichtbar), beim Arbeiten und Sprechen
         // Schnipser: kurz warten – bleibt es still und kommt kein zweiter Knall, verschwindet ORB
-        const t = cand.t; snapT = t; snapRms = cand.rms; snapLaut = 0; claps = [];
+        const t = cand.t; snapT = t; snapRms = cand.rms; snapLaut = 0; snapPk = cand.pk;
         setTimeout(() => { if (snapT !== t) return;
           snapT = 0;
           if (lastClap > t + 50) return snapInfo('Zwei Knalle gehört – das zählt als Klatschen');
@@ -1290,7 +1293,11 @@ function clapTick(tBlock) {
           fetch('/mouse').then(r => r.json()).then(j => { if (j.eingabe > 1 && j.ago > 1) onSnap(); else snapInfo('Knall gehört – aber Maus/Tastatur war gerade in Benutzung'); }).catch(() => {}); }, 900);
       }
       else if (knall && !cand.snap && testet) snapInfo('Knall gehört – klang eher dumpf wie Klatschen');
-      else if (knall && !cand.snap && !mouse) { snapT = 0; clapPk.push([cand.t, cand.pk]); clapPk = clapPk.slice(-4); checkSysMouse(cand.t); }
+      else if (knall && !cand.snap && !mouse) {
+        // kam kurz davor ein „Schnipser“, war das in Wahrheit der erste Klatscher
+        if (snapT && cand.t - snapT < 1100) { claps = claps.filter(c => cand.t - c < 1100); claps.push(snapT); clapPk.push([snapT, snapPk]); lastClap = snapT; }
+        snapT = 0; clapPk.push([cand.t, cand.pk]); clapPk = clapPk.slice(-4); checkSysMouse(cand.t);
+      }
       else if (!knall) claps = [];   // Dauergeräusch statt Knall
       cand = null;
     }
