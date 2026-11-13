@@ -59,7 +59,7 @@ DEFAULT_CFG = {
     "stimme": "de-DE-FlorianMultilingualNeural", "tempo": "+12%", "hoehe": "+0Hz", "lautstaerke": 90,
     "farbe": "rot", "effekte": "mittel", "untertitel": True,
     "sfx": True, "sfxlaut": 60, "ambient": False,
-    "steuerung": "taste", "wakeword": "Jarvis", "unterbrechen": True,
+    "steuerung": "wort", "wakeword": "Jarvis", "schnipsen": True, "unterbrechen": True,
     "tts_anbieter": "edge",
     "klatschen": True, "dauerzuhoeren": True, "empfindlichkeit": 6, "begruessung": True, "ort": "", "name": "",
     "schlafen": 5, "vollbild": True, "autostart": True, "schlaf_schliessen": True, "bildschirm": False,
@@ -68,7 +68,7 @@ DEFAULT_CFG = {
 }
 # Damit ORB immer dein Claude-Code-Login (Max-Abo) nutzt und nie einen API-Schlüssel
 CLAUDE_ENV_DROP = ("ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "ANTHROPIC_BASE_URL")
-VERSION = "35"
+VERSION = "36"
 ORB_UI = ("Deine Oberfläche (die Larsen gerade sieht): in der Mitte du als flüssige leuchtende Kugel mit Tropfen, "
           "Orbit-Ringen und Sternenhimmel; links eine Uhr und darunter der Gesprächsverlauf mit Eingabefeld; rechts "
           "Karten für System (CPU, RAM, Akku), Wetter mit Stundenvorschau, Aktivität (was du gerade tust) und Vorschläge; "
@@ -116,6 +116,7 @@ LAST_ACTIVE = [0.0]   # wann das Fenster zuletzt gesprochen/zugehört hat  # wan
 ON_SHOW = [None]    # wird von orb_app gesetzt: öffnet/zeigt das Fenster
 ON_HIDE = [None]    # schließt das Fenster (Schlaf spart Speicher)
 ON_UPDATE = [None]  # neuesten Stand von GitHub holen und neu starten
+ON_CHECK = [None]   # liefert den neueren GitHub-Stand (sha) oder None, wenn ORB aktuell ist
 
 _mouse = {"t": 0.0, "on": False}
 
@@ -1025,6 +1026,22 @@ class Handler(BaseHTTPRequestHandler):
                 if sha and not re.fullmatch(r"[0-9a-f]{40}", sha):
                     sha = None   # nur echte Commit-Kennungen   # update.ps1 schickt den genauen Stand mit
                 threading.Thread(target=lambda: (time.sleep(.3), ON_UPDATE[0](sha)), daemon=True).start()
+        elif u.path == "/updatecheck":  # Knopf „Nach Updates suchen“
+            if not ON_CHECK[0] or not ON_UPDATE[0]:
+                self.send(200, {"ok": False, "version": VERSION, "fehler": "Nur in der installierten Version möglich"})
+            else:
+                try:
+                    neu = ON_CHECK[0]()
+                except Exception:
+                    self.send(200, {"ok": False, "version": VERSION, "fehler": "GitHub nicht erreichbar"})
+                    write_answer("Ich konnte GitHub gerade nicht erreichen.", heard="")
+                else:
+                    self.send(200, {"ok": True, "version": VERSION, "update": bool(neu)})
+                    if neu:
+                        write_answer("Update gefunden. Ich lade es und starte neu.", heard="")
+                        threading.Thread(target=lambda: (time.sleep(3.5), ON_UPDATE[0](neu)), daemon=True).start()
+                    else:
+                        write_answer("Du bist auf dem neuesten Stand, Version %s." % VERSION, heard="")
         elif u.path == "/announce":  # z. B. update.ps1: „Update fertig“ laut sagen
             text = str(b.get("text", "")).strip()
             if text:

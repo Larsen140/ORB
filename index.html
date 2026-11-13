@@ -206,7 +206,7 @@
   select, #set input[type=text], #set input[type=password] { font:inherit; font-size:14px; color:var(--txt); background:rgba(255,255,255,.08); border:0;
     box-shadow:inset 0 1px 0 rgba(255,255,255,.08); border-radius:13px; padding:9px 11px; outline:none; max-width:58%; }
   .row.col select, .row.col input[type=text], .row.col input[type=password] { max-width:none !important; }
-  #ic_stat { font-size:13px; color:var(--sub); } #ic_stat.ok { color:rgb(var(--c4)); } #ic_stat.err { color:#ff8a80; }
+  #ic_stat, #up_stat { font-size:13px; color:var(--sub); } #ic_stat.ok, #up_stat.ok { color:rgb(var(--c4)); } #ic_stat.err, #up_stat.err { color:#ff8a80; }
   select option { background:#15151b; }
   .seg { display:flex; background:rgba(0,0,0,.25); border-radius:14px; padding:3px; gap:2px; }
   .seg button { flex:1; padding:8px 4px; border-radius:11px; font-size:12.5px; font-weight:600; color:var(--sub); transition:background .45s var(--spring), color .3s, transform .45s var(--spring); }
@@ -413,6 +413,7 @@
   <div class="sh"><span>Einstellungen</span><button class="done" id="setx">Fertig</button></div>
   <div class="grp"><h4>Wecken &amp; Gespräch</h4><div class="card">
     <div class="row">Zweimal klatschen weckt ORB<input type="checkbox" class="sw" id="s_klatsch"></div>
+    <div class="row">Schnipsen schickt ORB weg<input type="checkbox" class="sw" id="s_schnipsen"></div>
     <div class="row col"><div class="lbl">Klatsch-Empfindlichkeit<span class="v" id="v_empf"></span></div><input type="range" id="s_empf" min="1" max="10" step="1"></div>
     <div class="row">Dauerhaft zuhören bis „Stopp“<input type="checkbox" class="sw" id="s_dauer"></div>
     <div class="row">Mit „Jarvis“ unterbrechen<input type="checkbox" class="sw" id="s_unterbrechen"></div>
@@ -420,7 +421,7 @@
     <div class="row">Einschlafen nach<select id="s_schlaf"><option value="0">nie</option><option value="2">2 Min.</option><option value="5">5 Min.</option><option value="10">10 Min.</option><option value="30">30 Min.</option></select></div>
     <div class="row">Dein Name<input type="text" id="s_name" placeholder="optional"></div>
     <div class="row">Ort fürs Wetter<input type="text" id="s_ort" placeholder="automatisch"></div>
-  </div><p class="note">2× klatschen = Gespräch · „Stopp“ beendet · „Jarvis“ unterbricht · „Gute Nacht“ = Schlafmodus</p></div>
+  </div><p class="note">2× klatschen = ORB erscheint · „Jarvis“ = ORB hört zu · Schnipsen = ORB verschwindet · „Stopp“ beendet</p></div>
   <div class="grp"><h4>Start</h4><div class="card">
     <div class="row">Mit Windows starten (lauscht im Hintergrund)<input type="checkbox" class="sw" id="s_auto"></div>
     <div class="row">Im Vollbild öffnen<input type="checkbox" class="sw" id="s_voll"></div>
@@ -459,8 +460,12 @@
   </div></div>
   <div class="grp"><h4>Widgets anzeigen</h4><div class="card" id="wlist"></div>
   <p class="note">„Aktivität“ erscheint von selbst, solange ORB arbeitet. Verschieben: Widget am Titel greifen.</p></div>
+  <div class="grp"><h4>Updates</h4><div class="card">
+    <div class="row">Installierte Version<span class="v" id="up_ver">–</span></div>
+    <div class="row">Status<span id="up_stat">automatisch jede Minute</span></div>
+  </div><div style="margin-top:9px"><button class="btn" id="up_btn">↻ Nach Updates suchen</button></div></div>
   <div class="grp"><h4>Steuerung</h4><div class="card">
-    <div class="row col">Sprechen mit<div class="seg" id="seg_st"><button data-v="taste">Taste / Klatschen</button><button data-v="wort">Aktivierungswort</button></div></div>
+    <div class="row col">Sprechen mit<div class="seg" id="seg_st"><button data-v="taste">Nur Klatschen / Taste</button><button data-v="wort">Klatschen + „Jarvis“</button></div></div>
     <div class="row">Aktivierungswort<input type="text" id="s_wake"></div>
   </div><div style="margin-top:9px"><button class="btn" id="schlafjetzt">☾ Jetzt schlafen</button><button class="btn red" id="beenden">⏻ ORB ganz beenden</button></div>
   <p class="note">Leertaste halten = sprechen · Esc = stoppen · T = tippen · M = Stimme · F = Vollbild · E = Einstellungen</p></div>
@@ -488,7 +493,7 @@ const CALM = true;   // ruhiges Design: weniger Effekte, mehr Platz für die Kug
 const PAL = () => [BASE, BASE2, BASE3, BASE4];
 const pcol = (i, a, k = 0) => `rgba(${rgb(mix(PAL()[i % 4], [255,255,255], k))},${a})`;
 let cfg = { farbe:'rot', effekte:'mittel', untertitel:true, lautstaerke:90, sfx:true, sfxlaut:60, ambient:false,
-  steuerung:'taste', wakeword:'Jarvis', stimme:'', tempo:'+15%', hoehe:'+0Hz', laenge:'kurz', rechte:'auto', tempo_claude:'low', ordner:'',
+  steuerung:'wort', schnipsen:true, wakeword:'Jarvis', stimme:'', tempo:'+15%', hoehe:'+0Hz', laenge:'kurz', rechte:'auto', tempo_claude:'low', ordner:'',
   schlaf_schliessen:true, bildschirm:false, klatschen:true, dauerzuhoeren:true, unterbrechen:true, empfindlichkeit:6, begruessung:true, ort:'', name:'', schlafen:5, vollbild:true, autostart:true };
 const S = { mode:'idle', seq:-1, busy:false, energy:.12, holo:0, think:0, speakVis:0, listenVis:0, level:0, warn:0, boot:0, sleep:false, sleepVis:0, px:0, py:0 };
 const mix = (a, b, t) => a.map((v, i) => Math.round(v + (b[i] - v) * t));
@@ -850,28 +855,53 @@ function startClap() {
   clapBuf = new Float32Array(clapAn.fftSize); micSrc.connect(clapAn);
   clapTimer = setInterval(clapTick, 25);
 }
+let fBuf = null, snapT = 0;
+// Schnipsen klingt hell (Energie um 2–5 kHz), Klatschen voll (viel Energie unter 1,5 kHz)
+function snapRatio() {
+  if (!fBuf) fBuf = new Float32Array(clapAn.frequencyBinCount);
+  clapAn.getFloatFrequencyData(fBuf);
+  const hz = ac.sampleRate / clapAn.fftSize; let lo = 0, hi = 0;
+  for (let i = 1; i < fBuf.length; i++) {
+    const f = i * hz, p = Math.pow(10, fBuf[i] / 10);
+    if (f >= 150 && f < 1500) lo += p; else if (f >= 2000 && f < 5500) hi += p;
+  }
+  return hi / (lo || 1e-12);
+}
+function onSnap() {
+  if (S.sleep) return;
+  SFX.close(); ripple(.8); hint('Bis gleich · zweimal klatschen holt mich zurück', 2500);
+  goSleep(true);
+  clearTimeout(hideTimer); hideTimer = setTimeout(() => { if (S.sleep) fetch('/hide', { method:'POST' }).catch(() => {}); }, 1200);
+}
 function clapTick() {
-  if (!cfg.klatschen) return;
+  if (!cfg.klatschen && !cfg.schnipsen) return;
   clapAn.getFloatTimeDomainData(clapBuf);
   let pk = 0, s = 0;
   for (const v of clapBuf) { const a = Math.abs(v); if (a > pk) pk = a; s += v * v; }
   const rms = Math.sqrt(s / clapBuf.length), now = performance.now();
-  const own = speakingNow() || listening || convoRec || now < lastSfx + 500;
+  const ownSpeak = speakingNow() || now < lastSfx + 500;   // eigene Stimme/Sounds
+  const own = ownSpeak || listening || convoRec;
   const mouse = now - lastMouse < 400;   // Klickgeräusch der Maus ist kein Klatschen
   if (cand) {
     if (now - cand.t >= 75) {
-      if (rms < cand.rms * .35 && !own && !mouse) checkSysMouse(cand.t);
-      else if (rms >= cand.rms * .35) claps = [];   // Dauergeräusch statt Knall
+      const knall = rms < cand.rms * .35;
+      if (knall && cand.snap && !ownSpeak && !mouse && cfg.schnipsen && !S.sleep) {
+        // Schnipser: kurz warten – kommt kein zweiter Knall, verschwindet ORB
+        const t = cand.t; snapT = t; claps = [];
+        setTimeout(() => { if (snapT === t && lastClap <= t + 50) onSnap(); }, 900);
+      }
+      else if (knall && !cand.snap && !own && !mouse && cfg.klatschen) { snapT = 0; checkSysMouse(cand.t); }
+      else if (!knall) claps = [];   // Dauergeräusch statt Knall
       cand = null;
     }
   }
-  else if (!own && !mouse && now - lastClap > 140) {
+  else if (!ownSpeak && !mouse && now - lastClap > 140) {
     const base = .0006 * (11 - (+cfg.empfindlichkeit || 6)), thr = Math.max(base, floorRms * 40);
     if (pk > thr && rms > Math.max(floorRms * 10, base * .2)) {
       // Klatschen ist breitbandig, ein Mausklick fast nur hohes Klicken: Anteil hoher Frequenzen prüfen
       let d = 0; for (let i = 1; i < clapBuf.length; i++) { const q = clapBuf[i] - clapBuf[i - 1]; d += q * q; }
       const hf = d / (s || 1), hfMax = 2 - 2 * Math.cos(2 * Math.PI * 4800 / ac.sampleRate);
-      if (hf < hfMax && pk / rms < 18) cand = { t:now, rms };
+      if (hf < hfMax && pk / rms < 18) { const r = snapRatio(); cand = { t:now, rms, snap:r > 1.4 }; if (window.ORB_DEBUG) console.log('Knall', r.toFixed(2)); }
     }
   }
   floorRms = rms < floorRms ? rms : floorRms * .995 + Math.min(rms, .2) * .005;   // Stille sofort übernehmen
@@ -1719,7 +1749,7 @@ document.querySelectorAll('.swc').forEach(el => el.onclick = () => { saveCfg({ f
 const segs = { seg_eff:'tempo_claude', seg_len:'laenge', seg_rechte:'rechte', seg_fx:'effekte', seg_st:'steuerung' };
 for (const [id, key] of Object.entries(segs)) $(id).querySelectorAll('button').forEach(b => b.onclick = () => { saveCfg({ [key]:b.dataset.v }); SFX.click(); });
 function fillRange(el) { el.style.setProperty('--p', (el.value - el.min) / (el.max - el.min) * 100 + '%'); }
-const CHK = { s_klatsch:'klatschen', s_dauer:'dauerzuhoeren', s_unterbrechen:'unterbrechen', s_gruss:'begruessung', s_voll:'vollbild', s_auto:'autostart', s_schliessen:'schlaf_schliessen', s_screen:'bildschirm', s_unter:'untertitel', s_sfx:'sfx', s_amb:'ambient' };
+const CHK = { s_klatsch:'klatschen', s_schnipsen:'schnipsen', s_dauer:'dauerzuhoeren', s_unterbrechen:'unterbrechen', s_gruss:'begruessung', s_voll:'vollbild', s_auto:'autostart', s_schliessen:'schlaf_schliessen', s_screen:'bildschirm', s_unter:'untertitel', s_sfx:'sfx', s_amb:'ambient' };
 function syncSettingsUI() {
   const set = (id, v) => { const el = $(id); if (el && document.activeElement !== el) el.value = v; };
   set('s_stimme', cfg.stimme); set('s_tempo', parseInt(cfg.tempo) || 0); set('s_hoehe', parseInt(cfg.hoehe) || 0);
@@ -1769,6 +1799,20 @@ $('ic_btn').onclick = async () => {
   } catch (e) { $('ic_stat').textContent = 'Fehler'; $('ic_stat').className = 'err'; }
 };
 loadICloud();
+fetch('/version', { cache:'no-store' }).then(r => r.json()).then(r => $('up_ver').textContent = 'Version ' + r.version).catch(() => {});
+$('up_btn').onclick = async () => {
+  const st = $('up_stat'), b = $('up_btn');
+  if (b.disabled) return;
+  b.disabled = true; SFX.click(); st.textContent = 'prüfe GitHub …'; st.className = ''; b.textContent = '… suche';
+  try {
+    const r = await (await fetch('/updatecheck', { method:'POST' })).json();
+    $('up_ver').textContent = 'Version ' + r.version;
+    if (!r.ok) { st.textContent = r.fehler || 'Fehler'; st.className = 'err'; SFX.off(); }
+    else if (r.update) { st.textContent = 'Update wird geladen – ORB startet neu …'; st.className = 'ok'; SFX.done(); ripple(1.2); burst(40); return; }
+    else { st.textContent = 'Aktuell (Version ' + r.version + ')'; st.className = 'ok'; SFX.done(); }
+  } catch (e) { st.textContent = 'Fehler'; st.className = 'err'; }
+  b.disabled = false; b.textContent = '↻ Nach Updates suchen';
+};
 $('schlafjetzt').onclick = () => { toggleSettings(false); goSleep(); };
 $('resetLayout').onclick = () => { try { localStorage.removeItem('orbLayout'); } catch (e) {} location.reload(); };
 $('beenden').onclick = async () => { SFX.sleep(); await fetch('/quit', { method:'POST' }).catch(() => {}); setTimeout(() => window.close(), 300); };

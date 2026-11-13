@@ -248,6 +248,17 @@ def apply_update(sha=None):
     restart(update=False)
 
 
+def check_update():
+    """Neueren GitHub-Stand liefern (sha) oder None, wenn ORB aktuell ist."""
+    launcher = sys.modules.get("__main__")
+    sha = github_head()
+    if not sha:
+        raise OSError("kein Stand")
+    if sha == launcher.local_sha() or sha in getattr(launcher, "bad_shas", lambda: [])():
+        return None
+    return sha
+
+
 def update_loop():
     """Jede Minute auf GitHub nachsehen und ein Update SOFORT einspielen – nur nicht mitten im Sprechen oder Arbeiten."""
     launcher = sys.modules.get("__main__")
@@ -350,6 +361,8 @@ def main():
     server.ON_SHOW[0] = show
     server.ON_HIDE[0] = hide_window
     server.ON_UPDATE[0] = apply_update
+    if hasattr(sys.modules.get("__main__"), "local_sha"):
+        server.ON_CHECK[0] = check_update
     threading.Thread(target=srv.serve_forever, daemon=True).start()
     cfg = server.load_cfg()
     server.set_autostart(bool(cfg.get("autostart", True)))
