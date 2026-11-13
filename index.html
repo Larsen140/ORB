@@ -266,6 +266,20 @@
     background:rgb(var(--chip)); box-shadow:0 0 6px rgb(var(--chip)); }
   #send { background:radial-gradient(circle at 40% 30%, rgba(255,255,255,.6), rgb(var(--c)) 50%, rgb(var(--c4))); }
   #mic { background:radial-gradient(circle at 38% 28%, rgba(255,255,255,.75), rgba(var(--c),.95) 34%, rgba(var(--c2),.7) 62%, rgba(var(--c4),.65)); }
+  /* ===== Gespräch gut lesbar: dunkles Glas, große klare Schrift, kräftige Blasen ===== */
+  #chatp { background:linear-gradient(170deg, rgba(14,12,22,.82), rgba(10,8,16,.88)) !important;
+    backdrop-filter:blur(26px) saturate(140%); -webkit-backdrop-filter:blur(26px) saturate(140%); }
+  #msgs { gap:12px; padding:8px 6px 12px; }
+  .msg { font-size:16.5px; line-height:1.5; font-weight:450; padding:11px 16px 9px; letter-spacing:.005em; max-width:90%; }
+  .msg.orb { background:rgba(255,255,255,.1) !important; color:#fff; box-shadow:inset 0 1px 0 rgba(255,255,255,.12), inset 3px 0 0 rgba(var(--c4),.85); }
+  .msg.me { background:linear-gradient(150deg, rgba(var(--c),.92), rgba(var(--c),.75) 60%, rgba(var(--c2),.7)) !important; color:#fff;
+    text-shadow:0 1px 2px rgba(0,0,0,.35); }
+  .msg time { font-size:11px; color:rgba(255,255,255,.62); }
+  .msg.live { opacity:.8; }
+  .msg::after { animation-duration:1s; opacity:.6; }
+  #caption { font-size:23px; font-weight:500; text-shadow:0 2px 6px rgba(0,0,0,.95), 0 0 24px rgba(0,0,0,.8); }
+  #caption.me { color:rgba(255,255,255,.75); }
+  #txt { font-size:15.5px; }
   /* gleicher Innenabstand für alle Karten – egal in welcher Spalte sie liegen */
   .col > [data-w] { padding:16px 18px; flex:none; }
   /* Drag & Drop der Widgets */
