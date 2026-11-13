@@ -17,7 +17,7 @@ from urllib.parse import parse_qs, urlparse
 
 import secrets
 
-from hook import clean, split_sentences  # Markdown -> vorlesbarer Text, Text -> Sprech-Stücke
+from hook import clean, satz_grenzen, split_sentences  # Markdown -> vorlesbarer Text, Text -> Sprech-Stücke
 
 RES = os.path.dirname(os.path.abspath(__file__))  # Seite & Stimme liegen neben server.py (nicht in der exe)
 HOME = os.path.join(os.path.expanduser("~"), "Orb")
@@ -68,7 +68,7 @@ DEFAULT_CFG = {
 }
 # Damit ORB immer dein Claude-Code-Login (Max-Abo) nutzt und nie einen API-Schlüssel
 CLAUDE_ENV_DROP = ("ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "ANTHROPIC_BASE_URL")
-VERSION = "78"
+VERSION = "79"
 ORB_UI = ("Deine Oberfläche (die Larsen gerade sieht): in der Mitte du als flüssige leuchtende Kugel mit Tropfen, "
           "Orbit-Ringen und Sternenhimmel; links eine Uhr und darunter der Gesprächsverlauf mit Eingabefeld; rechts "
           "Karten für System (CPU, RAM, Akku), Wetter mit Stundenvorschau, Aktivität (was du gerade tust) und Vorschläge; "
@@ -652,26 +652,39 @@ def write_answer(text, **kw):
 
 
 # ---------- Sprachausgabe ----------
+STIMM_LOG = os.path.join(HOME, "stimme.log")   # Neural-Stimme: Fehler, Wiederholversuche, Ersatzstimme (Fehlersuche „klingt komisch“)
+_edge_sem = threading.BoundedSemaphore(3)       # nicht zu viele gleichzeitige Verbindungen (sonst drosselt der Dienst)
+
+
 def synth(text, cfg=None):
-    """Microsoft-Neural-Stimme (online) → Windows-Stimme (offline)."""
+    """Microsoft-Neural-Stimme (online, mit Wiederholversuchen) → Windows-Stimme nur, wenn alles scheitert."""
     cfg = cfg or load_cfg()
-    try:
-        import asyncio
-        import edge_tts
+    fehler = []
+    for versuch, frist in enumerate((12, 15, 20)):
+        try:
+            import asyncio
+            import edge_tts
 
-        async def run():
-            buf = bytearray()
-            com = edge_tts.Communicate(text, cfg["stimme"], rate=cfg["tempo"], pitch=cfg["hoehe"])
-            async for chunk in com.stream():
-                if chunk["type"] == "audio":
-                    buf.extend(chunk["data"])
-            return bytes(buf)
+            async def run():
+                buf = bytearray()
+                com = edge_tts.Communicate(text, cfg["stimme"], rate=cfg["tempo"], pitch=cfg["hoehe"])
+                async for chunk in com.stream():
+                    if chunk["type"] == "audio":
+                        buf.extend(chunk["data"])
+                return bytes(buf)
 
-        data = asyncio.run(asyncio.wait_for(run(), 30))
-        if data:
-            return data
-    except Exception as e:
-        print("Neural-Stimme nicht verfügbar, nutze Windows-Stimme:", e)
+            with _edge_sem:
+                data = asyncio.run(asyncio.wait_for(run(), frist))
+            if len(data) > 400:   # leere/abgeschnittene Antwort zählt als Fehler
+                if fehler:
+                    log_close("Neural-Stimme ok im %d. Versuch nach: %s | %s" % (versuch + 1, "; ".join(fehler), text[:60]), STIMM_LOG)
+                return data
+            fehler.append("leere Antwort")
+        except Exception as e:
+            fehler.append("%s: %s" % (type(e).__name__, str(e)[:120] or "Zeitüberschreitung"))
+        time.sleep(.4 + .6 * versuch)
+    log_close("ERSATZSTIMME (Windows) nach 3 Fehlversuchen: %s | %s" % ("; ".join(fehler), text[:60]), STIMM_LOG)
+    print("Neural-Stimme nicht verfügbar, nutze Windows-Stimme:", fehler)
     return synth_windows(text)
 
 
@@ -1072,13 +1085,11 @@ class Brain:
         if final:
             ready, rest = t, ""
         else:
-            m = None
-            ende = r"[.!?…:;,](?=\s)" if not self.spoken and len(t) >= 25 else r"[.!?…:;](?=\s)"   # erstes Stück früher
-            for m in re.finditer(ende, t):
-                pass
-            if not m:
+            # Satzgrenzen ohne Abkürzungen/Datumsangaben; Komma nur bei einem sehr langen ersten Satz (sonst klingt es zerhackt)
+            g = satz_grenzen(t) or (satz_grenzen(t, komma=True) if not self.spoken and len(t) >= 90 else [])
+            if not g:
                 return
-            ready, rest = t[: m.end()], t[m.end():]
+            ready, rest = t[: g[-1]], t[g[-1]:]
             # erstes Stück so früh wie möglich, danach größere Stücke für flüssigen Klang
             if len(ready.strip()) < (12 if not self.spoken else 260):
                 return
@@ -1991,7 +2002,7 @@ class Handler(BaseHTTPRequestHandler):
             if aid != st.get("aid") or not (0 <= i < len(parts)):
                 return self.send(404, b"", "text/plain")
             ent = ensure((aid, i), parts[i])
-            ent["ev"].wait(60)
+            ent["ev"].wait(75)   # Wiederholversuche der Neural-Stimme abwarten
             self.audio(ent["data"])
         elif u.path == "/preview":
             cfg = load_cfg()

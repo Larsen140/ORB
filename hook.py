@@ -139,9 +139,41 @@ def clean(t):
     return t
 
 
+_ABK = {"z", "b", "d", "h", "u", "a", "o", "s", "v", "ca", "bzw", "usw", "etc", "evtl", "ggf", "inkl", "exkl", "vgl", "nr",
+        "dr", "prof", "hr", "fr", "st", "str", "tel", "mio", "mrd", "std", "min", "sek", "max", "zb", "bspw", "allg",
+        "ggü", "jh", "jhd", "abs", "art", "bd", "kap", "mr", "mrs", "ms", "no", "vs", "dt", "engl", "ital", "franz"}
+_MONATE = {"januar", "februar", "märz", "april", "mai", "juni", "juli", "august", "september", "oktober", "november",
+           "dezember", "jan", "feb", "mär", "apr", "jun", "jul", "aug", "sep", "sept", "okt", "nov", "dez"}
+
+
+def satz_grenzen(t, komma=False):
+    """Stellen (Index nach dem Satzzeichen), an denen der Text sauber in Sprech-Stücke geteilt werden darf.
+    Nicht bei Abkürzungen („z. B.“, „Dr.“), Datumsangaben („13. November“) oder wenn klein weitergeschrieben wird –
+    sonst spricht die Stimme mitten im Satz mit Schluss-Betonung und Pause."""
+    out = []
+    for m in re.finditer(r"[.!?…:;,](?=\s)" if komma else r"[.!?…:;](?=\s)", t):
+        z, rest = m.group(), t[m.end():].lstrip()
+        nxt = rest[:1]
+        if z != "," and nxt.islower():
+            continue   # „… ca. zehn“, „Achtung: das …“ – Satz geht weiter
+        if z == ".":
+            w = re.search(r"([\wäöüÄÖÜß]+)$", t[:m.start()])
+            w = w.group(1) if w else ""
+            if w.lower() in _ABK or (len(w) == 1 and w.isalpha()):
+                continue
+            if w.isdigit() and re.match(r"[\wäöüÄÖÜß]+", rest) and                     re.match(r"[\wäöüÄÖÜß]+", rest).group().lower() in _MONATE:
+                continue   # „am 13. November“
+        out.append(m.end())
+    return out
+
+
 def split_sentences(t, first_min=12, chunk_min=260):
     """Teilt Text in sprechbare Stücke: erster Satz sofort, danach größere Stücke für flüssigen Klang."""
-    sents = [s.strip() for s in re.split(r"(?<=[.!?…:;])\s+", t) if s.strip()]
+    sents, a = [], 0
+    for e in satz_grenzen(t) + [len(t)]:
+        if t[a:e].strip():
+            sents.append(t[a:e].strip())
+        a = e
     parts, cur = [], ""
     for s in sents:
         cur = (cur + " " + s).strip()

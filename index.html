@@ -984,13 +984,12 @@ function initAudio() {
     ac = new (window.AudioContext || window.webkitAudioContext)({ latencyHint:'interactive' });
     analyser = ac.createAnalyser(); analyser.fftSize = 256; analyser.smoothingTimeConstant = .55;
     freq = new Uint8Array(analyser.frequencyBinCount); tdata = new Uint8Array(analyser.fftSize);
-    // Stimme: jedes Stück ist schon auf -14 LUFS normalisiert (prepVoice) -> Klang-EQ -> Lautstärke (bis 300 %) -> Limiter
-    const eq = (type, f, g, q) => { const b = ac.createBiquadFilter(); b.type = type; b.frequency.value = f; if (g != null) b.gain.value = g; if (q != null) b.Q.value = q; return b; };
-    const hp = eq('highpass', 75, null, .7), mud = eq('peaking', 260, -2, 1), pres = eq('peaking', 3200, 2.5, .9), air = eq('highshelf', 8500, 2);
+    // Stimme: jedes Stück wird vorab fertig aufbereitet (prepVoice: EQ, -14 LUFS, Verstärkung, Limiter mit Vorschau).
+    // Live nur noch absenken (nie verstärken) + Not-Begrenzer, der praktisch nie greift -> kein Pumpen, kein Übersteuern.
     const lim = ac.createDynamicsCompressor();
-    lim.threshold.value = -1; lim.knee.value = 1; lim.ratio.value = 20;   // Decke -1 dB statt -3 dB: lauter lim.attack.value = .001; lim.release.value = .1;
+    lim.threshold.value = -.5; lim.knee.value = 0; lim.ratio.value = 20; lim.attack.value = .001; lim.release.value = .1;
     outGain = ac.createGain();
-    analyser.connect(hp); hp.connect(mud); mud.connect(pres); pres.connect(air); air.connect(outGain); outGain.connect(lim); lim.connect(ac.destination);
+    analyser.connect(outGain); outGain.connect(lim); lim.connect(ac.destination);
     const sfxLim = ac.createDynamicsCompressor();
     sfxLim.threshold.value = -1.5; sfxLim.knee.value = 3; sfxLim.ratio.value = 12; sfxLim.attack.value = .002; sfxLim.release.value = .12;
     sfxGain = ac.createGain(); sfxGain.connect(sfxLim); sfxLim.connect(ac.destination);
@@ -1000,7 +999,7 @@ function initAudio() {
 }
 function applyAudio() {
   if (!ac) return;
-  outGain.gain.value = (+cfg.lautstaerke) / 100;
+  outGain.gain.value = Math.min(1, (+cfg.lautstaerke) / 100);   // über 100 % verstärkt prepVoice sauber vorab
   sfxGain.gain.value = cfg.sfx ? (+cfg.sfxlaut) / 100 * 3.5 : 0;   // Effekte waren viel zu leise
   setAmbient(cfg.ambient && cfg.sfx);
 }
@@ -1024,29 +1023,50 @@ function lufs(x, sr) {
   const rel = L(avg(g)) - 10; g = g.filter(m => L(m) > rel);
   return L(avg(g));
 }
-// Stimm-Stück aufbereiten: Stille vorn/hinten kürzen (schnellere erste Silbe, kürzere Satzpausen),
-// auf einheitlich -14 LUFS bringen und mit Vorschau-Limiter unter -1 dBFS halten – gleich laut für jede Stimme
-function prepVoice(buf) {
+// Stimm-Stück aufbereiten (vorab, nicht live): Stille vorn/hinten kürzen (weich ein-/ausgeblendet), Klang-EQ,
+// gleichmäßige Lautheit (-14 LUFS, pro Stimme geglättet, damit kurze Stücke nicht lauter/leiser springen),
+// Lautstärke über 100 % und ein Limiter mit 5 ms Vorschau: Spitzen bleiben unter -1 dBFS, ohne Verzerren oder Pumpen.
+const vGain = {};
+async function prepVoice(buf) {
   try {
-    const sr = buf.sampleRate, nc = buf.numberOfChannels, x0 = buf.getChannelData(0), thr = .006;
+    const sr = buf.sampleRate, nc = buf.numberOfChannels, x0 = buf.getChannelData(0), thr = .003;
     let a = 0, b = x0.length - 1;
     while (a < b && Math.abs(x0[a]) < thr) a++;
     while (b > a && Math.abs(x0[b]) < thr) b--;
     if (b - a < sr * .05) return buf;
-    a = Math.max(0, a - Math.round(sr * .012)); b = Math.min(x0.length, b + Math.round(sr * .16));
-    const len = b - a, out = ac.createBuffer(nc, len, sr);
-    const L = lufs(x0.subarray(a, b), sr), gain = L > -90 ? Math.min(8, Math.max(.25, Math.pow(10, (-14 - L) / 20))) : 1;
-    const ceil = .89, W = Math.max(1, Math.round(sr * .003)), rel = 1 / (sr * .08);
-    const env = new Float32Array(len);
-    let e = 1;   // rückwärts: Verstärkung schon vor der Spitze absenken (Vorschau)
-    for (let i = len - 1; i >= 0; i--) {
-      let pk = 0; for (let c = 0; c < nc; c++) pk = Math.max(pk, Math.abs(buf.getChannelData(c)[a + i]));
-      const t = pk * gain > ceil ? ceil / (pk * gain) : 1;
-      e = Math.min(t, e + 1 / W); env[i] = e;
+    a = Math.max(0, a - Math.round(sr * .04)); b = Math.min(x0.length, b + Math.round(sr * .22));
+    const len = b - a, fade = Math.round(sr * .005);
+    // 1) Klang-EQ offline (wie bisher: Rumpeln weg, weniger Mulm, mehr Präsenz und Luft)
+    const oc = new OfflineAudioContext(nc, len, sr), inp = oc.createBuffer(nc, len, sr);
+    for (let c = 0; c < nc; c++) { const d = inp.getChannelData(c); d.set(buf.getChannelData(c).subarray(a, b));
+      for (let i = 0; i < fade; i++) { d[i] *= i / fade; d[len - 1 - i] *= i / fade; } }
+    const eq = (type, f, g, q) => { const x = oc.createBiquadFilter(); x.type = type; x.frequency.value = f; if (g != null) x.gain.value = g; if (q != null) x.Q.value = q; return x; };
+    const src = oc.createBufferSource(); src.buffer = inp;
+    const k = [eq('highpass', 75, null, .7), eq('peaking', 260, -2, 1), eq('peaking', 3200, 2.5, .9), eq('highshelf', 8500, 2)];
+    src.connect(k[0]); k[0].connect(k[1]); k[1].connect(k[2]); k[2].connect(k[3]); k[3].connect(oc.destination); src.start();
+    const out = await oc.startRendering(), ch = [];
+    for (let c = 0; c < nc; c++) ch.push(out.getChannelData(c));
+    // 2) Lautheit: Ziel -14 LUFS; pro Stimme geglättet, max. ±1,5 dB Sprung zwischen Stücken
+    const L = lufs(ch[0], sr), key = cfg.stimme + '|' + sr;
+    let gdb = L > -90 ? Math.min(18, Math.max(-12, -14 - L)) : 0;
+    const v = vGain[key];
+    if (v != null) gdb = Math.min(v + 1.5, Math.max(v - 1.5, gdb));
+    if (len > sr * 1.2) vGain[key] = v == null ? gdb : v * .7 + gdb * .3;
+    const G = Math.pow(10, gdb / 20) * Math.max(1, (+cfg.lautstaerke) / 100);
+    // 3) Limiter mit Vorschau: Mindest-Verstärkung im 5-ms-Fenster voraus, Erholung 80 ms, Rampe geglättet -> nie über der Decke
+    const ceil = .89, LA = Math.max(1, Math.round(sr * .005)), rc = 1 - Math.exp(-1 / (sr * .08));
+    const req = new Float32Array(len);
+    for (let i = 0; i < len; i++) { let pk = 0; for (let c = 0; c < nc; c++) pk = Math.max(pk, Math.abs(ch[c][i])); req[i] = pk * G > ceil ? ceil / (pk * G) : 1; }
+    const mn = new Float32Array(len), dq = new Int32Array(len); let h = 0, t = 0;   // gleitendes Minimum über [i, i+LA]
+    for (let j = len - 1; j >= 0; j--) {
+      while (t > h && req[dq[t - 1]] >= req[j]) t--;
+      dq[t++] = j; while (dq[h] > j + LA) h++;
+      mn[j] = req[dq[h]];
     }
-    e = 1;   // vorwärts: langsam wieder auf (kein Pumpen)
-    for (let i = 0; i < len; i++) { e = Math.min(env[i], e + rel); env[i] = e * gain; }
-    for (let c = 0; c < nc; c++) { const src = buf.getChannelData(c), dst = out.getChannelData(c); for (let i = 0; i < len; i++) dst[i] = src[a + i] * env[i]; }
+    let e = 1; for (let i = 0; i < len; i++) { e = Math.min(mn[i], e + (1 - e) * rc); mn[i] = e; }
+    let sum = 0; const env = new Float32Array(len);
+    for (let i = 0; i < len; i++) { sum += mn[i] - (i >= LA ? mn[i - LA] : 1); env[i] = (sum + LA) / LA * G; }
+    for (let c = 0; c < nc; c++) { const d = ch[c]; for (let i = 0; i < len; i++) d[i] *= env[i]; }
     return out;
   } catch (e) { return buf; }
 }
@@ -1173,7 +1193,7 @@ function onParts(st, first) {
 async function fetchPart(aid, i, text) {
   let buf = null;
   if (voiceOn && audioOk()) {
-    try { const r = await fetch(`/tts?aid=${encodeURIComponent(aid)}&i=${i}`); if (r.ok) buf = prepVoice(await ac.decodeAudioData(await r.arrayBuffer())); } catch (e) {}
+    try { const r = await fetch(`/tts?aid=${encodeURIComponent(aid)}&i=${i}`); if (r.ok) buf = await prepVoice(await ac.decodeAudioData(await r.arrayBuffer())); } catch (e) {}
   }
   if (aid !== curAid || aid === mutedAid) return;
   pending[i] = { buf, text }; scheduleReady();
@@ -2946,7 +2966,7 @@ $('probe').onclick = async () => {
   $('probe').textContent = '… lade';
   try {
     const q = new URLSearchParams({ stimme:cfg.stimme, tempo:cfg.tempo, hoehe:cfg.hoehe });
-    const buf = prepVoice(await ac.decodeAudioData(await (await fetch('/preview?' + q)).arrayBuffer()));
+    const buf = await prepVoice(await ac.decodeAudioData(await (await fetch('/preview?' + q)).arrayBuffer()));
     stopAudio(); const s = ac.createBufferSource(); s.buffer = buf; s.connect(analyser);
     const st = ac.currentTime + .02; s.start(st); sched.push({ src:s, start:st, end:st + buf.duration }); endTime = st + buf.duration;
   } catch (e) { hint('Probe fehlgeschlagen'); }
