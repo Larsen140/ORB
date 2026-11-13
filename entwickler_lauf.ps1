@@ -20,8 +20,18 @@ function Melde($status, $schritt, $ergebnis) {
           $b = [Text.Encoding]::UTF8.GetBytes(($h | ConvertTo-Json))
           Invoke-WebRequest http://127.0.0.1:8766/aufgabe -Method Post -Headers $tokHdr -ContentType 'application/json; charset=utf-8' -Body $b -UseBasicParsing -TimeoutSec 3 | Out-Null } catch {}
 }
+# Fortschritt in Prozent: der Entwickler schreibt ihn per fortschritt.ps1 in eine Statusdatei, ORB liest sie
+$env:ORB_DEV_ART = $Art
+$fortschritt = Join-Path $o 'fortschritt.ps1'
+& $fortschritt 0 'Verstehen' | Out-Null
+$kurz = $(if ($auftrag.Length -gt 90) { $auftrag.Substring(0, 90) + ' …' } else { $auftrag })
+function MeldeAuftrag {
+    try { $b = [Text.Encoding]::UTF8.GetBytes((@{ aktion = 'melde'; id = $tid; auftrag = $kurz } | ConvertTo-Json))
+          Invoke-WebRequest http://127.0.0.1:8766/aufgabe -Method Post -Headers $tokHdr -ContentType 'application/json; charset=utf-8' -Body $b -UseBasicParsing -TimeoutSec 3 | Out-Null } catch {}
+}
 Melde 'laeuft' $null $null
-Melde 'laeuft' ('Auftrag: ' + $(if ($auftrag.Length -gt 70) { $auftrag.Substring(0, 70) + ' …' } else { $auftrag })) $null
+MeldeAuftrag
+Melde 'laeuft' 'Liest den Auftrag …' $null
 $labels = @{ Read = 'Liest'; Edit = 'Bearbeitet'; Write = 'Schreibt'; MultiEdit = 'Bearbeitet'; Bash = 'Befehl'; PowerShell = 'Befehl'; Grep = 'Sucht'; Glob = 'Sucht Dateien'; WebSearch = 'Recherchiert'; WebFetch = 'Liest Webseite'; Task = 'Helfer'; Agent = 'Helfer' }
 if ($Art -eq 'projekt') {
     $ordner = 'C:\Users\larse\Projekte'
@@ -36,6 +46,9 @@ Regeln:
 - Ist das Ergebnis im Browser anzusehen (Website, Web-App, Spiel), öffne es am Ende mit Start-Process.
 - Veröffentliche nur, wenn der Auftrag es ausdrücklich verlangt. Keine privaten Daten (Schlüssel, Mailadressen) in öffentliche Dateien.
 - Nichts an ORB selbst (C:\Users\larse\Orb, ORB.exe) ändern.
+- Melde während der Arbeit deinen Fortschritt (ORB zeigt ihn als Balken in Prozent):
+  powershell -NoProfile -ExecutionPolicy Bypass -File C:\Users\larse\Orb\fortschritt.ps1 <Prozent> "<Schritt>"
+  Richtwerte: 10 "Verstehen" (nach dem Einlesen), 30–70 "Bauen" (beim Fortschreiten erhöhen), 80 "Testen", 90 "Veröffentlichen", 100 "Fertig".
 - Deine letzte Antwort wird Larsen laut vorgelesen: EIN kurzer deutscher Satz, was fertig ist und wo er es findet.
 "@
 } else {
@@ -51,6 +64,9 @@ Regeln:
   (nur wenn orb_launcher.py geändert wurde, zusätzlich -Exe). ORB spielt das Update dann selbst ein.
 - NIEMALS selbst PyInstaller ausführen, exe-Dateien bauen/kopieren oder ORB beenden/starten. Nicht auf ORB warten.
 - Ist der Auftrag unklar oder würde er ORB beschädigen, setze die sinnvollste kleine Version um.
+- Melde während der Arbeit deinen Fortschritt (ORB zeigt ihn als Balken in Prozent):
+  powershell -NoProfile -ExecutionPolicy Bypass -File C:\Users\larse\Orb\fortschritt.ps1 <Prozent> "<Schritt>"
+  Richtwerte: 10 "Verstehen" (nach dem Einlesen), 30–70 "Bauen" (beim Fortschreiten erhöhen), 80 "Testen", 90 "Veröffentlichen", 100 "Fertig".
 - Deine letzte Antwort wird Larsen laut vorgelesen: EIN kurzer deutscher Satz, was jetzt neu ist (ohne Dateinamen/Technik).
 "@
 }

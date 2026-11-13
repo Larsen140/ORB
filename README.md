@@ -28,6 +28,7 @@ Voraussetzung für Antworten: [Claude Code](https://claude.com/claude-code) inst
 | `icloud.py` | iCloud-Kalender über CalDAV (Zugang in der Windows-Anmeldeinformationsverwaltung) |
 | `hook.py` | Claude-Code-Hooks → zeigt in ORB an, was Claude gerade tut |
 | `index.html` | Oberfläche (WebGL-Kugel, Effekte, Sounds, Einstellungen) |
+| `fortschritt.ps1` | Entwickler meldet seinen Fortschritt (Prozent + Schritt) – ORB zeigt ihn als Balken im Entwickler-Hologramm |
 | `whatsapp.ps1` | WhatsApp-Nachricht (Text/Bild) in Sekunden vorbereiten, Abschicken erst nach Bestätigung |
 | `check.py` | prüft Code und Oberfläche vor jedem Update |
 | `update.ps1` | prüfen → hochladen → ORB aktualisiert sich → Kontrolle (bei Fehler automatisch zurück) |

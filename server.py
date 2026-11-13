@@ -68,7 +68,7 @@ DEFAULT_CFG = {
 }
 # Damit ORB immer dein Claude-Code-Login (Max-Abo) nutzt und nie einen API-Schlüssel
 CLAUDE_ENV_DROP = ("ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "ANTHROPIC_BASE_URL")
-VERSION = "56"
+VERSION = "57"
 ORB_UI = ("Deine Oberfläche (die Larsen gerade sieht): in der Mitte du als flüssige leuchtende Kugel mit Tropfen, "
           "Orbit-Ringen und Sternenhimmel; links eine Uhr und darunter der Gesprächsverlauf mit Eingabefeld; rechts "
           "Karten für System (CPU, RAM, Akku), Wetter mit Stundenvorschau, Aktivität (was du gerade tust) und Vorschläge; "
@@ -1281,7 +1281,7 @@ def task_set(tid, **kw):
         t = TASKS.setdefault(tid, {"id": tid, "titel": "Aufgabe", "art": "hintergrund", "status": "laeuft",
                                    "schritt": "", "schritte": 0, "start": time.time(), "ende": 0, "ergebnis": ""})
         if kw.get("status") == "laeuft" and t.get("status") != "laeuft":
-            t.update(start=time.time(), ende=0, ergebnis="", schritte=0)   # neue Runde (z. B. nächster Entwickler-Auftrag)
+            t.update(start=time.time(), ende=0, ergebnis="", schritte=0, prozent=None, phase="", auftrag="")   # neue Runde (z. B. nächster Entwickler-Auftrag)
         if kw.get("schritt") and kw["schritt"] != t.get("schritt"):
             t["schritte"] = t.get("schritte", 0) + 1
         t.update({k: v for k, v in kw.items() if v is not None})
@@ -1290,11 +1290,37 @@ def task_set(tid, **kw):
         return dict(t)
 
 
+DEV_DIR = os.path.join(os.environ.get("LOCALAPPDATA", os.path.expanduser("~")), "ORB", "entwickler")
+
+
+def dev_fortschritt(t):
+    """Entwickler schreibt seinen Fortschritt (fortschritt.ps1) in eine Statusdatei – hier ins Hologramm übernehmen."""
+    if t.get("art") != "entwickler" or not str(t["id"]).startswith("dev-"):
+        return
+    if t["status"] == "fertig":
+        t["prozent"], t["phase"] = 100, "Fertig"
+        return
+    if t["status"] != "laeuft":
+        return
+    f = os.path.join(DEV_DIR, str(t["id"])[4:], "fortschritt.json")
+    try:
+        if os.path.getmtime(f) < t["start"] - 5:
+            return   # Datei vom vorigen Auftrag
+        with open(f, encoding="utf-8-sig") as fh:
+            d = json.load(fh)
+        t["prozent"] = max(0, min(99, int(d.get("prozent", 0))))   # 100 % erst, wenn wirklich fertig
+        t["phase"] = str(d.get("schritt") or "")[:40]
+    except (OSError, ValueError, TypeError, AttributeError):
+        pass
+
+
 def tasks_list():
     now = time.time()
     with _tasks_lock:
         for tid in [k for k, t in TASKS.items() if t["ende"] and now - t["ende"] > 600]:
             del TASKS[tid]   # fertige Aufgaben nach 10 Minuten wegräumen
+        for t in TASKS.values():
+            dev_fortschritt(t)
         return [dict(t, laeuft_seit=round(now - t["start"]), jetzt=now) for t in sorted(TASKS.values(), key=lambda t: t["start"])]
 
 
@@ -1605,7 +1631,7 @@ class Handler(BaseHTTPRequestHandler):
             if a == "start" and str(b.get("auftrag", "")).strip():
                 self.send(200, {"id": task_start(str(b.get("titel", "")).strip(), str(b["auftrag"]).strip())})
             elif a == "melde" and re.fullmatch(r"[\w-]{1,40}", str(b.get("id", ""))):
-                self.send(200, task_set(str(b["id"]), **{k: b.get(k) for k in ("titel", "art", "status", "schritt", "ergebnis")
+                self.send(200, task_set(str(b["id"]), **{k: b.get(k) for k in ("titel", "art", "status", "schritt", "ergebnis", "auftrag")
                                                          if b.get(k) is not None}))
             elif a == "abbrechen":
                 self.send(200, {"ok": task_cancel(str(b.get("id", "")))})

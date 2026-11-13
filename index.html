@@ -352,6 +352,17 @@
   .th .bar { margin-top:8px; height:2px; border-radius:2px; background:color-mix(in srgb, var(--hl) 20%, transparent); overflow:hidden; }
   .th .bar i { display:block; height:100%; width:30%; background:var(--hl); box-shadow:0 0 8px var(--hl); animation:thBar 1.6s ease-in-out infinite; }
   .th.fertig .bar i, .th.fehler .bar i, .th.abgebrochen .bar i { width:100%; animation:none; }
+  .th.dev { width:250px; }
+  .th .au { margin-top:6px; font-size:11.5px; line-height:1.35; opacity:.75; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+  .th .au:empty { display:none; }
+  .th .au::after { content:attr(data-ab); display:block; margin-top:2px; font-size:10px; letter-spacing:.08em; opacity:.8; font-variant-numeric:tabular-nums; }
+  .th .pw { display:flex; align-items:center; gap:9px; margin-top:8px; }
+  .th .pw .bar { flex:1; margin-top:0; }
+  .th .pz { flex:none; font-size:11px; font-weight:700; font-variant-numeric:tabular-nums; color:var(--hl); text-shadow:0 0 8px var(--hl); max-width:60%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .th .pz:empty { display:none; }
+  .th.pro .bar { height:5px; border-radius:3px; }
+  .th.pro .bar i { animation:none; border-radius:3px; transition:width .8s cubic-bezier(.2,.8,.2,1);
+    background:linear-gradient(90deg, rgb(var(--c2)), var(--hl)); }
   .th { touch-action:pan-y; user-select:none; }
   .th .x { position:absolute !important; top:6px; right:6px; z-index:2; width:20px; height:20px; border-radius:50%; border:0; display:grid; place-items:center;
     background:color-mix(in srgb, var(--hl) 14%, transparent); color:inherit; opacity:.7; cursor:pointer; font-size:11px; line-height:1;
@@ -1680,7 +1691,7 @@ function renderTasks(list) {
     let el = taskEls[t.id];
     if (!el) {
       el = taskEls[t.id] = document.createElement('div');
-      el.innerHTML = '<div class="tt"><span class="ring"></span><span class="nm"></span><span class="zt"></span></div><div class="st"></div><div class="bar"><i></i></div><button class="stop" title="Aufgabe abbrechen">■</button><button class="x" title="Hologramm schließen">✕</button>';
+      el.innerHTML = '<div class="tt"><span class="ring"></span><span class="nm"></span><span class="zt"></span></div><div class="au"></div><div class="st"></div><div class="pw"><div class="bar"><i></i></div><b class="pz"></b></div><button class="stop" title="Aufgabe abbrechen">■</button><button class="x" title="Hologramm schließen">✕</button>';
       el.querySelector('.stop').onclick = e => { e.stopPropagation();
         fetch('/aufgabe', { method:'POST', headers:{ 'Content-Type':'application/json' }, body:JSON.stringify({ aktion:'abbrechen', id:t.id }) }).catch(() => {}); };
       el.querySelector('.x').onclick = e => { e.stopPropagation(); holoZu(t.id, el); };
@@ -1698,6 +1709,14 @@ function renderTasks(list) {
     el.querySelector('.nm').textContent = (t.art === 'entwickler' ? '⚙ ' : '') + t.titel;
     el.querySelector('.zt').textContent = t.status === 'laeuft' ? fmtZeit(t.laeuft_seit) : (t.status === 'fertig' ? '✓' : '✕');
     el.querySelector('.st').textContent = t.status === 'laeuft' ? (t.schritt || 'Arbeitet …') : (t.ergebnis || '');
+    // Entwickler: Auftrag, Startzeit und Fortschritt in Prozent (aus seiner Statusdatei)
+    const dev = t.art === 'entwickler', pz = typeof t.prozent === 'number' ? t.prozent : null;
+    const ab = new Date((t.jetzt - t.laeuft_seit) * 1000).toLocaleTimeString('de-DE', { hour:'2-digit', minute:'2-digit' });
+    el.querySelector('.au').textContent = dev && t.auftrag ? t.auftrag : '';
+    el.querySelector('.au').dataset.ab = dev ? 'Start ' + ab : '';
+    el.classList.toggle('pro', dev && pz !== null);
+    el.querySelector('.bar i').style.width = dev && pz !== null ? pz + '%' : '';
+    el.querySelector('.pz').textContent = dev && pz !== null ? (t.status === 'fertig' ? 'Fertig' : pz + ' %' + (t.phase ? ' · ' + t.phase : '')) : '';
     // fertige Hologramme nach 45 s ausblenden
     if (t.status !== 'laeuft' && t.jetzt - t.ende > 45) { el._weg = true; el.classList.add('weg'); }
   }
