@@ -495,6 +495,27 @@
   #webh.fenster iframe { display:none; } #webh.fenster .wf { display:flex; }
   #webh .wf button { padding:9px 18px; border-radius:18px; border:1px solid rgba(var(--hl),.6); background:rgba(var(--hl),.2); color:inherit; font:inherit;
     font-weight:700; letter-spacing:.1em; cursor:pointer; box-shadow:0 0 18px rgba(var(--hl),.3); }
+  /* „Echte Farben“: Bild-/Web-Hologramm ohne Effekte (keine Scanlines, kein Flackern, keine Tönung) – Inhalt wie auf Handy/PC */
+  #bildh .ef, #webh .ef { display:flex; align-items:center; gap:6px; white-space:nowrap; }
+  #bildh .ef { position:absolute; top:8px; right:42px; z-index:2; height:26px; padding:0 10px; border:0; border-radius:13px; cursor:pointer;
+    background:rgba(10,14,30,.5); color:inherit; font:inherit; font-size:10px; font-weight:700; letter-spacing:.1em; text-transform:uppercase; opacity:.75;
+    box-shadow:inset 0 0 0 1px rgba(var(--hl),.45); transition:opacity .2s, transform .3s var(--spring), background .2s; }
+  #bildh .ef:hover { opacity:1; transform:scale(1.06); background:rgba(var(--hl),.3); }
+  #bildh .ef b, #webh .ef b { width:7px; height:7px; border-radius:50%; flex:none; box-shadow:inset 0 0 0 1.5px currentColor; transition:background .2s; }
+  #bildh .ef.an b, #webh .ef.an b { background:currentColor; }
+  #bildh .ef.an, #webh .ef.an { opacity:1; }
+  @keyframes reinAuf { from { opacity:0; } to { opacity:1; } }
+  @keyframes reinAb { from { opacity:1; } to { opacity:0; } }
+  #bildh.rein, #webh.rein { background:rgba(14,16,22,.94); border-color:rgba(255,255,255,.2); backdrop-filter:none; -webkit-backdrop-filter:none; }
+  #bildh.rein { box-shadow:0 14px 40px rgba(0,0,0,.5); }
+  #bildh.rein.gross { box-shadow:0 0 0 100vmax rgba(2,4,12,.62), 0 24px 70px rgba(0,0,0,.6); }
+  #webh.rein { box-shadow:0 0 0 100vmax rgba(2,4,12,.5), 0 24px 70px rgba(0,0,0,.6); }
+  #bildh.rein.on, #webh.rein.on { animation:reinAuf .3s ease backwards; }
+  #bildh.rein.zu, #webh.rein.zu { animation:reinAb .3s ease forwards; }
+  #bildh.rein::before, #bildh.rein::after, #webh.rein::after, #webh.rein .wk::before { display:none; }
+  #bildh.rein img { filter:none; }
+  #bildh.rein .tt, #webh.rein .wk { text-shadow:none; }
+  #webh.rein .wb { box-shadow:0 0 0 1px rgba(255,255,255,.12); background:#fff; }
   #holo.glitch { animation:holoGlitch .45s steps(2) 1; }
   #holo .ico { font-size:38px; line-height:1.1; filter:grayscale(1) brightness(1.8) drop-shadow(0 0 10px rgb(var(--hl))); }
   #holo .big { font-size:46px; font-weight:250; line-height:1.05; letter-spacing:-.01em; }
@@ -587,13 +608,13 @@
 <div id="hint" class="glass"></div>
 <div id="caption"></div>
 <div id="holo"><div class="ico"></div><div class="big"></div><div class="sub"></div></div>
-<div id="bildh" title="Klicken zum Vergrößern"><button class="x" title="Schließen">✕</button><img alt=""><div class="tt"><i></i><span></span></div></div>
+<div id="bildh" title="Klicken zum Vergrößern"><button class="ef" title="Ohne Hologramm-Effekte – so, wie es auf Handy/PC aussieht"><b></b>Echte Farben</button><button class="x" title="Schließen">✕</button><img alt=""><div class="tt"><i></i><span></span></div></div>
 <div id="goldh"><div class="gf"></div><button class="x" title="Schließen">✕</button><div class="gk"><i></i>XAU/USD <b>· Live</b></div>
   <div class="gp"><small>$</small><span>–</span><em></em></div><div class="gd">Lade Kurs …</div>
   <svg viewBox="0 0 240 54" preserveAspectRatio="none"><defs><linearGradient id="goldVerlauf" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="rgb(255,196,70)" stop-opacity=".35"/><stop offset="1" stop-color="rgb(255,196,70)" stop-opacity="0"/></linearGradient></defs>
     <line class="ba" x1="0" x2="240" y1="27" y2="27"/><g class="zug"><path class="ar"/><path class="ln"/><circle r="3" cx="-10" cy="27"/></g></svg>
   <div class="gz"><i></i></div></div>
-<div id="webh"><div class="wk"><i></i><span>Webseite</span><small></small><button class="neu" title="Neu laden">⟳</button><button class="br" title="Im normalen Browser öffnen">Im Browser ↗</button><button class="x" title="Schließen">✕</button></div><div class="wb"><iframe sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox allow-modals allow-downloads allow-presentation" allow="fullscreen; clipboard-write; geolocation" referrerpolicy="no-referrer-when-downgrade"></iframe><div class="wf"><div>Diese Seite läuft in der echten Webansicht über dem Hologramm.</div><button class="vor">Nach vorne holen</button></div></div></div>
+<div id="webh"><div class="wk"><i></i><span>Webseite</span><small></small><button class="ef" title="Ohne Hologramm-Effekte – so, wie es auf Handy/PC aussieht"><b></b>Echte Farben</button><button class="neu" title="Neu laden">⟳</button><button class="br" title="Im normalen Browser öffnen">Im Browser ↗</button><button class="x" title="Schließen">✕</button></div><div class="wb"><iframe sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox allow-modals allow-downloads allow-presentation" allow="fullscreen; clipboard-write; geolocation" referrerpolicy="no-referrer-when-downgrade"></iframe><div class="wf"><div>Diese Seite läuft in der echten Webansicht über dem Hologramm.</div><button class="vor">Nach vorne holen</button></div></div></div>
 <div id="dock" class="glass rim">
   <button class="ic" id="kb" title="Tippen (T)"><svg viewBox="0 0 24 24"><path d="M20 5H4a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2zm-9 3h2v2h-2V8zm0 3h2v2h-2v-2zM8 8h2v2H8V8zm0 3h2v2H8v-2zM5 8h2v2H5V8zm0 3h2v2H5v-2zm11 5H8v-2h8v2zm0-3h-2v-2h2v2zm0-3h-2V8h2v2zm3 3h-2v-2h2v2zm0-3h-2V8h2v2z"/></svg></button>
   <button class="ic" id="mic" title="Halten zum Sprechen (Leertaste) · 2× klatschen · „Jarvis“"><svg viewBox="0 0 24 24"><path d="M12 15a3 3 0 0 0 3-3V6a3 3 0 0 0-6 0v6a3 3 0 0 0 3 3zm5-3a5 5 0 0 1-10 0H5a7 7 0 0 0 6 6.9V22h2v-3.1a7 7 0 0 0 6-6.9z"/></svg></button>
@@ -1613,6 +1634,12 @@ async function runDemo() {
 }
 let lastDemo = null;
 document.addEventListener('keydown', e => { if ((e.key === 'd' || e.key === 'D') && e.target.tagName !== 'INPUT') runDemo(); });
+/* ---------- Echte Farben: Bild-/Web-Hologramm ohne Effekte (Wahl wird gemerkt) ---------- */
+let echtStd = false;
+try { echtStd = localStorage.getItem('orbEchteFarben') === '1'; } catch (e) {}
+function reinSetzen(el, an) { el.classList.toggle('rein', !!an); el.querySelector('.ef').classList.toggle('an', !!an); }
+function reinUmschalten(el) { const an = !el.classList.contains('rein'); reinSetzen(el, an); echtStd = an;
+  try { localStorage.setItem('orbEchteFarben', an ? '1' : '0'); } catch (e) {} SFX.holo(); }
 /* ---------- Bild-Hologramm ---------- */
 let bildN = null, bildUrl = '', bildTimer = 0;
 function bildZu() { const el = $('bildh'); clearTimeout(bildTimer); if (!el.classList.contains('on') || el.classList.contains('zu')) return;
@@ -1629,13 +1656,14 @@ async function bildHolo(b) {
     const el = $('bildh'), img = el.querySelector('img');
     await new Promise(ok => { img.onload = img.onerror = ok; img.src = url; });
     if (bildUrl) URL.revokeObjectURL(bildUrl); bildUrl = url;
-    el.querySelector('.tt span').textContent = b.name || 'Neues Bild';
+    el.querySelector('.tt span').textContent = b.name || 'Neues Bild'; reinSetzen(el, b.rein || echtStd);
     clearTimeout(bildZu._t); el.classList.remove('on', 'gross', 'zu'); holoPlatz._k = ''; holoPlatz(); void el.offsetWidth; el.classList.add('on'); holoPlatz._k = '';
     SFX.holo(); ripple(.6); burst(24); bildWarte(14000);
   } catch (e) {}
 }
 $('bildh').addEventListener('click', e => { const el = $('bildh');
   if (e.target.classList.contains('x')) { bildZu(); return; }
+  if (e.target.closest('.ef')) { reinUmschalten(el); bildWarte(14000); return; }
   el.classList.toggle('gross'); holoPlatz._k = ''; SFX.holo(); bildWarte(14000); });
 // Großansicht: Klick daneben verkleinert wieder
 document.addEventListener('pointerdown', e => { const el = $('bildh');
@@ -1728,7 +1756,7 @@ function webHolo(w) {
     const el = $('webh'), f = el.querySelector('iframe');
     let host = ''; try { host = new URL(w.url).hostname.replace(/^www\./, ''); } catch (e) {}
     el.querySelector('.wk span').textContent = w.titel || host || 'Webseite';
-    el.querySelector('.wk small').textContent = host;
+    el.querySelector('.wk small').textContent = host; reinSetzen(el, w.rein || echtStd);
     clearTimeout(webZu._t); el.classList.remove('on', 'zu', 'fenster', 'laedt'); void el.offsetWidth;
     el.classList.add('on'); SFX.holo(); ripple(.6); burst(24);
     if (w.modus === 'fenster') { el.classList.add('fenster'); f.src = 'about:blank'; setTimeout(webFenster, 850); }   // nach der Auf-Animation
@@ -1742,6 +1770,7 @@ function webHolo(w) {
 { const el = $('webh');
   el.querySelector('iframe').addEventListener('load', () => el.classList.remove('laedt'));
   el.querySelector('.x').addEventListener('click', () => webZu());
+  el.querySelector('.ef').addEventListener('click', () => reinUmschalten(el));
   el.querySelector('.br').addEventListener('click', () => { fetch('/web/browser', { method:'POST', body:'{}' }).catch(() => {}); webZu(false); });
   el.querySelector('.neu').addEventListener('click', () => {
     if (webModus === 'fenster') { webFenster(); return; }

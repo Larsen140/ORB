@@ -68,7 +68,7 @@ DEFAULT_CFG = {
 }
 # Damit ORB immer dein Claude-Code-Login (Max-Abo) nutzt und nie einen API-Schlüssel
 CLAUDE_ENV_DROP = ("ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "ANTHROPIC_BASE_URL")
-VERSION = "61"
+VERSION = "62"
 ORB_UI = ("Deine Oberfläche (die Larsen gerade sieht): in der Mitte du als flüssige leuchtende Kugel mit Tropfen, "
           "Orbit-Ringen und Sternenhimmel; links eine Uhr und darunter der Gesprächsverlauf mit Eingabefeld; rechts "
           "Karten für System (CPU, RAM, Akku), Wetter mit Stundenvorschau, Aktivität (was du gerade tust) und Vorschläge; "
@@ -111,11 +111,11 @@ KALENDER_REGELN = (
 # ---------- Bild-Hologramme: neue Bilder (z. B. von Claude erstellt) sofort in ORB einblenden ----------
 BILD_ORDNER = os.path.join(os.path.expanduser("~"), "Pictures", "ORB Bilder")
 BILD_ENDUNGEN = (".png", ".jpg", ".jpeg", ".webp", ".gif", ".bmp")
-BILD = {"n": 0, "pfad": "", "name": "", "zeit": 0.0}
+BILD = {"n": 0, "pfad": "", "name": "", "zeit": 0.0, "rein": False}
 BILD_LOCK = threading.Lock()
 
 
-def bild_zeigen(pfad):
+def bild_zeigen(pfad, rein=False):
     """Bild als Hologramm anzeigen lassen (die Seite holt es über /bild). Gibt True zurück, wenn es gültig ist."""
     pfad = os.path.abspath(str(pfad or "").strip().strip('"'))
     if not pfad.lower().endswith(BILD_ENDUNGEN) or not os.path.isfile(pfad):
@@ -127,8 +127,10 @@ def bild_zeigen(pfad):
         return False
     with BILD_LOCK:
         if pfad == BILD["pfad"] and time.time() - BILD["zeit"] < 8:
+            BILD["rein"] = BILD["rein"] or bool(rein)
             return True   # Skript und Ordner-Beobachtung melden dasselbe Bild nur einmal
-        BILD.update(n=BILD["n"] + 1, pfad=pfad, name=os.path.splitext(os.path.basename(pfad))[0], zeit=time.time())
+        BILD.update(n=BILD["n"] + 1, pfad=pfad, name=os.path.splitext(os.path.basename(pfad))[0], zeit=time.time(),
+                    rein=bool(rein))
     return True
 
 
@@ -163,13 +165,14 @@ def bild_wache():
 BILD_REGELN = (
     "Bilder, die du für Larsen erstellst, speicherst du als PNG in \"%USERPROFILE%\\Pictures\\ORB Bilder\" – ORB blendet "
     "sie dann automatisch als Hologramm ein. Liegt ein Bild woanders, zeigst du es mit: powershell -NoProfile "
-    "-ExecutionPolicy Bypass -File \"$env:LOCALAPPDATA\\ORB\\app\\bild_zeigen.ps1\" \"<Pfad zum Bild>\".")
+    "-ExecutionPolicy Bypass -File \"$env:LOCALAPPDATA\\ORB\\app\\bild_zeigen.ps1\" \"<Pfad zum Bild>\". Soll Larsen die echten Farben "
+    "ohne Hologramm-Effekte sehen (z. B. Designs, Fotos), hänge -Rein an.")
 
 
 # ---------- Web-Hologramme: echte, bedienbare Webseite im Hologramm-Fenster ----------
 # Erlaubt die Seite das Einbetten, läuft sie direkt im Hologramm (iframe). Verbietet sie es (X-Frame-Options /
 # frame-ancestors), öffnet ORB eine echte Webansicht (Edge-App-Fenster) genau über dem Hologramm.
-WEB = {"n": 0, "url": "", "titel": "", "modus": "", "proc": None, "hwnd": 0}
+WEB = {"n": 0, "url": "", "titel": "", "modus": "", "proc": None, "hwnd": 0, "rein": False}
 WEB_LOCK = threading.Lock()
 WEB_PROFIL = os.path.join(os.environ.get("LOCALAPPDATA", os.path.expanduser("~")), "ORB", "webansicht")
 
@@ -206,7 +209,7 @@ def web_pruefen(url):
     return True, ziel, titel
 
 
-def web_zeigen(url, titel=""):
+def web_zeigen(url, titel="", rein=False):
     """Webseite als bedienbares Hologramm anzeigen. Gibt (ok, Antwort-Daten) zurück."""
     url = str(url or "").strip().strip('"')
     if url and not re.match(r"^https?://", url, re.I):
@@ -215,9 +218,15 @@ def web_zeigen(url, titel=""):
         return False, {"fehler": "Keine gültige Adresse"}
     einbettbar, ziel, t = web_pruefen(url)
     web_schliessen_fenster()
+    # lokale Bild-Werkstatt (Port 8790) immer ohne Hologramm-Effekte – dort zählen die echten Farben
+    try:
+        ort = urlparse(ziel or url)
+        rein = bool(rein) or (ort.hostname in ("127.0.0.1", "localhost") and ort.port == 8790)
+    except ValueError:
+        rein = bool(rein)
     with WEB_LOCK:
         WEB.update(n=WEB["n"] + 1, url=ziel or url, titel=str(titel or t or urlparse(url).hostname or url)[:80],
-                   modus="iframe" if einbettbar else "fenster", hwnd=0)
+                   modus="iframe" if einbettbar else "fenster", hwnd=0, rein=rein)
     return True, {"modus": WEB["modus"], "url": WEB["url"], "titel": WEB["titel"]}
 
 
@@ -339,7 +348,8 @@ def web_schliessen():
 WEB_REGELN = (
     "Webseiten zeigst du Larsen nicht als Screenshot, sondern als echte, bedienbare Webseite im Hologramm: "
     "powershell -NoProfile -ExecutionPolicy Bypass -File \"$env:LOCALAPPDATA\\ORB\\app\\web_zeigen.ps1\" \"<URL>\" "
-    "(optional -Titel \"…\"). Larsen kann darin klicken, scrollen und tippen.")
+    "(optional -Titel \"…\"). -Rein zeigt sie ohne Hologramm-Effekte in echten Farben. "
+    "Larsen kann darin klicken, scrollen und tippen.")
 
 
 def system_prompt(cfg):
@@ -1730,10 +1740,10 @@ class Handler(BaseHTTPRequestHandler):
                 st = read_state()
             st["busy"] = BRAIN.busy
             st["aufgaben"] = tasks_list()   # Hintergrund-Aufgaben + Entwickler (je ein Hologramm)
-            st["bild"] = {"n": BILD["n"], "name": BILD["name"]}   # Bild-Hologramm
+            st["bild"] = {"n": BILD["n"], "name": BILD["name"], "rein": BILD["rein"]}   # Bild-Hologramm
             st["gold"] = GOLD["n"]   # Gold-Hologramm auf Zuruf
             st["web"] = {"n": WEB["n"], "url": WEB["url"], "titel": WEB["titel"], "modus": WEB["modus"],
-                         "lebt": web_lebt()}   # Web-Hologramm
+                         "lebt": web_lebt(), "rein": WEB["rein"]}   # Web-Hologramm
             st["anruf"] = in_call()   # während Meet/Teams/Zoom nicht zuhören
             st["version"] = VERSION   # Fenster lädt sich neu, wenn eine neue Version läuft
             for i, p in enumerate(st.get("parts") or []):   # Stimme für alle Stücke vorbereiten
@@ -1888,9 +1898,9 @@ class Handler(BaseHTTPRequestHandler):
             else:
                 self.send(400, {"ok": False})
         elif u.path == "/bild":   # bild_zeigen.ps1: Bild sofort als Hologramm einblenden
-            self.send(200, {"ok": bild_zeigen(b.get("pfad"))})
+            self.send(200, {"ok": bild_zeigen(b.get("pfad"), b.get("rein"))})
         elif u.path == "/web":   # web_zeigen.ps1: Webseite als bedienbares Hologramm
-            ok, d = web_zeigen(b.get("url"), b.get("titel"))
+            ok, d = web_zeigen(b.get("url"), b.get("titel"), b.get("rein"))
             self.send(200, dict(d, ok=ok))
         elif u.path == "/web/fenster":   # Oberfläche: echte Webansicht über dem Hologramm öffnen/ausrichten
             try:
