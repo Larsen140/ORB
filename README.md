@@ -12,7 +12,7 @@ Voraussetzung für Antworten: [Claude Code](https://claude.com/claude-code) inst
 ## Was ORB kann
 - **Wecken mit Doppelklatschen** – auch direkt nach dem PC-Start (lauscht unsichtbar im Hintergrund, ~70 MB).
 - **Gespräch**: hört dauerhaft zu, bis man „Stopp“ sagt; „Jarvis“ unterbricht ihn.
-- **Antwortet laut** auf Deutsch (Microsoft-Neural-Stimmen oder ElevenLabs), Satz für Satz, während die Antwort entsteht.
+- **Antwortet laut** auf Deutsch (Microsoft-Neural-Stimmen), Satz für Satz, während die Antwort entsteht.
 - **Apps & Webseiten öffnen**, Wetter, Termine, Spotify-Steuerung – ohne Token.
 - **Oberfläche** im Liquid-Glass-Stil mit Uhr, Gesprächsverlauf, System, Wetter, Termine, Spotify und Vorschlägen.
 - **Wissensbasis**: arbeitet im Ordner `Documents\Jarvis` und merkt sich dort alles.

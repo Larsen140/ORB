@@ -46,7 +46,7 @@ DEFAULT_CFG = {
     "farbe": "rot", "effekte": "mittel", "untertitel": True,
     "sfx": True, "sfxlaut": 60, "ambient": False,
     "steuerung": "taste", "wakeword": "Jarvis", "unterbrechen": True,
-    "tts_anbieter": "edge", "el_key": "", "el_voice": "", "el_modell": "eleven_flash_v2_5",
+    "tts_anbieter": "edge",
     "klatschen": True, "dauerzuhoeren": True, "empfindlichkeit": 6, "begruessung": True, "ort": "", "name": "",
     "schlafen": 5, "vollbild": True, "autostart": True, "schlaf_schliessen": True, "bildschirm": False,
     "modell": "claude-opus-5-5", "laenge": "kurz", "rechte": "auto", "tempo_claude": "low",
@@ -54,7 +54,7 @@ DEFAULT_CFG = {
 }
 # Damit ORB immer dein Claude-Code-Login (Max-Abo) nutzt und nie einen API-Schlüssel
 CLAUDE_ENV_DROP = ("ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "ANTHROPIC_BASE_URL")
-VERSION = "29"
+VERSION = "30"
 ORB_UI = ("Deine Oberfläche (die Larsen gerade sieht): in der Mitte du als flüssige leuchtende Kugel mit Tropfen, "
           "Orbit-Ringen und Sternenhimmel; links eine Uhr und darunter der Gesprächsverlauf mit Eingabefeld; rechts "
           "Karten für System (CPU, RAM, Akku), Wetter mit Stundenvorschau, Aktivität (was du gerade tust) und Vorschläge; "
@@ -140,13 +140,12 @@ def save_cfg(patch):
     with _cfg_lock:
         cfg = load_cfg()
         old = dict(cfg)
-        cfg.update({k: v for k, v in patch.items() if k in DEFAULT_CFG
-                    and not (k == "el_key" and str(v).startswith("••"))})
+        cfg.update({k: v for k, v in patch.items() if k in DEFAULT_CFG})
+        for k in [k for k in cfg if k not in DEFAULT_CFG]:
+            del cfg[k]   # alte Einträge (z. B. ElevenLabs) aufräumen
         os.makedirs(HOME, exist_ok=True)
         with open(CONFIG, "w", encoding="utf-8") as f:
             json.dump(cfg, f, ensure_ascii=False, indent=2)
-    if "el_key" in patch or "el_voice" in patch:
-        EL_FAIL[0] = 0.0   # neuer Schlüssel/neue Stimme → sofort wieder versuchen
     if "autostart" in patch:
         set_autostart(bool(cfg["autostart"]))
     # Claude mit neuen Einstellungen neu starten (passiert beim nächsten Auftrag)
@@ -199,39 +198,9 @@ def write_answer(text, **kw):
 
 
 # ---------- Sprachausgabe ----------
-EL_FAIL = [0.0]   # Zeitpunkt der letzten Ablehnung (ungültiger Schlüssel)
-
-
-def synth_eleven(text, cfg):
-    """ElevenLabs – sehr natürliche Stimme (braucht eigenen API-Schlüssel)."""
-    body = json.dumps({"text": text, "model_id": cfg.get("el_modell") or "eleven_flash_v2_5",
-                       "voice_settings": {"stability": .42, "similarity_boost": .8, "style": .25, "use_speaker_boost": True,
-                                          "speed": max(.7, min(1.2, 1 + int(str(cfg.get("tempo", "+0%")).strip("%+") or 0) / 100))}}).encode()
-    req = urllib.request.Request("https://api.elevenlabs.io/v1/text-to-speech/%s?output_format=mp3_44100_128" % cfg["el_voice"],
-                                 data=body, method="POST",
-                                 headers={"xi-api-key": cfg["el_key"], "Content-Type": "application/json", "Accept": "audio/mpeg"})
-    with urllib.request.urlopen(req, timeout=20) as r:
-        return r.read()
-
-
-def el_voices(key):
-    req = urllib.request.Request("https://api.elevenlabs.io/v1/voices", headers={"xi-api-key": key})
-    with urllib.request.urlopen(req, timeout=10) as r:
-        return [[v["voice_id"], v["name"] + (" · " + v.get("labels", {}).get("gender", "") if v.get("labels") else "")]
-                for v in json.loads(r.read().decode()).get("voices", [])]
-
-
 def synth(text, cfg=None):
-    """ElevenLabs (falls eingerichtet) → Microsoft-Neural-Stimme (online) → Windows-Stimme (offline)."""
+    """Microsoft-Neural-Stimme (online) → Windows-Stimme (offline)."""
     cfg = cfg or load_cfg()
-    if (cfg.get("tts_anbieter") == "elevenlabs" and cfg.get("el_key") and cfg.get("el_voice")
-            and time.time() - EL_FAIL[0] > 600):   # nach Ablehnung 10 Min. nicht erneut versuchen (spart Zeit pro Satz)
-        try:
-            return synth_eleven(text, cfg)
-        except Exception as e:
-            if "401" in str(e) or "403" in str(e):
-                EL_FAIL[0] = time.time()
-            print("ElevenLabs-Fehler, nutze Microsoft-Stimme:", e)
     try:
         import asyncio
         import edge_tts
@@ -527,6 +496,7 @@ class Brain:
         self.full = ""
         self.aid = ""
         self.last_used = 0.0
+        self.last_out = 0.0     # letzte Ausgabe des Gehirns (für den Hänger-Wächter)
 
     def alive(self):
         return self.proc is not None and self.proc.poll() is None
@@ -563,7 +533,7 @@ class Brain:
             self.start()
             self.busy, self.stopped = True, False
             self.buf, self.full, self.spoken, self.aid = "", "", [], new_aid()
-            self.last_used = time.time()
+            self.last_used = self.last_out = time.time()
             write_state(mode="denkt", heard=text, log=[], task="", detail="", say="", parts=[], aid=self.aid, final=False, holo=None)
             if load_cfg().get("bildschirm"):
                 try:   # aktueller Bildschirm für ORB (nur ansehen, wenn die Frage ihn betrifft)
@@ -647,6 +617,7 @@ class Brain:
                 write_answer("Da ist leider etwas schiefgelaufen.")
 
     def handle(self, o):
+        self.last_out = time.time()
         if True:
             typ = o.get("type")
             if typ == "system" and o.get("subtype") == "init" and o.get("session_id"):
@@ -791,8 +762,14 @@ def idle_reaper():
     """Claude nach 15 Minuten ohne Frage beenden, damit es keinen Speicher belegt (~250 MB)."""
     while True:
         time.sleep(30)
-        if BRAIN.alive() and not BRAIN.busy and time.time() - BRAIN.last_used > 900:
+        if BRAIN.alive() and not BRAIN.busy and time.time() - BRAIN.last_used > 600:
             BRAIN.kill()
+        if BRAIN.busy and time.time() - BRAIN.last_out > 180:
+            # Gehirn hängt (3 Min. ohne jede Ausgabe) → abbrechen statt ewig „denkt“
+            BRAIN.stopped = True
+            BRAIN.kill()
+            BRAIN.busy = False
+            write_answer("Das hat zu lange gedauert, ich habe abgebrochen. Frag mich bitte noch einmal.")
 
 
 # ---------- HTTP ----------
@@ -851,6 +828,11 @@ class Handler(BaseHTTPRequestHandler):
             if q.get("aktiv") == "1":
                 LAST_ACTIVE[0] = time.time()
             st = read_state()
+            if (st.get("mode") in ("denkt", "auftrag", "wartet") and not BRAIN.busy
+                    and time.time() - float(st.get("time") or 0) > 90):
+                # Rest eines abgebrochenen Auftrags (z. B. Claude-Code-Sitzung ohne Abschluss) → wieder bereit
+                write_state(mode="idle", task="", detail="", log=[])
+                st = read_state()
             st["busy"] = BRAIN.busy
             st["version"] = VERSION   # Fenster lädt sich neu, wenn eine neue Version läuft
             for i, p in enumerate(st.get("parts") or []):   # Stimme für alle Stücke vorbereiten
@@ -875,13 +857,7 @@ class Handler(BaseHTTPRequestHandler):
             self.audio(synth(q.get("text") or "Hallo! So klinge ich mit diesen Einstellungen.", cfg))
         elif u.path == "/config":
             c = load_cfg()
-            c["el_key"] = ("••••" + c["el_key"][-4:]) if c.get("el_key") else ""   # Schlüssel nie ganz zurückgeben
             self.send(200, {"config": c, "stimmen": STIMMEN})
-        elif u.path == "/el_voices":
-            try:
-                self.send(200, {"voices": el_voices(load_cfg().get("el_key", ""))})
-            except Exception as e:
-                self.send(200, {"voices": [], "error": str(e)[:120]})
         elif u.path == "/version":
             self.send(200, {"version": VERSION})
         elif u.path == "/sys":

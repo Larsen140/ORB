@@ -24,6 +24,9 @@ LEAN = [
     "AutofillServerCommunication,OptimizationHints,MediaRouter,BackForwardCache,Prerender2,"
     "SpareRendererForSitePerProcess,msEdgeEnableNurturingFramework,EdgeShoppingAssistant",
     "--disk-cache-size=1048576",
+    # Speicher sparen: Grafikspeicher und JS-Heap begrenzen (gemessen ~50 MB weniger, Bild bleibt gleich)
+    "--force-gpu-mem-available-mb=192", "--force-gpu-mem-discardable-limit-mb=64", "--disable-gpu-program-cache",
+    "--js-flags=--max-old-space-size=128",
     # damit Zuhören/Klatschen auch weiterläuft, wenn das Fenster nicht im Vordergrund ist
     "--disable-background-timer-throttling", "--disable-renderer-backgrounding", "--disable-backgrounding-occluded-windows",
     "--window-size=1200,820",
