@@ -68,7 +68,7 @@ DEFAULT_CFG = {
 }
 # Damit ORB immer dein Claude-Code-Login (Max-Abo) nutzt und nie einen API-Schlüssel
 CLAUDE_ENV_DROP = ("ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "ANTHROPIC_BASE_URL")
-VERSION = "43"
+VERSION = "44"
 ORB_UI = ("Deine Oberfläche (die Larsen gerade sieht): in der Mitte du als flüssige leuchtende Kugel mit Tropfen, "
           "Orbit-Ringen und Sternenhimmel; links eine Uhr und darunter der Gesprächsverlauf mit Eingabefeld; rechts "
           "Karten für System (CPU, RAM, Akku), Wetter mit Stundenvorschau, Aktivität (was du gerade tust) und Vorschläge; "
@@ -81,6 +81,13 @@ KURZ_REGELN = ("Antworte immer auf Deutsch. Du sprichst über ORB, eine Sprachob
 LANG_REGELN = ("Antworte immer auf Deutsch. Du sprichst über ORB, eine Sprachoberfläche; alles wird laut vorgelesen. Antworte natürlich "
                "gesprochen ohne Markdown oder Listen; ausführlicher ist erlaubt, wenn es nötig ist.")
 
+MAIL_REGELN = (
+    "Larsens Gmail erreichst du über die claude.ai-Connector-Werkzeuge (mcp__claude_ai_Gmail__…; bei Bedarf mit "
+    "ToolSearch nach \"gmail\" laden). Mails lesen, suchen und zusammenfassen darfst du jederzeit. Eine Mail abschicken "
+    "oder einen Entwurf versenden NUR, nachdem du Larsen Empfänger und Inhalt kurz genannt hast und er ausdrücklich "
+    "zugestimmt hat. Findest du keine Gmail-Werkzeuge, sag ehrlich, dass die Gmail-Verbindung gerade nicht erreichbar "
+    "ist und er es gleich noch einmal versuchen soll – erfinde keine Mails.")
+MAIL_WORT = re.compile(r"\b(e-?mails?|mails?|gmail|postfach|posteingang|inbox|nachrichten von google)\b", re.I)
 KALENDER_REGELN = (
     "Larsens Kalender ist sein iCloud-Kalender (iPhone); das Termine-Widget links zeigt ihn. Termine trägst du NICHT in "
     "termine.md ein, sondern über ORBs Kalender-Skript (es kümmert sich selbst um die Anmeldung): "
@@ -103,7 +110,7 @@ def system_prompt(cfg):
     except Exception:
         kal = ""
     return ((persona + "\n\n" if persona else "") + ORB_UI + "\n\n"
-            + (KURZ_REGELN if cfg.get("laenge") == "kurz" else LANG_REGELN) + kal)
+            + (KURZ_REGELN if cfg.get("laenge") == "kurz" else LANG_REGELN) + "\n\n" + MAIL_REGELN + kal)
 
 
 KURZ_PROMPT = ("Du sprichst gerade über ORB, eine Sprachoberfläche; deine Antwort wird laut vorgelesen. "
@@ -625,6 +632,8 @@ class Brain:
         self.aid = ""
         self.last_used = 0.0
         self.last_out = 0.0     # letzte Ausgabe des Gehirns (für den Hänger-Wächter)
+        self.gmail = False      # claude.ai-Gmail-Connector in dieser Sitzung verbunden?
+        self.gmail_retry = 0.0  # letzter Neustart, um Gmail neu zu verbinden
 
     def alive(self):
         return self.proc is not None and self.proc.poll() is None
@@ -642,7 +651,10 @@ class Brain:
         ordner = cfg["ordner"] if os.path.isdir(cfg["ordner"]) else os.path.expanduser("~")
         env = {k: v for k, v in os.environ.items() if k not in CLAUDE_ENV_DROP}
         env["ORB_RUN"] = "1"
-        self.proc = subprocess.Popen(args, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+        # claude.ai-Connectoren (Gmail, Drive) beim Start abwarten statt nur im Hintergrund zu verbinden
+        env.setdefault("MCP_CONNECTION_NONBLOCKING", "false")
+        self.gmail = False
+        self.proc =subprocess.Popen(args, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
                                      cwd=ordner, env=env, creationflags=NO_WINDOW)
         self.started_with_session = bool(cfg.get("sitzung"))
         threading.Thread(target=self.reader, args=(self.proc,), daemon=True).start()
@@ -658,6 +670,11 @@ class Brain:
         with self.lock:
             if self.busy:
                 return False
+            # Mail-Frage, aber Gmail-Connector nicht verbunden (Abruf bei claude.ai schlägt manchmal fehl und
+            # wird in einer laufenden Sitzung nie wiederholt) -> Gehirn neu starten, die Unterhaltung bleibt erhalten.
+            if MAIL_WORT.search(text) and self.alive() and not self.gmail and time.time() - self.gmail_retry > 60:
+                self.gmail_retry = time.time()
+                self.kill()
             self.start()
             self.busy, self.stopped = True, False
             self.buf, self.full, self.spoken, self.aid = "", "", [], new_aid()
@@ -749,6 +766,8 @@ class Brain:
         if True:
             typ = o.get("type")
             if typ == "system" and o.get("subtype") == "init" and o.get("session_id"):
+                self.gmail = any("gmail" in str(s.get("name", "")).lower() and s.get("status") == "connected"
+                                 for s in (o.get("mcp_servers") or []) if isinstance(s, dict))
                 save_cfg({"sitzung": o["session_id"]})
             elif typ == "stream_event" and self.busy:
                 ev = o.get("event") or {}
