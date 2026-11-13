@@ -47,7 +47,7 @@ DEFAULT_CFG = {
 }
 # Damit ORB immer dein Claude-Code-Login (Max-Abo) nutzt und nie einen API-Schlüssel
 CLAUDE_ENV_DROP = ("ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "ANTHROPIC_BASE_URL")
-VERSION = "12"
+VERSION = "13"
 ORB_UI = ("Deine Oberfläche (die Larsen gerade sieht): in der Mitte du als flüssige leuchtende Kugel mit Tropfen, "
           "Orbit-Ringen und Sternenhimmel; links eine Uhr und darunter der Gesprächsverlauf mit Eingabefeld; rechts "
           "Karten für System (CPU, RAM, Akku), Wetter mit Stundenvorschau, Aktivität (was du gerade tust) und Vorschläge; "
@@ -80,6 +80,7 @@ _cache, _lock, _cfg_lock = {}, threading.Lock(), threading.Lock()
 LAST_POLL = [0.0]  # wann das Fenster zuletzt nachgefragt hat
 ON_SHOW = [None]    # wird von orb_app gesetzt: öffnet/zeigt das Fenster
 ON_HIDE = [None]    # schließt das Fenster (Schlaf spart Speicher)
+ON_UPDATE = [None]  # neuesten Stand von GitHub holen und neu starten
 
 
 # ---------- Zustand & Einstellungen ----------
@@ -843,6 +844,10 @@ class Handler(BaseHTTPRequestHandler):
             if not BRAIN.busy:
                 BRAIN.kill()  # im Schlaf keinen Speicher belegen
             self.send(200, {"ok": True})
+        elif u.path == "/selfupdate":  # „Nach Updates suchen“ bzw. update.ps1 nach dem Hochladen
+            self.send(200, {"ok": bool(ON_UPDATE[0])})
+            if ON_UPDATE[0]:
+                threading.Thread(target=lambda: (time.sleep(.3), ON_UPDATE[0]()), daemon=True).start()
         elif u.path == "/announce":  # z. B. update.ps1: „Update fertig“ laut sagen
             text = str(b.get("text", "")).strip()
             if text:

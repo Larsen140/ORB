@@ -168,8 +168,49 @@ def post(path, data=None):
         pass
 
 
+RESTART = "--neustart" in sys.argv
+
+
+def restart(update=False):
+    """ORB neu starten (z. B. nach einem Update von GitHub). Das offene Fenster bleibt und lädt sich selbst neu."""
+    exe = os.environ.get("ORB_EXE") or sys.executable
+    args = [exe, "--neustart"] + (["--update"] if update else [])
+    if getattr(sys, "frozen", False) or exe.lower().endswith(".exe") and "python" not in exe.lower():
+        subprocess.Popen(args, creationflags=0x00000008 | 0x00000200)  # DETACHED_PROCESS | NEW_PROCESS_GROUP
+    else:
+        subprocess.Popen([sys.executable, os.path.abspath(__file__), "--neustart"], creationflags=0x00000008 | 0x00000200)
+    server.BRAIN.kill()
+    os._exit(0)
+
+
+def update_loop():
+    """Alle 30 Minuten auf GitHub nach einer neuen Version schauen; einspielen, wenn ORB gerade nicht benutzt wird."""
+    launcher = sys.modules.get("__main__")
+    if not hasattr(launcher, "remote_sha"):
+        return  # läuft ohne Starter (Entwicklung)
+    while True:
+        time.sleep(1800)
+        try:
+            sha = launcher.remote_sha()
+            if not sha or sha == launcher.local_sha():
+                continue
+            idle = not server.BRAIN.busy and time.time() - server.BRAIN.last_used > 600
+            if idle and (not window_open() or server.read_state().get("mode") in ("idle", "spricht")):
+                restart(update=True)
+        except Exception as e:
+            print("Update-Prüfung:", e)
+
+
 def main():
     srv = server.make_server()
+    if not srv and RESTART:
+        for _ in range(60):  # alte Instanz beendet sich gerade – Port wird gleich frei
+            time.sleep(.25)
+            srv = server.make_server()
+            if srv:
+                break
+        if not srv:
+            return
     if not srv:
         v = other_instance()
         if v == server.VERSION:
@@ -197,11 +238,13 @@ def main():
         pass
     server.ON_SHOW[0] = show
     server.ON_HIDE[0] = hide_window
+    server.ON_UPDATE[0] = lambda: restart(update=True)
     threading.Thread(target=srv.serve_forever, daemon=True).start()
     cfg = server.load_cfg()
     server.set_autostart(bool(cfg.get("autostart", True)))
     threading.Thread(target=clap_loop, daemon=True).start()
-    if not BG:
+    threading.Thread(target=update_loop, daemon=True).start()
+    if not BG and not RESTART:
         show()
     while True:  # bleibt im Hintergrund, bis „ORB beenden“ gewählt wird
         time.sleep(3600)
