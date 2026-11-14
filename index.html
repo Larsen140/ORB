@@ -559,13 +559,20 @@
   .kampunkt { width:9px; height:9px; border-radius:50%; flex:none; background:#ff3b30; box-shadow:0 0 0 3px rgba(255,59,48,.22), 0 0 12px rgba(255,59,48,.9); animation:goldPuls 1.4s ease-in-out infinite; }
   #kamh .kb { position:relative; aspect-ratio:16/9; max-height:calc(100vh - 140px); margin:0 auto; border-radius:20px; overflow:hidden; background:#05060a;
     box-shadow:inset 0 0 0 1px rgba(255,255,255,.1), 0 0 0 1px rgba(var(--hl),.18); touch-action:none; }
-  #kamh video { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; transform:scaleX(-1); filter:saturate(1.05) contrast(1.03); }
-  #kamh canvas { position:absolute; inset:0; width:100%; height:100%; pointer-events:none; z-index:2; }
+  #kamh.gross { width:calc(100vw - 24px); padding:8px; }
+  #kamh.gross .kb { max-height:calc(100vh - 70px); }
+  #kamh .kk button.aktiv { background:rgba(var(--hl),.42); box-shadow:inset 0 0 0 1px rgba(var(--hl),.8), 0 0 16px rgba(var(--hl),.45); }
+  /* scharf: volle Kamera-Auflösung, nur gespiegelt; dunkles Bild wird sanft aufgehellt (--kl) */
+  #kamh video { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; transform:scaleX(-1); image-rendering:auto;
+    filter:brightness(var(--kl, 1)) contrast(1.05) saturate(1.08); transition:filter 1.2s linear; }
+  #kamh .kb > canvas { position:absolute; inset:0; width:100%; height:100%; pointer-events:none; z-index:2; }
+  #kamh .kb > canvas.hc { z-index:4; }
+  #kamh.malt .kb { cursor:crosshair; }
   /* feine Holo-Rasterlinien + Rand-Vignette über dem Kamerabild */
   #kamh .kb::after { content:''; position:absolute; inset:0; z-index:1; pointer-events:none;
     background:repeating-linear-gradient(0deg, rgba(var(--hl),.045) 0 1px, transparent 1px 4px), radial-gradient(120% 90% at 50% 50%, transparent 58%, rgba(var(--hl),.16)); }
   #kamh .ar { position:absolute; inset:0; z-index:3; }
-  .ai { position:absolute; left:calc(var(--x) * 100%); top:calc(var(--y) * 100%); transform:translate(-50%, -50%) scale(var(--s, 1)); transform-origin:center;
+  .ai { position:absolute; left:calc(var(--x) * 100%); top:calc(var(--y) * 100%); transform:translate(-50%, -50%) rotate(calc(var(--r, 0) * 1deg)) scale(var(--s, 1)); transform-origin:center;
     padding:12px 16px; border-radius:20px; cursor:grab; user-select:none; color:#fff; min-width:120px;
     background:linear-gradient(160deg, rgba(255,255,255,.16), rgba(255,255,255,.04) 50%, rgba(var(--ah, var(--hl)),.14)), rgba(10,12,20,.38);
     backdrop-filter:blur(14px) saturate(170%); -webkit-backdrop-filter:blur(14px) saturate(170%);
@@ -580,8 +587,65 @@
   .ai .as { font-size:11.5px; color:rgba(255,255,255,.66); font-variant-numeric:tabular-nums; }
   .ai.gold { --ah:255,196,70; } .ai.gold .as.up { color:rgb(70,230,140); } .ai.gold .as.dn { color:rgb(255,90,90); }
   .ai.bild { padding:8px; } .ai.bild img { display:block; width:220px; max-height:220px; object-fit:cover; border-radius:14px; pointer-events:none; }
-  #kamh .kh { position:absolute; left:50%; bottom:14px; transform:translateX(-50%); z-index:4; padding:6px 14px; border-radius:999px; font-size:11.5px; color:rgba(255,255,255,.8);
-    background:rgba(8,10,18,.5); backdrop-filter:blur(10px); -webkit-backdrop-filter:blur(10px); white-space:nowrap; pointer-events:none; transition:opacity .6s; }
+  .ai.puls { animation:aiPuls .6s var(--spring); } @keyframes aiPuls { 50% { scale:1.08; } }
+  /* kleine Knopfleiste: parken, anheften, weg – erscheint bei Maus/Hand darüber */
+  .ai .at { position:absolute; top:-15px; right:-10px; display:flex; gap:5px; opacity:0; transform:scale(.8); pointer-events:none; transition:opacity .25s, transform .3s var(--spring); }
+  .ai:hover .at, .ai.ziel .at, .ai.greif .at, .ai.park .at, .ai.pin .at { opacity:1; transform:none; pointer-events:auto; }
+  .ai.pin:not(:hover):not(.ziel) .at button:not([data-k="pin"]) { display:none; }
+  .ai [data-k] { width:30px; height:30px; border-radius:50%; border:0; padding:0; color:#fff; font:inherit; font-size:13px; cursor:pointer; display:grid; place-items:center;
+    background:rgba(12,14,24,.72); box-shadow:inset 0 0 0 1px rgba(255,255,255,.2), 0 0 14px rgba(var(--ah, var(--hl)),.35);
+    backdrop-filter:blur(8px); -webkit-backdrop-filter:blur(8px); transition:background .2s, transform .25s var(--spring); }
+  .ai [data-k]:hover, .ai [data-k].hand { background:rgba(var(--ah, var(--hl)),.5); transform:scale(1.14); }
+  #kamh [data-k].druck { background:#fff !important; color:#000; }
+  .ai [data-k] svg { width:15px; height:15px; fill:none; stroke:currentColor; stroke-width:2; stroke-linecap:round; stroke-linejoin:round; }
+  .ai.pin [data-k="pin"] { background:rgba(var(--ah, var(--hl)),.8); }
+  .ai.pin { outline:1px dashed rgba(var(--ah, var(--hl)),.6); outline-offset:4px; }
+  .ai.park { opacity:.85; }
+  .ai.wetter { --ah:var(--c2); } .ai.termine { --ah:var(--c3); } .ai.system { --ah:var(--c4); } .ai.spotify { --ah:30,215,96; } .ai.text { --ah:var(--c2); } .ai.karte { --ah:var(--c3); }
+  .ai .wz { display:flex; align-items:center; gap:10px; } .ai .wi { font-size:30px; line-height:1; }
+  .ai .ws { display:flex; gap:12px; margin-top:8px; font-size:11px; }
+  .ai .ws span { display:flex; flex-direction:column; align-items:center; gap:2px; color:rgba(255,255,255,.66); } .ai .ws i { font-style:normal; font-size:15px; } .ai .ws b { color:#fff; }
+  .ai .tl { list-style:none; margin:6px 0 0; padding:0; font-size:12.5px; min-width:230px; max-width:320px; }
+  .ai .tl li { display:flex; gap:10px; padding:4px 0; border-top:1px solid rgba(255,255,255,.08); } .ai .tl li:first-child { border-top:0; }
+  .ai .tl li b { flex:none; min-width:78px; color:rgba(var(--ah),1); font-weight:650; } .ai .tl li span { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .ai .tl .leer { color:var(--sub); }
+  .ai .st { font-size:16px; font-weight:700; max-width:250px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; margin-top:2px; }
+  .ai .sk { display:flex; justify-content:center; gap:12px; margin-top:10px; } .ai .sk [data-k] { width:42px; height:42px; font-size:15px; }
+  .ai.spotify.aus .sk { opacity:.4; }
+  .ai .sy { display:grid; grid-template-columns:42px 130px 46px; align-items:center; gap:8px; margin-top:7px; font-size:12px; }
+  .ai .sy i { height:6px; border-radius:6px; background:rgba(255,255,255,.12); overflow:hidden; }
+  .ai .sy i b { display:block; height:100%; width:0; background:rgb(var(--ah)); box-shadow:0 0 8px rgb(var(--ah)); transition:width .8s var(--ease); }
+  .ai .sy em { font-style:normal; text-align:right; font-variant-numeric:tabular-nums; }
+  .ai.karte, .ai.text { width:var(--kw, 320px); }
+  .ai .kt { margin-top:4px; font-size:13px; line-height:1.45; color:rgba(255,255,255,.86); max-height:380px; overflow:hidden; }
+  .ai .kt img { display:block; max-width:100%; border-radius:12px; margin:6px 0; } .ai .kt ul { margin:6px 0; padding-left:18px; }
+  .ai .kt table { border-collapse:collapse; font-size:12px; } .ai .kt td, .ai .kt th { padding:3px 8px; border-bottom:1px solid rgba(255,255,255,.1); text-align:left; }
+  .ai .kt .b-titel { font-size:16px; font-weight:700; margin:4px 0; color:#fff; } .ai .kt hr { border:0; height:1px; background:rgba(255,255,255,.15); }
+  .ai .kt .reihe { display:flex; gap:12px; } .ai .kt .b-zahl b { font-size:22px; display:block; } .ai .kt .b-zahl i { font-style:normal; font-size:11px; color:var(--sub); }
+  /* 3D-Objekte: freischwebend ohne Glasplatte, leuchtendes Gitter */
+  .ai.d3 { padding:0; min-width:0; border-radius:50%; background:radial-gradient(closest-side, rgba(var(--hl),.2), transparent 72%); box-shadow:none !important;
+    backdrop-filter:none; -webkit-backdrop-filter:none; }
+  .ai.d3 canvas { display:block; width:200px; height:200px; filter:drop-shadow(0 0 5px rgba(var(--hl),.95)) drop-shadow(0 0 16px rgba(var(--hl),.55)); }
+  .ai.d3.greif canvas, .ai.d3.ziel canvas { filter:drop-shadow(0 0 6px #fff) drop-shadow(0 0 22px rgba(var(--hl),.9)); }
+  .ai.d3 .ak { position:absolute; left:50%; bottom:-4px; transform:translateX(-50%); white-space:nowrap; }
+  .ai.d3.folgt .ak::after { content:' · in deiner Hand'; }
+  .ai.d3 .at { top:14px; right:14px; }
+  /* radiales Gesten-Menü */
+  #kamh .km { position:absolute; z-index:5; left:50%; top:50%; width:0; height:0; pointer-events:none; }
+  #kamh .km::before { content:''; position:absolute; width:130px; height:130px; margin:-65px; border-radius:50%; border:1px solid rgba(var(--hl),.55);
+    box-shadow:0 0 30px rgba(var(--hl),.4), inset 0 0 30px rgba(var(--hl),.25); opacity:0; transform:scale(.4); transition:opacity .3s, transform .45s var(--spring); }
+  #kamh .km.on::before { opacity:1; transform:none; }
+  #kamh .km button { position:absolute; left:0; top:0; width:76px; height:76px; margin:-38px; border-radius:50%; border:0; padding:0; color:#fff; font:inherit; font-size:11.5px; font-weight:650; cursor:pointer;
+    background:linear-gradient(160deg, rgba(255,255,255,.2), rgba(255,255,255,.04)), rgba(10,12,22,.58); backdrop-filter:blur(12px) saturate(160%); -webkit-backdrop-filter:blur(12px) saturate(160%);
+    box-shadow:inset 0 1px 0 rgba(255,255,255,.4), inset 0 0 0 1px rgba(255,255,255,.14), 0 0 22px rgba(var(--hl),.35);
+    opacity:0; pointer-events:none; transform:rotate(var(--w)) translate(0) rotate(calc(-1 * var(--w))) scale(.3);
+    transition:transform .45s var(--spring), opacity .3s, background .2s, box-shadow .2s; transition-delay:calc(var(--i) * 22ms); }
+  #kamh .km.on button { opacity:1; pointer-events:auto; transform:rotate(var(--w)) translate(142px) rotate(calc(-1 * var(--w))); }
+  #kamh .km button:hover, #kamh .km button.hand { background:rgba(var(--hl),.55); box-shadow:inset 0 0 0 1.5px rgba(255,255,255,.7), 0 0 30px rgba(var(--hl),.8); }
+  #kamh .kh { position:absolute; left:50%; bottom:14px; transform:translateX(-50%); z-index:6; max-width:92%; padding:6px 14px; border-radius:999px; font-size:11.5px; color:rgba(255,255,255,.8);
+    background:rgba(8,10,18,.5); backdrop-filter:blur(10px); -webkit-backdrop-filter:blur(10px); text-align:center; pointer-events:none; transition:opacity .6s; }
+  body.kam-an #karten { opacity:0; pointer-events:none; }   /* freie Hologramme erscheinen solange in der Kamera-Ansicht */
+  body.kam-an #karten * { pointer-events:none !important; }
   #kamh .kh.weg { opacity:0; }
   /* deutlich sichtbares Kamera-Symbol, solange die Kamera an ist – immer obenauf */
   #kamlicht { position:fixed; top:calc(var(--gap) + 6px); right:calc(var(--gap) + 4px); z-index:60; display:none; align-items:center; gap:8px; height:34px; padding:0 14px 0 12px;
@@ -737,8 +801,8 @@
   <div class="gz"><i></i></div></div>
 <div id="kamlicht" title="Kamera ist an – klicken zum Ausschalten"><svg viewBox="0 0 24 24"><path d="M3 7.5h3l1.6-2.3h8.8L18 7.5h3v11.3H3z"/><circle cx="12" cy="13" r="3.6"/></svg><i class="kampunkt"></i>KAMERA AN</div>
 <div id="kamh"><div class="kk"><span><i class="kampunkt"></i>Kamera</span><small>nur lokal · nichts wird gespeichert</small>
-  <button data-a="uhr" title="Uhr-Hologramm einblenden">+ Uhr</button><button data-a="gold" title="Goldkurs-Hologramm einblenden">+ Gold</button><button data-a="bild" title="Letztes Bild als Hologramm einblenden">+ Bild</button><button class="x" title="Kamera aus">✕</button></div>
-  <div class="kb"><video muted playsinline></video><canvas></canvas><div class="ar"></div><div class="kh">Hand-Erkennung lädt …</div></div></div>
+  <button data-a="menue" title="Hologramm-Menü (oder Handfläche ruhig zeigen)">+ Hologramm</button><button data-a="zeichnen" title="In der Luft zeichnen (Zeigefinger)">Zeichnen</button><button data-a="gross" title="Größere Ansicht">Groß</button><button class="x" title="Kamera aus">✕</button></div>
+  <div class="kb"><video muted playsinline></video><canvas class="zc"></canvas><div class="ar"></div><canvas class="hc"></canvas><div class="km"></div><div class="kh">Hand-Erkennung lädt …</div></div></div>
 <div id="webh"><div class="wk"><i></i><span>Webseite</span><small></small><button class="ef" title="Ohne Hologramm-Effekte – so, wie es auf Handy/PC aussieht"><b></b>Echte Farben</button><button class="neu" title="Neu laden">⟳</button><button class="br" title="Im normalen Browser öffnen">Im Browser ↗</button><button class="x" title="Schließen">✕</button></div><div class="wb"><iframe sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox allow-modals allow-downloads allow-presentation" allow="fullscreen; clipboard-write; geolocation" referrerpolicy="no-referrer-when-downgrade"></iframe><div class="wf"><div>Diese Seite läuft in der echten Webansicht über dem Hologramm.</div><button class="vor">Nach vorne holen</button></div></div></div>
 <div id="dock" class="glass rim">
   <button class="ic" id="kb" title="Tippen (T)"><svg viewBox="0 0 24 24"><path d="M20 5H4a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2zm-9 3h2v2h-2V8zm0 3h2v2h-2v-2zM8 8h2v2H8V8zm0 3h2v2H8v-2zM5 8h2v2H5V8zm0 3h2v2H5v-2zm11 5H8v-2h8v2zm0-3h-2v-2h2v2zm0-3h-2V8h2v2zm3 3h-2v-2h2v2zm0-3h-2V8h2v2z"/></svg></button>
@@ -1236,6 +1300,7 @@ function onParts(st, first) {
     sched = []; endTime = 0;
     if (first) { partsQueued = nextIdx = st.parts.length; return; }
     if (st.parts.length) { SFX.msgIn(); ripple(1.1); burst(30); setHum(false); }
+    if (KAM.an && st.holo && st.holo.typ === 'wetter') aiNeu('wetter');
     if (st.holo && st.holo.titel) holoShow({ ico:st.holo.typ === 'wetter' ? WX(st.holo.code) : '🚀', titel:st.holo.titel, sub:st.holo.sub }, 7000);
   }
   if (st.say) { if (st.aid !== sayAid) { altSay = curSay; sayAid = st.aid; } curSay = st.say; orbMsg(st.aid, st.say, st.final); caption(st.say); }
@@ -1627,6 +1692,9 @@ async function ask(text) {
   const t0 = text.replace(/[.!?,]+$/g, '').trim();
   // „Kamera an“ / „Kamera aus“ – nur auf ausdrücklichen Befehl, „aus“ beendet sofort
   if (KAM_RE.test(t0)) { addMsg('me', text); if (KAM_AUS_RE.test(t0)) { kameraAus(); hint('Kamera ist aus', 2000); } else kameraAn(); return; }
+  // „Sphäre in meine Hand“ (schaltet die Kamera dafür ein) und lokale Kamera-Befehle („zeig mir das Wetter“, „zeichnen“, „räum auf“)
+  if (KAM_HAND_RE.test(t0)) { addMsg('me', text); kamInHand(/würfel/i.test(t0) ? 'wuerfel' : /modell/i.test(t0) ? 'modell' : 'sphaere'); return; }
+  if (KAM.an && kamSprache(t0)) { addMsg('me', text); return; }
   // „Schließ dich komplett“ → ORB ganz beenden (auch der Hintergrund-Lauscher ist dann aus)
   if (/^((orb|jarvis),?\s*)?(schlie(ß|ss)e? dich (komplett|ganz|vollständig)|beende dich( komplett| ganz)?|(komplett|ganz) (beenden|schlie(ß|ss)en)|mach dich (komplett|ganz) aus)$/i.test(t0)) {
     addMsg('me', text); SFX.sleep(); hint('ORB wird komplett beendet', 2000);
@@ -2014,7 +2082,7 @@ async function poll() {
     const resp = await fetch('/state?aktiv=' + aktiv, { cache:'no-store', signal:ctl.signal });
     if (resp.status === 403 && !poll._reload) { poll._reload = true; setTimeout(() => location.reload(), 300); }   // ORB neu gestartet → neues Token
     const st = await resp.json(); lastOk = performance.now(); S.busy = !!st.busy; renderTasks(st.aufgaben);
-    if (st.karten_v !== undefined && st.karten_v !== kartenV) { kartenV = st.karten_v; ladeKarten(); } if (st.bild) bildHolo(st.bild); if (st.gold !== undefined) goldHolo(st.gold); if (st.kamera_foto !== undefined) kamFoto(st.kamera_foto); if (st.web) webHolo(st.web);
+    if (st.karten_v !== undefined && st.karten_v !== kartenV) { kartenV = st.karten_v; ladeKarten(); } if (st.bild) bildHolo(st.bild); if (st.gold !== undefined) goldHolo(st.gold); if (st.kamera_foto !== undefined) kamFoto(st.kamera_foto); if (st.kam_n !== undefined) kamInhalt(st.kam_n); if (st.web) webHolo(st.web);
     if (!!st.anruf !== !!S.call) { S.call = !!st.anruf; if (S.call) { stopWake(); killConvoRec(); killBarge(); hint('Meeting erkannt – ich höre nicht zu', 3500); } else if (cfg.steuerung === 'wort') startWake(); }
     // neue ORB-Version läuft → Seite neu laden (sonst sieht man Änderungen erst nach Fenster-Neustart)
     if (st.version) { if (!poll._v) poll._v = st.version; else if (st.version !== poll._v) { location.replace(S.sleep ? '/#schlaf' : '/#wake'); location.reload(); return; } }
@@ -2068,6 +2136,7 @@ function bildWarte(ms) { clearTimeout(bildTimer); bildTimer = setTimeout(() => {
 async function bildHolo(b) {
   if (bildN === null) { bildN = b.n; return; }   // beim Start kein altes Bild zeigen
   if (b.n === bildN) return; bildN = b.n;
+  if (KAM.an) return aiBild('/bild?n=' + b.n);   // Kamera läuft: Bild erscheint als greifbares AR-Hologramm
   try {
     const r = await fetch('/bild?n=' + b.n, { cache:'no-store' }); if (!r.ok) return;
     const url = URL.createObjectURL(await r.blob());
@@ -2136,6 +2205,7 @@ async function goldHolen() {
 function goldHolo(n) {
   if (goldN === null) { goldN = n; return; }   // beim Start nicht von selbst öffnen
   if (n === goldN) return; goldN = n;
+  if (KAM.an) { aiNeu('gold'); SFX.holo(); return; }
   const el = $('goldh'), offen = el.classList.contains('on') && !el.classList.contains('zu');
   if (!offen) {
     goldStart = null; goldWerte = [];
@@ -2151,46 +2221,104 @@ function goldHolo(n) {
   goldHolen();
 }
 $('goldh').querySelector('.x').addEventListener('click', goldZu);
-/* ---------- Kamera-Ansicht: Live-Bild + AR-Hologramme; Hände greifen, verschieben, vergrößern, wischen weg ----------
-   Datenschutz: Kamera nur auf ausdrücklichen Befehl („Kamera an“), rotes Kamera-Symbol solange sie läuft, nichts wird
-   aufgenommen oder gesendet. Die Handerkennung (MediaPipe) rechnet komplett hier im Fenster – nur ihr Programmcode wird
-   beim ersten Mal geladen. Ausnahme auf Larsens Frage: kamera.ps1 bittet um EIN Standbild (bleibt auf dem PC). */
+/* ---------- Kamera-Ansicht: Live-Bild + AR-Hologramme; Hände greifen, verschieben, drehen, skalieren, parken, wischen weg ----------
+   Datenschutz: Kamera nur auf ausdrücklichen Befehl („Kamera an“, „Sphäre in meine Hand“), rotes Kamera-Symbol solange sie läuft,
+   nichts wird aufgenommen oder gesendet. Die Handerkennung (MediaPipe) rechnet komplett hier im Fenster – nur ihr Programmcode wird
+   beim ersten Mal geladen. Ausnahme auf Larsens Frage: kamera.ps1 bittet um EIN Standbild (bleibt auf dem PC).
+   Gesten: Daumen+Zeigefinger = greifen (kurz antippen = Knopf drücken) · zwei Hände = Größe + Drehen · Zeigefinger = Cursor
+   (kurz über einem Knopf verweilen = drücken) · Handfläche ruhig halten = radiales Menü · schnell wischen = weg · in eine Ecke ziehen = parken. */
 const KAM_RE = new RegExp('^((' + NAME_VARIANTEN + '|orb),?\\s*)?(bitte\\s+)?((mach|schalt(e)?|stell)\\s+(die\\s+)?)?(kamera|webcam)(\\s+bitte)?\\s+'
   + '(an|ein|einschalten|anschalten|anmachen|starten|öffnen|aus|ausschalten|ausmachen|stoppen|beenden|schließen|zu)(\\s+bitte)?$', 'i');
 const KAM_AUS_RE = /\b(aus|ausschalten|ausmachen|stoppen|beenden|schließen|zu)(\s+bitte)?$/i;
+const KAM_WORTE = { 'uhr':'uhr', 'uhrzeit':'uhr', 'wetter':'wetter', 'termine':'termine', 'kalender':'termine', 'spotify':'spotify', 'musik':'spotify',
+  'gold':'gold', 'goldkurs':'gold', 'goldpreis':'gold', 'system':'system', 'systemwerte':'system', 'sphäre':'sphaere', 'sphere':'sphaere',
+  'kugel':'sphaere', 'würfel':'wuerfel', 'modell':'modell', 'bild':'bild', 'menü':'menue' };
+const KAM_VOR = '^((' + NAME_VARIANTEN + '|orb),?\\s*)?(bitte\\s+)?';
+const KAM_HAND_RE = new RegExp(KAM_VOR + '((gib|leg|setz|pack|tu|mach)(e)?\\s+(mir\\s+)?)?(eine\\s+|die\\s+|einen\\s+|den\\s+|das\\s+|ein\\s+)?(sphäre|sphere|kugel|würfel|modell)\\s+(in|auf)\\s+(meine|die|mein)\\s+hand(\\s+bitte)?$', 'i');
+const KAM_ZEIG_RE = new RegExp(KAM_VOR + '(zeig(e)?|blend(e)?|hol(e)?)\\s+(mir\\s+)?(die\\s+|das\\s+|den\\s+|meine\\s+|meinen\\s+|eine\\s+|einen\\s+|ein\\s+)?('
+  + Object.keys(KAM_WORTE).join('|') + ')(\\s+(ein|an|her|auf))?(\\s+bitte)?$', 'i');
 const MP_URL = 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14';
-const HAND_TIPP = 'Daumen + Zeigefinger zusammen = greifen · mit zwei Händen größer ziehen · schnell wischen = weg';
+const HAND_TIPP = 'Daumen + Zeigefinger = greifen · zwei Hände = Größe & Drehen · Zeigefinger = Cursor · Handfläche ruhig halten = Menü · wischen = weg · in die Ecke = parken';
 const HAND_LINIEN = [[0,1],[1,2],[2,3],[3,4],[0,5],[5,6],[6,7],[7,8],[5,9],[9,10],[10,11],[11,12],[9,13],[13,14],[14,15],[15,16],[13,17],[17,18],[18,19],[19,20],[0,17]];
-var KAM = { strom:null, an:false, haende:null, laedt:false, raf:0, puls:0, zeit:-1, erg:null, griffe:{}, spuren:{}, sperre:0, z:1, fotoN:null, uhrT:0, goldT:0, goldStart:null, farbe:'255,55,45', farbeT:0 };
+const KAM_3D = { sphaere:'Sphäre', wuerfel:'Würfel', modell:'Modell' };
+const KAM_DAUER = ['uhr', 'gold', 'wetter', 'termine', 'spotify', 'system', 'sphaere', 'wuerfel', 'modell'];   // werden beim nächsten „Kamera an“ wieder geöffnet
+const KAM_START = { uhr:[.84, .2], gold:[.16, .2] };
+const KAM_MENUE = [['uhr','Uhr'], ['wetter','Wetter'], ['termine','Termine'], ['spotify','Spotify'], ['gold','Gold'], ['system','System'],
+  ['bild','Bild'], ['sphaere','Sphäre'], ['wuerfel','Würfel'], ['modell','Modell'], ['zeichnen','Zeichnen'], ['aufraeumen','Aufräumen']];
+const KAM_SPEICHER = 'orb_kam_layout';
+var KAM = { strom:null, an:false, haende:null, laedt:false, raf:0, puls:0, zeit:-1, erg:null, letzte:[], hs:{}, filter:{}, sperre:0, z:1, fotoN:null,
+  tick:{}, lt:0, goldStart:null, farbe:'255,55,45', farbeT:0, inhaltN:null, menueOffen:false, menueBis:0, menueSperre:0,
+  zeichnen:false, striche:[], stricheNeu:false, licht:1, kartenWeg:new Set(), strahl:null };
 const kamEl = s => $('kamh').querySelector(s);
 function kamMelden(aktiv = true) { fetch('/kamera', { method:'POST', headers:{ 'Content-Type':'application/json' }, body:JSON.stringify({ aktiv }) }).catch(() => {}); }
 function kamHinweis(t, ms = 0) { const k = kamEl('.kh'); k.textContent = t; k.classList.remove('weg'); clearTimeout(kamHinweis._t); if (ms) kamHinweis._t = setTimeout(() => k.classList.add('weg'), ms); }
+/* Bildqualität: höchste sinnvolle Auflösung/Bildrate, Autofokus/-belichtung/-weißabgleich, sanftes Aufhellen bei wenig Licht */
+async function kamStrom() {
+  const wuensche = [{ width:{ ideal:1920 }, height:{ ideal:1080 }, frameRate:{ ideal:60 } }, { width:{ ideal:1920 }, height:{ ideal:1080 }, frameRate:{ ideal:30 } },
+    { width:{ ideal:1280 }, height:{ ideal:720 } }, {}];
+  let fehler;
+  for (const w of wuensche) {
+    try { return await navigator.mediaDevices.getUserMedia({ video:Object.assign({ facingMode:'user' }, w), audio:false }); }
+    catch (e) { fehler = e; if (e && e.name === 'NotAllowedError') break; }
+  }
+  throw fehler;
+}
+async function kamBildTunen(track) {
+  if (!track) return;
+  try {
+    const c = track.getCapabilities ? track.getCapabilities() : {}, adv = {};
+    for (const k of ['focusMode', 'exposureMode', 'whiteBalanceMode']) if ((c[k] || []).includes('continuous')) adv[k] = 'continuous';
+    if (Object.keys(adv).length) await track.applyConstraints({ advanced:[adv] }).catch(() => {});
+    const s = track.getSettings();
+    if (c.frameRate && c.frameRate.max > (s.frameRate || 0) + 1)   // volle Bildrate bei gleicher Auflösung, wenn die Kamera mehr kann
+      await track.applyConstraints({ width:{ ideal:s.width }, height:{ ideal:s.height }, frameRate:{ ideal:Math.min(60, c.frameRate.max) } }).catch(() => {});
+  } catch (e) {}
+  const s = track.getSettings ? track.getSettings() : {};
+  kamEl('.kk small').textContent = 'nur lokal · nichts wird gespeichert' + (s.width ? ` · ${s.width}×${s.height}` + (s.frameRate ? ` · ${Math.round(s.frameRate)} fps` : '') : '');
+}
+function kamLicht() {   // mittlere Helligkeit messen → dunkles Bild sanft aufhellen (rein in der Anzeige)
+  const v = kamEl('video'); if (!v.videoWidth) return;
+  const c = kamLicht._c || (kamLicht._c = Object.assign(document.createElement('canvas'), { width:32, height:18 })), g = c.getContext('2d', { willReadFrequently:true });
+  try {
+    g.drawImage(v, 0, 0, 32, 18); const d = g.getImageData(0, 0, 32, 18).data; let L = 0;
+    for (let i = 0; i < d.length; i += 4) L += d[i] * .2126 + d[i + 1] * .7152 + d[i + 2] * .0722;
+    L /= d.length / 4; const ziel = L >= 112 ? 1 : Math.min(1.45, 116 / Math.max(L, 20));
+    KAM.licht += (ziel - KAM.licht) * .35; v.style.setProperty('--kl', KAM.licht.toFixed(3));
+  } catch (e) {}
+}
 async function kameraAn() {
-  if (KAM.an || KAM.startet) return hint('Kamera ist schon an');
+  if (KAM.an) { hint('Kamera ist schon an'); return true; }
+  if (KAM.startet) return false;
   KAM.startet = true; let strom;
-  try { strom = await navigator.mediaDevices.getUserMedia({ video:{ width:{ ideal:1280 }, height:{ ideal:720 }, facingMode:'user' }, audio:false }); }
-  catch (e) { KAM.startet = false; return hint(e && e.name === 'NotAllowedError' ? 'Kamera-Zugriff wurde nicht erlaubt' : 'Keine Kamera gefunden', 4000); }
+  try { strom = await kamStrom(); }
+  catch (e) { KAM.startet = false; hint(e && e.name === 'NotAllowedError' ? 'Kamera-Zugriff wurde nicht erlaubt' : 'Keine Kamera gefunden', 4000); return false; }
   KAM.startet = false; KAM.strom = strom; KAM.an = true;
-  const el = $('kamh'), v = kamEl('video');
+  const el = $('kamh'), v = kamEl('video'), L = kamLayout();
   v.srcObject = strom; v.play().catch(() => {});
   strom.getVideoTracks().forEach(t => t.addEventListener('ended', () => kameraAus()));
-  clearTimeout(kameraAus._t); el.classList.remove('zu'); el.classList.add('on'); $('kamlicht').classList.add('on');
+  kamBildTunen(strom.getVideoTracks()[0]);
+  clearTimeout(kameraAus._t); el.classList.remove('zu'); el.classList.add('on'); el.classList.toggle('gross', !!L.gross);
+  $('kamlicht').classList.add('on'); document.body.classList.add('kam-an');
   SFX.holo(); ripple(.6);
   kamMelden(true); clearInterval(KAM.puls); KAM.puls = setInterval(kamMelden, 2500);
-  if (!kamEl('.ar').childElementCount) { aiNeu('uhr', .84, .2); aiNeu('gold', .16, .2); }
-  kamHinweis(KAM.haende ? HAND_TIPP : 'Hand-Erkennung lädt …', KAM.haende ? 9000 : 0);
+  KAM.tick = {}; KAM.goldStart = null; KAM.licht = 1;
+  if (!aiAlle().length) (Array.isArray(L.offen) ? L.offen : ['uhr', 'gold']).filter(a => KAM_DAUER.includes(a)).forEach(a => aiNeu(a, ...(KAM_START[a] || [])));
+  kamHinweis(KAM.haende ? HAND_TIPP : 'Hand-Erkennung lädt …', KAM.haende ? 10000 : 0);
   kamHaendeLaden();
-  cancelAnimationFrame(KAM.raf); KAM.raf = requestAnimationFrame(kamSchleife);
+  cancelAnimationFrame(KAM.raf); KAM.lt = 0; KAM.raf = requestAnimationFrame(kamSchleife);
+  return true;
 }
 function kameraAus() {   // sofort: Kamera-Spur stoppen, dann Fenster ausblenden
   if (!window.KAM || !KAM.an) return; KAM.an = false;
   if (KAM.strom) KAM.strom.getTracks().forEach(t => t.stop()); KAM.strom = null;
-  clearInterval(KAM.puls); cancelAnimationFrame(KAM.raf); KAM.griffe = {}; KAM.spuren = {}; KAM.erg = null;
-  kamMelden(false); $('kamlicht').classList.remove('on');
+  clearInterval(KAM.puls); cancelAnimationFrame(KAM.raf); KAM.hs = {}; KAM.filter = {}; KAM.erg = null; KAM.letzte = []; KAM.strahl = null;
+  kamMelden(false); $('kamlicht').classList.remove('on'); document.body.classList.remove('kam-an');
+  kamMenueZu(); kamZeichnenSetzen(false, true); KAM.striche = []; KAM.stricheNeu = true;
   const el = $('kamh'); el.classList.add('zu'); SFX.close();
   clearTimeout(kameraAus._t); kameraAus._t = setTimeout(() => {
     el.classList.remove('on', 'zu'); kamEl('video').srcObject = null;
-    kamEl('.ar').querySelectorAll('.ai').forEach(a => { if (a._url) URL.revokeObjectURL(a._url); a.remove(); });
+    kamEl('.ar').querySelectorAll('.ai').forEach(aiEntfernen); KAM.kartenWeg.clear();
+    const z = kamEl('.zc'); z.getContext('2d').clearRect(0, 0, z.width, z.height);
   }, 320);
 }
 async function kamHaendeLaden() {
@@ -2198,134 +2326,517 @@ async function kamHaendeLaden() {
   try {
     const mp = await import(MP_URL + '/vision_bundle.mjs');
     const fs = await mp.FilesetResolver.forVisionTasks(MP_URL + '/wasm');
+    // beide Hände, strengere Erkennung (weniger Fehlgriffe), Verfolgung bleibt flott; Zittern glättet danach ein 1-Euro-Filter
     const opt = d => ({ baseOptions:{ modelAssetPath:'https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task', delegate:d },
-      runningMode:'VIDEO', numHands:2, minHandDetectionConfidence:.6, minHandPresenceConfidence:.5, minTrackingConfidence:.5 });
+      runningMode:'VIDEO', numHands:2, minHandDetectionConfidence:.7, minHandPresenceConfidence:.6, minTrackingConfidence:.6 });
     try { KAM.haende = await mp.HandLandmarker.createFromOptions(fs, opt('GPU')); }
     catch (e) { KAM.haende = await mp.HandLandmarker.createFromOptions(fs, opt('CPU')); }
-    if (KAM.an) kamHinweis(HAND_TIPP, 9000);
+    if (KAM.an) kamHinweis(HAND_TIPP, 10000);
   } catch (e) {
     console.warn('Hand-Erkennung:', e);
-    if (KAM.an) kamHinweis('Hand-Erkennung nicht verfügbar – mit der Maus ziehen, Mausrad = Größe, Doppelklick = weg', 9000);
+    if (KAM.an) kamHinweis('Hand-Erkennung nicht verfügbar – mit der Maus ziehen, Mausrad = Größe, Umschalt+Mausrad = drehen, Doppelklick = weg', 9000);
   }
   KAM.laedt = false;
 }
-/* AR-Hologramme: Position als Anteil der Bühne (x/y = Mitte), Größe s */
-const aiAlle = () => [...kamEl('.ar').querySelectorAll('.ai:not(.weg)')];
-function aiSetzen(a, x, y, s = a._s) {
-  a._x = Math.min(.97, Math.max(.03, x)); a._y = Math.min(.97, Math.max(.03, y)); a._s = Math.min(3.5, Math.max(.4, s || 1));
-  a.style.setProperty('--x', a._x); a.style.setProperty('--y', a._y); a.style.setProperty('--s', a._s);
+/* 1-Euro-Filter: ruhige Hand = stark geglättet (kein Zittern), schnelle Bewegung = kaum Verzögerung */
+class KamFilter {
+  f(x, t, min = 1.6, beta = .014) {
+    if (this.t === undefined) { this.t = t; this.x = x; this.d = 0; return x; }
+    const dt = Math.max(.001, (t - this.t) / 1000), a = c => { const r = 2 * Math.PI * c * dt; return r / (r + 1); };
+    this.t = t; this.d += a(1) * ((x - this.x) / dt - this.d);
+    this.x += a(min + beta * Math.abs(this.d)) * (x - this.x); return this.x;
+  }
 }
-function aiNeu(art, x, y) {
-  const a = document.createElement('div'); a.className = 'ai ' + art;
-  a.innerHTML = art === 'uhr' ? '<div class="ak">Uhrzeit</div><div class="aw">--:--:--</div><div class="as"></div>'
-    : art === 'gold' ? '<div class="ak">Gold · XAU/USD</div><div class="aw">–</div><div class="as">lädt …</div>' : '<img alt="">';
-  a.style.zIndex = ++KAM.z; kamEl('.ar').appendChild(a); aiSetzen(a, x, y, 1);
-  if (art === 'uhr') aiUhren(); if (art === 'gold') KAM.goldT = 0;
+/* Speicher: Position, Größe, Drehung, Anheften, Parken je Inhalt + welche Inhalte offen waren (nur lokal im Fenster) */
+function kamLayout() { try { return JSON.parse(localStorage.getItem(KAM_SPEICHER)) || {}; } catch (e) { return {}; } }
+function kamMerken() {
+  clearTimeout(kamMerken._t); kamMerken._t = setTimeout(() => {
+    const L = kamLayout(); L.pos = L.pos || {};
+    aiAlle().forEach(a => { if (!a._folgt) L.pos[a._key] = { x:a._park ? a._park.x : a._x, y:a._park ? a._park.y : a._y, s:a._park ? a._park.s : a._s,
+      r:a._park ? a._park.r || 0 : a._r || 0, pin:!!a._pin, park:a._park ? [a._x, a._y] : null }; });
+    if (KAM.an) L.offen = aiAlle().filter(a => KAM_DAUER.includes(a._art)).map(a => a._art);
+    L.gross = $('kamh').classList.contains('gross');
+    const keys = Object.keys(L.pos); if (keys.length > 60) keys.slice(0, keys.length - 60).forEach(k => delete L.pos[k]);
+    try { localStorage.setItem(KAM_SPEICHER, JSON.stringify(L)); } catch (e) {}
+  }, 400);
+}
+/* AR-Hologramme: Position als Anteil der Bühne (x/y = Mitte), Größe s, Drehung r (Grad) */
+const aiAlle = () => [...kamEl('.ar').querySelectorAll('.ai:not(.weg)')];
+const KNOPF_SVG = {
+  park:'<svg viewBox="0 0 24 24"><path d="M4 9V4h5M20 15v5h-5"/><rect x="9" y="9" width="6" height="6" rx="1.5"/></svg>',
+  pin:'<svg viewBox="0 0 24 24"><path d="M9 3.5h6l-1 5.5 3.5 3.5h-11L10 9z"/><path d="M12 12.5V21"/></svg>' };
+function aiSetzen(a, x, y, s = a._s, r = a._r || 0) {
+  a._x = Math.min(.98, Math.max(.02, x)); a._y = Math.min(.98, Math.max(.02, y)); a._s = Math.min(a._art === 'bild' ? 5 : 3.5, Math.max(.3, s || 1)); a._r = r;
+  a.style.setProperty('--x', a._x); a.style.setProperty('--y', a._y); a.style.setProperty('--s', a._s); a.style.setProperty('--r', a._r.toFixed(1));
+  kamMerken();
+}
+function aiHtml(art) {
+  const k = t => `<div class="ak">${t}</div>`;
+  switch (art) {
+    case 'uhr': return k('Uhrzeit') + '<div class="aw">--:--:--</div><div class="as"></div>';
+    case 'gold': return k('Gold · XAU/USD') + '<div class="aw">–</div><div class="as">lädt …</div>';
+    case 'wetter': return k('Wetter') + '<div class="wz"><span class="wi"></span><div class="aw">–</div></div><div class="as">lädt …</div><div class="ws"></div>';
+    case 'termine': return k('Termine') + '<ul class="tl"><li class="leer">lädt …</li></ul>';
+    case 'spotify': return k('Spotify') + '<div class="st">–</div><div class="as"></div><div class="sk"><button data-k="sp:prev" title="Zurück">⏮</button><button data-k="sp:play" title="Play/Pause">⏯</button><button data-k="sp:next" title="Weiter">⏭</button></div>';
+    case 'system': return k('System') + ['cpu:CPU', 'ram:RAM', 'akku:Akku'].map(x => { const [w, n] = x.split(':'); return `<div class="sy" data-w="${w}"><span>${n}</span><i><b></b></i><em>–</em></div>`; }).join('');
+    case 'bild': return '<img alt="">';
+    case 'sphaere': case 'wuerfel': case 'modell': return '<canvas></canvas>' + k(KAM_3D[art]);
+  }
+  return k('') + '<div class="kt"></div>';   // text, karte
+}
+function aiNeu(art, x, y, opt = {}) {
+  const key = opt.key || art;
+  let a = aiAlle().find(b => b._key === key);
+  if (a) { a.style.zIndex = ++KAM.z; if (a._park) aiAusparken(a); a.classList.remove('puls'); void a.offsetWidth; a.classList.add('puls'); aiText(a, opt); KAM.tick[art] = 0; return a; }
+  a = document.createElement('div'); a.className = 'ai ' + art + (KAM_3D[art] ? ' d3' : ''); a._art = art; a._key = key;
+  a.innerHTML = aiHtml(art) + `<div class="at"><button data-k="park" title="In die Ecke parken">${KNOPF_SVG.park}</button><button data-k="pin" title="Anheften">${KNOPF_SVG.pin}</button><button data-k="zu" title="Weg">✕</button></div>`;
+  a.style.zIndex = ++KAM.z; kamEl('.ar').appendChild(a);
+  const p = (kamLayout().pos || {})[key];
+  if (p && !opt.neu) {
+    aiSetzen(a, p.x, p.y, p.s, p.r);
+    if (p.pin) aiPin(a, true, true);
+    if (p.park) { a._park = { s:a._s, x:a._x, y:a._y, r:a._r }; a.classList.add('park'); aiSetzen(a, p.park[0], p.park[1], .42); }
+  } else aiSetzen(a, x ?? .5 + (Math.random() - .5) * .3, y ?? .45 + (Math.random() - .5) * .2, opt.s || 1, 0);
+  if (KAM_3D[art]) kam3DStart(a);
+  aiText(a, opt); KAM.tick[art] = 0;
   return a;
+}
+function aiText(a, o) {   // Text-Hologramm (kamera_zeigen.ps1 -Art text)
+  if (a._art !== 'text' || !(o.titel || o.text || o.punkte)) return;
+  a.querySelector('.ak').textContent = o.titel || 'Hinweis';
+  a.querySelector('.kt').innerHTML = (o.text ? `<div class="b-text">${esc(o.text).replace(/\n/g, '<br>')}</div>` : '')
+    + ((o.punkte || []).length ? `<ul>${o.punkte.map(p => `<li>${esc(p)}</li>`).join('')}</ul>` : '');
+}
+function aiEntfernen(a) {
+  if (a._url) URL.revokeObjectURL(a._url);
+  if (a._gl) { try { a._gl.gl.getExtension('WEBGL_lose_context')?.loseContext(); } catch (e) {} a._gl = null; }
+  a.remove();
 }
 function aiWeg(a, richtung = 1) {
   if (!a || a.classList.contains('weg')) return;
-  a.classList.add('weg'); a.style.transform = `translate(calc(-50% + ${richtung * 45}vw), -50%) rotate(${richtung * 12}deg) scale(${a._s * .8})`;
-  SFX.close(); setTimeout(() => { if (a._url) URL.revokeObjectURL(a._url); a.remove(); }, 470);
+  if (a._art === 'karte') { const id = a._key.slice(6), k = kartenEls[id]; if (k) KAM.kartenWeg.add(id + ':' + k._v); }
+  a._folgt = false; a.classList.add('weg'); a.style.transform = `translate(calc(-50% + ${richtung * 45}vw), -50%) rotate(${richtung * 12}deg) scale(${a._s * .8})`;
+  SFX.close(); kamMerken(); setTimeout(() => aiEntfernen(a), 470);
 }
-async function aiBild() {
+function aiPin(a, an, still) {
+  a._pin = an; a.classList.toggle('pin', an);
+  if (!still) { SFX.click(); kamHinweis(an ? 'Angeheftet – bleibt fest an seinem Platz' : 'Gelöst – wieder beweglich', 1800); kamMerken(); }
+}
+function aiParken(a) {   // in die nächste Ecke, klein – mehrere stapeln sich
+  if (!a._park) a._park = { s:a._s, x:a._x, y:a._y, r:a._r || 0 };
+  const links = a._x < .5, oben = a._y < .5;
+  const n = aiAlle().filter(b => b !== a && b._park && (b._x < .5) === links && (b._y < .5) === oben).length;
+  a._folgt = false; a.classList.add('park'); a.classList.remove('folgt');
+  aiSetzen(a, links ? .08 : .92, oben ? .12 + n * .17 : .88 - n * .17, .42, 0); SFX.pop();
+}
+function aiAusparken(a, zurueck) {
+  if (!a._park) return; const p = a._park; a._park = null; a.classList.remove('park');
+  aiSetzen(a, zurueck ? p.x : a._x, zurueck ? p.y : a._y, p.s, p.r || 0); SFX.pop();
+}
+function aiFolgt(a, an) { a._folgt = an; a.classList.toggle('folgt', an); }
+async function aiBild(quelle) {
   try {
-    const r = await fetch('/bild?n=' + Date.now(), { cache:'no-store' }); if (!r.ok) throw 0;
-    const url = URL.createObjectURL(await r.blob()), a = aiNeu('bild', .5 + (Math.random() - .5) * .3, .55);
-    a._url = url; a.querySelector('img').src = url;
+    const r = await fetch(quelle || '/bild?n=' + Date.now(), { cache:'no-store' }); if (!r.ok) throw 0;
+    const url = URL.createObjectURL(await r.blob()), a = aiNeu('bild', .5 + (Math.random() - .5) * .3, .55, { key:'bild:' + Date.now(), neu:true });
+    a._url = url; a.querySelector('img').src = url; SFX.holo();
   } catch (e) { hint('Noch kein Bild da – erst ein Bild zeigen lassen', 3500); }
 }
+const kamAlle = (art, f) => kamEl('.ar').querySelectorAll('.ai.' + art + ':not(.weg)').forEach(f);
 function aiUhren() {
   const d = new Date(), z = d.toLocaleTimeString('de-DE'), t = d.toLocaleDateString('de-DE', { weekday:'long', day:'numeric', month:'long' });
-  kamEl('.ar').querySelectorAll('.ai.uhr').forEach(a => { a.querySelector('.aw').textContent = z; a.querySelector('.as').textContent = t; });
+  kamAlle('uhr', a => { a.querySelector('.aw').textContent = z; a.querySelector('.as').textContent = t; });
 }
 async function aiGold() {
   try {
     const j = await (await fetch('/gold', { cache:'no-store' })).json(); if (typeof j.preis !== 'number') return;
     if (KAM.goldStart === null) KAM.goldStart = j.preis;
     const d = j.preis - KAM.goldStart;
-    kamEl('.ar').querySelectorAll('.ai.gold').forEach(a => {
+    kamAlle('gold', a => {
       a.querySelector('.aw').textContent = '$ ' + goldZahl(j.preis);
       const s = a.querySelector('.as'); s.className = 'as ' + (d > 0 ? 'up' : d < 0 ? 'dn' : '');
       s.textContent = (d >= 0 ? '▲ +' : '▼ −') + goldZahl(Math.abs(d)) + ' seit Kamera an';
     });
   } catch (e) {}
 }
+const KAM_TAKT = { uhr:250, gold:2000, wetter:600000, termine:60000, spotify:2500, system:2500 };
+const KAM_LADEN = {
+  uhr:aiUhren, gold:aiGold,
+  async wetter() {
+    try {
+      const w = await (await fetch('/weather')).json(); if (!w || w.temp == null) return;
+      kamAlle('wetter', a => {
+        a.querySelector('.wi').textContent = WX(w.code); a.querySelector('.aw').textContent = Math.round(w.temp) + '°';
+        a.querySelector('.as').textContent = [w.desc, w.city, Math.round(w.min) + '° / ' + Math.round(w.max) + '°'].filter(Boolean).join(' · ');
+        a.querySelector('.ws').innerHTML = (w.hourly || []).slice(0, 5).map(h => `<span>${esc(String(h.h))}<i>${WX(h.c)}</i><b>${Math.round(h.t)}°</b></span>`).join('');
+      });
+    } catch (e) {}
+  },
+  async termine() {
+    try {
+      const { termine } = await (await fetch('/termine', { cache:'no-store' })).json(), heute = new Date(); heute.setHours(0, 0, 0, 0);
+      const html = !termine.length ? '<li class="leer">Keine Termine</li>' : termine.slice(0, 5).map(t => {
+        const d = new Date(t.datum + 'T00:00'), diff = Math.round((d - heute) / 864e5);
+        const tag = diff === 0 ? 'Heute' : diff === 1 ? 'Morgen' : d.toLocaleDateString('de-DE', { weekday:'short', day:'numeric', month:'numeric' });
+        return `<li><b>${tag}${t.zeit ? ' ' + esc(t.zeit) : ''}</b><span>${esc(t.text)}</span></li>`; }).join('');
+      kamAlle('termine', a => { a.querySelector('.tl').innerHTML = html; });
+    } catch (e) {}
+  },
+  async spotify() {
+    try {
+      const s = await (await fetch('/spotify', { cache:'no-store' })).json();
+      kamAlle('spotify', a => {
+        a.classList.toggle('aus', !s.laeuft);
+        a.querySelector('.st').textContent = !s.laeuft ? 'Spotify ist zu' : s.spielt ? s.titel : 'Pausiert';
+        a.querySelector('.as').textContent = s.spielt ? s.kuenstler || '' : '';
+        a.querySelector('[data-k="sp:play"]').textContent = s.spielt ? '⏸' : '▶';
+      });
+    } catch (e) {}
+  },
+  async system() {
+    try {
+      const s = await (await fetch('/sys')).json();
+      kamAlle('system', a => ['cpu', 'ram', 'akku'].forEach(w => {
+        const z = a.querySelector(`.sy[data-w="${w}"]`), v = s[w];
+        z.style.display = v == null ? 'none' : ''; if (v == null) return;
+        z.querySelector('b').style.width = Math.max(0, Math.min(100, v)) + '%';
+        z.querySelector('em').textContent = Math.round(v) + '%' + (w === 'akku' && s.laden ? ' ⚡' : '');
+      }));
+    } catch (e) {}
+  }
+};
+async function kamSpotify(cmd) {
+  try { await fetch('/media', { method:'POST', headers:{ 'Content-Type':'application/json' }, body:JSON.stringify({ cmd }) }); } catch (e) {}
+  kamHinweis({ play:'Spotify: Play/Pause', next:'Spotify: nächster Titel', prev:'Spotify: vorheriger Titel' }[cmd] || '', 1400);
+  setTimeout(() => { KAM.tick.spotify = 0; }, 450);
+}
+/* Freie Hologramme (holo.ps1) erscheinen bei laufender Kamera als AR-Karte (Kopie; die normalen Karten sind solange ausgeblendet) */
+function kamKarten() {
+  const da = new Set();
+  for (const [id, el] of Object.entries(kartenEls)) {
+    if (el.classList.contains('weg')) continue; da.add(id);
+    let a = aiAlle().find(b => b._key === 'karte:' + id);
+    if (!a) { if (KAM.kartenWeg.has(id + ':' + el._v)) continue; a = aiNeu('karte', undefined, undefined, { key:'karte:' + id }); }
+    const sig = el._v + ':' + el.querySelectorAll('img[src]').length; if (a._sig === sig) continue; a._sig = sig;
+    a.querySelector('.ak').textContent = el.querySelector('.kh span').textContent;
+    a.style.setProperty('--ah', getComputedStyle(el).getPropertyValue('--hl').trim() || 'var(--c3)');
+    const kb = el.querySelector('.kb').cloneNode(true);
+    kb.querySelectorAll('iframe').forEach(f => { const s = document.createElement('div'); s.className = 'b-text'; s.textContent = 'Webseite: ' + f.src; f.replaceWith(s); });
+    const ziel = a.querySelector('.kt'); ziel.innerHTML = ''; ziel.append(...kb.childNodes);
+    a.style.setProperty('--kw', Math.max(240, Math.min(440, el.offsetWidth)) + 'px');
+  }
+  aiAlle().filter(a => a._art === 'karte' && !da.has(a._key.slice(6))).forEach(a => aiWeg(a, 1));
+}
+/* Inhalte von Sprache, Menü oder kamera_zeigen.ps1 */
+function kamZeigen(e) {
+  const art = e.art;
+  if (art === 'menue') return kamMenue(.5, .5);
+  if (art === 'zeichnen') return kamZeichnenSetzen(!KAM.zeichnen);
+  if (art === 'aufraeumen') return kamAufraeumen();
+  const key = art === 'text' ? 'text:' + (e.id || e.n || Date.now()) : art;
+  if (e.zu) { const a = aiAlle().find(b => b._key === key || (e.id && b._key === 'text:' + e.id)); if (a) aiWeg(a, a._x < .5 ? -1 : 1); return; }
+  if (art === 'bild') return aiBild(e.datei ? '/kamera/datei?n=' + e.n : '');
+  const a = aiNeu(art, undefined, undefined, { key, titel:e.titel, text:e.text, punkte:e.punkte });
+  if (e.hand && KAM_3D[art]) { aiFolgt(a, true); kamHinweis('Handfläche öffnen – ' + KAM_3D[art] + ' schwebt darüber · greifen = loslösen', 7000); }
+  SFX.holo();
+}
+async function kamInhalt(n) {
+  if (KAM.inhaltN === null) { KAM.inhaltN = n; return; }   // beim Start nichts Altes nachholen
+  if (n === KAM.inhaltN) return; const seit = KAM.inhaltN; KAM.inhaltN = n;
+  if (!KAM.an) return;
+  try { ((await (await fetch('/kamera/inhalt?seit=' + seit, { cache:'no-store' })).json()).liste || []).forEach(kamZeigen); } catch (e) {}
+}
+async function kamInHand(art) {   // „Jarvis, Sphäre in meine Hand“
+  if (!KAM.an && !(await kameraAn())) return;
+  const a = aiAlle().find(b => b._art === art) || aiNeu(art, .5, .45);
+  aiAusparken(a); aiFolgt(a, true); KAM.menueSperre = performance.now() + 3000; SFX.holo();
+  kamHinweis('Handfläche öffnen – ' + KAM_3D[art] + ' schwebt darüber und folgt deiner Hand · greifen = loslösen', 8000);
+}
+function kamSprache(t) {   // lokale Befehle bei laufender Kamera – true = erledigt
+  if (t.split(/\s+/).length > 8) return false;
+  if (KAM_ZEIG_RE.test(t)) { const w = t.toLowerCase().split(/[\s,]+/).find(x => KAM_WORTE[x]); kamZeigen({ art:KAM_WORTE[w] }); return true; }
+  if (/zeichnung\s+(löschen|weg|wegmachen|leeren)|lösch(e)?\s+(die\s+)?zeichnung/i.test(t)) { kamZeichnungLeeren(); return true; }
+  if (/(zeichnen|malen|zeichenmodus)\s+(aus|beenden|stoppen)$|hör\s+auf\s+zu\s+(zeichnen|malen)/i.test(t)) { kamZeichnenSetzen(false); return true; }
+  if (/(^|\s)(zeichnen|malen|zeichenmodus)(\s+(an|ein|starten))?$/i.test(t)) { kamZeichnenSetzen(true); return true; }
+  if (/(räum|räume)\s+(die\s+kamera\s+|alles\s+)?auf$|(^|\s)alles\s+weg$|alle\s+hologramme\s+weg$/i.test(t)) { kamAufraeumen(); return true; }
+  if (/(^|\s)(gesten)?menü(\s+(öffnen|auf|an|zeigen))?$/i.test(t)) { kamMenue(.5, .5); return true; }
+  return false;
+}
+function kamAufraeumen() {
+  aiAlle().filter(a => !a._pin).forEach((a, i) => setTimeout(() => aiWeg(a, a._x < .5 ? -1 : 1), i * 70));
+  kamZeichnungLeeren(); kamMenueZu();
+}
+/* Radiales Gesten-Menü (Handfläche ruhig halten, Knopf „+ Hologramm“ oder „Menü“) */
+function kamMenue(x, y) {
+  const m = kamEl('.km');
+  if (!m.childElementCount) m.innerHTML = KAM_MENUE.map(([art, n], i) =>
+    `<button data-k="m:${art}" style="--w:${(i / KAM_MENUE.length * 360 - 90).toFixed(1)}deg; --i:${i}">${n}</button>`).join('');
+  m.style.left = Math.min(.82, Math.max(.18, x)) * 100 + '%'; m.style.top = Math.min(.74, Math.max(.26, y)) * 100 + '%';
+  m.classList.add('on'); KAM.menueOffen = true; KAM.menueBis = performance.now() + 7000; SFX.holo();
+}
+function kamMenueZu() { const m = kamEl('.km'); if (!KAM.menueOffen) return; m.classList.remove('on'); KAM.menueOffen = false; KAM.menueSperre = performance.now() + 1800; }
+/* Zeichnen in der Luft: ausgestreckter Zeigefinger malt, Hand öffnen/Faust = absetzen (nur im Fenster, nichts wird gespeichert) */
+function kamZeichnenSetzen(an, still) {
+  KAM.zeichnen = an; $('kamh').classList.toggle('malt', an);
+  const b = kamEl('.kk [data-a="zeichnen"]'); if (b) b.classList.toggle('aktiv', an);
+  if (!still) { SFX.click(); kamHinweis(an ? 'Zeichnen: Zeigefinger ausstrecken = malen · Hand öffnen = absetzen · „Zeichnung löschen“' : 'Zeichnen aus', an ? 8000 : 1800); }
+}
+function kamZeichnungLeeren() { KAM.striche = []; KAM.stricheNeu = true; }
+function kamStricheMalen() {
+  KAM.stricheNeu = false;
+  const cv = kamEl('.zc'), z = devicePixelRatio || 1, w = cv.width / z, h = cv.height / z, g = cv.getContext('2d');
+  g.setTransform(z, 0, 0, z, 0, 0); g.clearRect(0, 0, w, h); g.lineCap = g.lineJoin = 'round';
+  for (const s of KAM.striche) {
+    if (s.p.length < 2) continue;
+    g.beginPath(); s.p.forEach(([x, y], i) => i ? g.lineTo(x * w, y * h) : g.moveTo(x * w, y * h));
+    g.shadowColor = `rgba(${s.c},1)`; g.shadowBlur = 16; g.strokeStyle = `rgba(${s.c},.92)`; g.lineWidth = 5; g.stroke();
+    g.shadowBlur = 0; g.strokeStyle = 'rgba(255,255,255,.85)'; g.lineWidth = 1.6; g.stroke();
+  }
+}
+/* 3D-Objekte (WebGL): leuchtendes Gitter, dreht sich von selbst; in der Hand: Handdrehung + Bewegung drehen es mit */
+function kam3DGeo(art) {
+  const L = [], P = [], seg = (a, b) => L.push(...a, ...b), PI = Math.PI;
+  if (art === 'sphaere') {
+    const kp = (ph, th) => [Math.sin(ph) * Math.cos(th), Math.cos(ph), Math.sin(ph) * Math.sin(th)];
+    for (let i = 1; i < 8; i++) for (let j = 0; j < 48; j++) seg(kp(i / 8 * PI, j / 48 * 2 * PI), kp(i / 8 * PI, (j + 1) / 48 * 2 * PI));
+    for (let j = 0; j < 12; j++) for (let i = 0; i < 24; i++) seg(kp(i / 24 * PI, j / 12 * 2 * PI), kp((i + 1) / 24 * PI, j / 12 * 2 * PI));
+    for (let i = 1; i < 8; i++) for (let j = 0; j < 12; j++) P.push(...kp(i / 8 * PI, j / 12 * 2 * PI));
+    const ring = (u, r, k) => [r * Math.cos(u), r * Math.sin(u) * k, r * Math.sin(u)];   // schräger Orbit-Ring
+    for (let j = 0; j < 72; j++) seg(ring(j / 72 * 2 * PI, 1.22, .28), ring((j + 1) / 72 * 2 * PI, 1.22, .28));
+  } else if (art === 'wuerfel') {
+    const h = .58, gr = [-h, -h / 2, 0, h / 2, h];
+    for (let ax = 0; ax < 3; ax++) for (const u of gr) for (const v of gr) {
+      if (Math.abs(u) !== h && Math.abs(v) !== h) continue;
+      const a = [0, 0, 0], b = [0, 0, 0]; a[ax] = -h; b[ax] = h; a[(ax + 1) % 3] = b[(ax + 1) % 3] = u; a[(ax + 2) % 3] = b[(ax + 2) % 3] = v; seg(a, b);
+    }
+    for (const x of [-h, h]) for (const y of [-h, h]) for (const z of [-h, h]) P.push(x, y, z);
+    const o = .3, ok = [[o,0,0],[-o,0,0],[0,o,0],[0,-o,0],[0,0,o],[0,0,-o]];   // leuchtender Kern (Oktaeder)
+    for (let i = 0; i < 6; i++) for (let j = i + 1; j < 6; j++) if (Math.floor(i / 2) !== Math.floor(j / 2)) seg(ok[i], ok[j]);
+    P.push(0, 0, 0);
+  } else {   // Modell: Torus
+    const R = .66, r = .26, T = (u, v) => [(R + r * Math.cos(v)) * Math.cos(u), r * Math.sin(v), (R + r * Math.cos(v)) * Math.sin(u)];
+    for (let i = 0; i < 24; i++) for (let j = 0; j < 16; j++) seg(T(i / 24 * 2 * PI, j / 16 * 2 * PI), T(i / 24 * 2 * PI, (j + 1) / 16 * 2 * PI));
+    for (let j = 0; j < 8; j++) for (let i = 0; i < 64; i++) seg(T(i / 64 * 2 * PI, j / 8 * 2 * PI), T((i + 1) / 64 * 2 * PI, j / 8 * 2 * PI));
+    for (let i = 0; i < 24; i++) for (let j = 0; j < 8; j++) P.push(...T(i / 24 * 2 * PI, j / 8 * 2 * PI));
+  }
+  return { lin:new Float32Array(L), pts:new Float32Array(P) };
+}
+function kam3DStart(a) {
+  const cv = a.querySelector('canvas'), gl = cv.getContext('webgl', { alpha:true, premultipliedAlpha:false, antialias:true });
+  a._rot = { x:.45, y:0, z:0, vx:0, vy:.6, vz:0 };
+  if (!gl) return;
+  const sh = (typ, src) => { const s = gl.createShader(typ); gl.shaderSource(s, src); gl.compileShader(s); return s; };
+  const pr = gl.createProgram();
+  gl.attachShader(pr, sh(gl.VERTEX_SHADER, 'attribute vec3 p; uniform mat3 m; uniform float ps; varying float d;'
+    + 'void main(){ vec3 q = m * p; float z = 3.0 - q.z; gl_Position = vec4(q.xy * 1.9 / z, 0.0, 1.0); d = clamp(0.5 + q.z * 0.5, 0.12, 1.0); gl_PointSize = ps * (0.7 + d * 0.6); }'));
+  gl.attachShader(pr, sh(gl.FRAGMENT_SHADER, 'precision mediump float; uniform vec3 c; uniform float pt; varying float d;'
+    + 'void main(){ float a = d; if (pt > 0.5) { float r = length(gl_PointCoord - 0.5); if (r > 0.5) discard; a *= 1.0 - r * 1.6; } gl_FragColor = vec4(mix(c, vec3(1.0), d * 0.35), a); }'));
+  gl.linkProgram(pr);
+  if (!gl.getProgramParameter(pr, gl.LINK_STATUS)) return;
+  const geo = kam3DGeo(a._art), puf = arr => { const b = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, b); gl.bufferData(gl.ARRAY_BUFFER, arr, gl.STATIC_DRAW); return b; };
+  a._gl = { gl, pr, lin:puf(geo.lin), nl:geo.lin.length / 3, pts:puf(geo.pts), np:geo.pts.length / 3,
+    aP:gl.getAttribLocation(pr, 'p'), uM:gl.getUniformLocation(pr, 'm'), uC:gl.getUniformLocation(pr, 'c'), uPt:gl.getUniformLocation(pr, 'pt'), uPs:gl.getUniformLocation(pr, 'ps') };
+}
+function kamMat(x, y, z) {   // Rz·Ry·Rx, spaltenweise
+  const [cx, sx, cy, sy, cz, sz] = [Math.cos(x), Math.sin(x), Math.cos(y), Math.sin(y), Math.cos(z), Math.sin(z)];
+  return new Float32Array([cz * cy, sz * cy, -sy, cz * sy * sx - sz * cx, sz * sy * sx + cz * cx, cy * sx, cz * sy * cx + sz * sx, sz * sy * cx - cz * sx, cy * cx]);
+}
+function kam3DMalen(a, dt) {
+  const G = a._gl, R = a._rot; if (!G || !R) return;
+  if (!a.classList.contains('greif')) { R.vy += (.6 - R.vy) * Math.min(1, dt * .9); R.vx *= Math.pow(.25, dt); R.x += (.45 - R.x) * Math.min(1, dt * .3); }
+  R.x += R.vx * dt; R.y += R.vy * dt;
+  const gl = G.gl, cv = gl.canvas, px = Math.round(200 * Math.min(2.4, Math.max(.6, a._s)) * Math.min(2, devicePixelRatio || 1));
+  if (cv.width !== px) { cv.width = cv.height = px; }
+  gl.viewport(0, 0, px, px); gl.clearColor(0, 0, 0, 0); gl.clear(gl.COLOR_BUFFER_BIT);
+  gl.useProgram(G.pr); gl.enable(gl.BLEND); gl.blendFunc(gl.SRC_ALPHA, gl.ONE);
+  const c = KAM.farbe.split(/[\s,]+/).map(v => (+v || 0) / 255);
+  gl.uniformMatrix3fv(G.uM, false, kamMat(R.x, R.y, R.z)); gl.uniform3f(G.uC, c[0], c[1], c[2]);
+  gl.enableVertexAttribArray(G.aP);
+  gl.bindBuffer(gl.ARRAY_BUFFER, G.lin); gl.vertexAttribPointer(G.aP, 3, gl.FLOAT, false, 0, 0); gl.uniform1f(G.uPt, 0); gl.drawArrays(gl.LINES, 0, G.nl);
+  if (G.np) { gl.bindBuffer(gl.ARRAY_BUFFER, G.pts); gl.vertexAttribPointer(G.aP, 3, gl.FLOAT, false, 0, 0); gl.uniform1f(G.uPt, 1); gl.uniform1f(G.uPs, px / 48); gl.drawArrays(gl.POINTS, 0, G.np); }
+}
 function aiTreffer(x, y) {   // oberstes Hologramm unter einem Bühnen-Punkt (mit etwas Spielraum)
   const kb = kamEl('.kb').getBoundingClientRect(), px = x + kb.left, py = y + kb.top;
   return aiAlle().sort((a, b) => b.style.zIndex - a.style.zIndex).find(a => {
     const r = a.getBoundingClientRect(); return px >= r.left - 16 && px <= r.right + 16 && py >= r.top - 16 && py <= r.bottom + 16; });
 }
+function kamKnopf(x, y) {   // Knopf (data-k) unter einem Bildschirm-Punkt, mit etwas Spielraum
+  for (const [dx, dy] of [[0, 0], [12, 0], [-12, 0], [0, 12], [0, -12]]) {
+    const e = document.elementFromPoint(x + dx, y + dy), k = e && e.closest('[data-k]');
+    if (k && $('kamh').contains(k)) return k;
+  }
+  return null;
+}
+function kamDruecken(el) { el.classList.add('druck'); setTimeout(() => el.classList.remove('druck'), 240); SFX.click(); el.click(); }
+function kamForm(p) {   // Handform: offen, zeigt (nur Zeigefinger), Abstand Daumen–Zeigefinger
+  const d = (a, b) => Math.hypot(p[a].x - p[b].x, p[a].y - p[b].y), gr = d(0, 9) || 1;
+  const aus = [[8, 6], [12, 10], [16, 14], [20, 18]].map(([t, j]) => d(t, 0) > d(j, 0) * 1.12);
+  const n = aus.filter(Boolean).length;
+  return { gr, ab:d(4, 8) / gr, offen:n === 4 && d(4, 17) > gr * .7, zeigt:aus[0] && !aus[1] && !aus[2] && !aus[3],
+    palm:{ x:(p[0].x + p[5].x + p[9].x + p[13].x + p[17].x) / 5, y:(p[0].y + p[5].y + p[9].y + p[13].y + p[17].y) / 5 } };
+}
+const kamRoll = p => Math.atan2(p[17].y - p[5].y, p[17].x - p[5].x);
+const kamWinkel = w => Math.atan2(Math.sin(w), Math.cos(w));
 function kamSchleife() {
   if (!KAM.an) return; KAM.raf = requestAnimationFrame(kamSchleife);
-  const t = performance.now();
-  if (t - KAM.uhrT > 250) { KAM.uhrT = t; aiUhren(); }
-  if (t - KAM.goldT > 2000 && kamEl('.ai.gold')) { KAM.goldT = t; aiGold(); }
-  if (t - KAM.farbeT > 1000) { KAM.farbeT = t; KAM.farbe = getComputedStyle(document.documentElement).getPropertyValue('--c').trim() || KAM.farbe; }
-  const kb = kamEl('.kb'), v = kamEl('video'), cv = kamEl('canvas'), w = kb.clientWidth, h = kb.clientHeight, z = devicePixelRatio || 1;
-  if (cv.width !== Math.round(w * z) || cv.height !== Math.round(h * z)) { cv.width = Math.round(w * z); cv.height = Math.round(h * z); }
+  const t = performance.now(), dt = KAM.lt ? Math.min(.1, (t - KAM.lt) / 1000) : .016; KAM.lt = t;
+  for (const art in KAM_TAKT) if (t - (KAM.tick[art] || 0) > KAM_TAKT[art] && kamEl('.ai.' + art + ':not(.weg)')) { KAM.tick[art] = t; KAM_LADEN[art](); }
+  if (t - KAM.farbeT > 1000) { KAM.farbeT = t; KAM.farbe = getComputedStyle(document.documentElement).getPropertyValue('--c').trim() || KAM.farbe; kamKarten(); kamLicht(); }
+  if (KAM.menueOffen && t > KAM.menueBis) kamMenueZu();
+  const kb = kamEl('.kb'), v = kamEl('video'), cv = kamEl('.hc'), zc = kamEl('.zc'), w = kb.clientWidth, h = kb.clientHeight, z = devicePixelRatio || 1;
+  if (cv.width !== Math.round(w * z) || cv.height !== Math.round(h * z)) {
+    cv.width = zc.width = Math.round(w * z); cv.height = zc.height = Math.round(h * z); KAM.stricheNeu = true; }
   const g = cv.getContext('2d'); g.setTransform(z, 0, 0, z, 0, 0); g.clearRect(0, 0, w, h);
-  if (!KAM.haende || v.readyState < 2 || !v.videoWidth) return;
-  if (v.currentTime !== KAM.zeit) { KAM.zeit = v.currentTime; try { KAM.erg = KAM.haende.detectForVideo(v, t); } catch (e) { KAM.erg = null; } }
-  const erg = KAM.erg; if (!erg || !erg.landmarks) return;
-  // Kamerakoordinaten → Bühnen-Pixel (Bild füllt die Bühne und ist gespiegelt wie ein Spiegel)
-  const k = Math.max(w / v.videoWidth, h / v.videoHeight), dw = v.videoWidth * k, dh = v.videoHeight * k, ox = (w - dw) / 2, oy = (h - dh) / 2;
-  const ids = new Set();
-  const haende = erg.landmarks.map((lm, i) => {
-    let id = ((erg.handedness || erg.handednesses || [])[i] || [])[0]?.categoryName || 'h' + i; if (ids.has(id)) id += i; ids.add(id);
-    return { id, p:lm.map(q => ({ x:ox + (1 - q.x) * dw, y:oy + q.y * dh })) };
-  });
-  kamGesten(haende, w, h, t); kamZeichnen(g, haende);
-}
-function kamGesten(haende, w, h, t) {
-  aiAlle().forEach(a => a.classList.remove('ziel'));
-  for (const hd of haende) {
-    const p = hd.p, gr = Math.hypot(p[0].x - p[9].x, p[0].y - p[9].y) || 1, ab = Math.hypot(p[4].x - p[8].x, p[4].y - p[8].y) / gr;
-    const g = KAM.griffe[hd.id];
-    hd.pinch = g ? ab < .5 : ab < .3;   // Daumen an Zeigefinger = greifen (loslassen erst etwas weiter auf – kein Flattern)
-    hd.pt = hd.pinch || g ? { x:(p[4].x + p[8].x) / 2, y:(p[4].y + p[8].y) / 2 } : { x:p[8].x, y:p[8].y };
-    if (hd.pinch && !g) {
-      const a = aiTreffer(hd.pt.x, hd.pt.y);
-      KAM.griffe[hd.id] = { a, dx:a ? hd.pt.x - a._x * w : 0, dy:a ? hd.pt.y - a._y * h : 0 };
-      if (a) { a.classList.add('greif'); a.style.zIndex = ++KAM.z; }
-    } else if (!hd.pinch && g) { if (g.a) { g.a.classList.remove('greif'); g.a._zwei = null; } delete KAM.griffe[hd.id]; }
-    if (!hd.pinch) {   // offene Hand: Ziel anzeigen und schnelles Wischen erkennen
-      const ziel = aiTreffer(hd.pt.x, hd.pt.y); if (ziel) ziel.classList.add('ziel');
-      const sp = (KAM.spuren[hd.id] = (KAM.spuren[hd.id] || []).filter(q => t - q.t < 260)); sp.push({ x:hd.pt.x, y:hd.pt.y, t });
-      const a0 = sp[0], dx = hd.pt.x - a0.x, dt = (t - a0.t) / 1000;
-      if (t > KAM.sperre && dt > .06 && Math.abs(dx) > w * .16 && Math.abs(dx) / dt > w * 1.4 && Math.abs(dx) > Math.abs(hd.pt.y - a0.y) * 1.5) {
-        const opfer = aiTreffer((a0.x + hd.pt.x) / 2, (a0.y + hd.pt.y) / 2) || aiTreffer(a0.x, a0.y) || ziel;
-        if (opfer) { aiWeg(opfer, Math.sign(dx)); KAM.sperre = t + 700; KAM.spuren[hd.id] = []; }
-      }
-    } else KAM.spuren[hd.id] = [];
+  aiAlle().forEach(a => { if (a._gl) kam3DMalen(a, dt); });
+  if (KAM.haende && v.readyState >= 2 && v.videoWidth && v.currentTime !== KAM.zeit) {
+    KAM.zeit = v.currentTime; let erg = null;
+    try { erg = KAM.haende.detectForVideo(v, t); } catch (e) {}
+    // Kamerakoordinaten → Bühnen-Pixel (Bild füllt die Bühne und ist gespiegelt wie ein Spiegel), dann geglättet
+    const k = Math.max(w / v.videoWidth, h / v.videoHeight), dw = v.videoWidth * k, dh = v.videoHeight * k, ox = (w - dw) / 2, oy = (h - dh) / 2, ids = new Set();
+    KAM.letzte = ((erg && erg.landmarks) || []).map((lm, i) => {
+      let id = ((erg.handedness || erg.handednesses || [])[i] || [])[0]?.categoryName || 'h' + i; if (ids.has(id)) id += i; ids.add(id);
+      const F = KAM.filter[id] || (KAM.filter[id] = lm.map(() => [new KamFilter(), new KamFilter()]));
+      return { id, p:lm.map((q, j) => ({ x:F[j][0].f(ox + (1 - q.x) * dw, t), y:F[j][1].f(oy + q.y * dh, t) })) };
+    });
+    for (const id in KAM.filter) if (!ids.has(id)) delete KAM.filter[id];
   }
-  for (const id in KAM.griffe) if (!haende.some(hd => hd.id === id)) {   // Hand aus dem Bild = loslassen
-    const g = KAM.griffe[id]; if (g.a) { g.a.classList.remove('greif'); g.a._zwei = null; } delete KAM.griffe[id]; }
+  const haende = KAM.haende ? KAM.letzte : [];
+  kamGesten(haende, w, h, t, dt); kamHandMalen(g, haende, w, h);
+  if (KAM.stricheNeu) kamStricheMalen();
+}
+function kamLoslassen(hs, t, w, h, hd) {
+  const gf = hs.griff; hs.griff = null; const a = gf && gf.a; if (!a) return;
+  a.classList.remove('greif'); a._zwei = null;
+  if (hd && t - gf.t0 < 320 && Math.hypot(hd.pt.x - gf.x0, hd.pt.y - gf.y0) < 18 && a._art === 'spotify') kamSpotify('play');   // kurz antippen = Play/Pause
+  else if ((a._x < .12 || a._x > .88) && (a._y < .2 || a._y > .8)) aiParken(a);   // in eine Ecke gezogen = parken
+  kamMerken();
+}
+function kamGesten(haende, w, h, t, dt) {
+  const ziele = new Set(), knoepfe = new Set(), kb = kamEl('.kb').getBoundingClientRect(), folger = aiAlle().filter(a => a._folgt);
+  for (const hd of haende) {
+    const p = hd.p, f = kamForm(p), hs = KAM.hs[hd.id] || (KAM.hs[hd.id] = { spur:[], zeigtN:0, offenN:0 });
+    Object.assign(hd, f); hd.lade = 0; hd.menueLade = 0;
+    const gf = hs.griff;
+    hd.pinch = gf ? f.ab < .48 : f.ab < .28;   // greifen mit Hysterese – kein Flattern
+    hs.zeigtN = f.zeigt && !hd.pinch ? hs.zeigtN + 1 : 0; hs.offenN = f.offen && !hd.pinch ? hs.offenN + 1 : 0;
+    hd.zeigt = hs.zeigtN >= 3; hd.offen = hs.offenN >= 3;   // Form erst nach ein paar Bildern übernehmen
+    hd.pt = hd.pinch || gf ? { x:(p[4].x + p[8].x) / 2, y:(p[4].y + p[8].y) / 2 } : { x:p[8].x, y:p[8].y };
+    const knopf = kamKnopf(kb.left + hd.pt.x, kb.top + hd.pt.y);
+    if (hd.pinch && !gf) {   // Griff beginnt: Knopf drücken – oder Hologramm greifen
+      if (knopf) { kamDruecken(knopf); hs.griff = { klick:true }; }
+      else {
+        const a = aiTreffer(hd.pt.x, hd.pt.y);
+        if (a && a._pin) { kamHinweis('Angeheftet – zum Lösen die Stecknadel antippen', 1800); hs.griff = { klick:true }; }
+        else {
+          if (a) { if (a._park) aiAusparken(a); aiFolgt(a, false); a.classList.add('greif'); a.style.zIndex = ++KAM.z; }
+          hs.griff = { a, t0:t, x0:hd.pt.x, y0:hd.pt.y, lx:hd.pt.x, ly:hd.pt.y, dx:a ? hd.pt.x - a._x * w : 0, dy:a ? hd.pt.y - a._y * h : 0,
+            roll0:kamRoll(p), rz0:a && a._rot ? a._rot.z : 0 };
+        }
+      }
+    } else if (!hd.pinch && gf) kamLoslassen(hs, t, w, h, hd);
+    if (hd.pinch) { hs.spur = []; hs.verweil = null; hs.strich = null; hs.ruhe = null; continue; }
+    const ziel = hd.zeigt || hd.offen ? aiTreffer(hd.pt.x, hd.pt.y) : null; if (ziel) ziele.add(ziel);
+    // Zeigefinger = Cursor: kurz über einem Knopf verweilen = drücken
+    if (hd.zeigt && knopf && !KAM.zeichnen) {
+      knoepfe.add(knopf);
+      if (hs.verweil && hs.verweil.el === knopf) { hd.lade = Math.min(1, (t - hs.verweil.t) / 650); if (hd.lade >= 1 && !hs.verweil.fertig) { hs.verweil.fertig = true; kamDruecken(knopf); } }
+      else hs.verweil = { el:knopf, t };
+    } else hs.verweil = null;
+    // Zeichnen in der Luft
+    if (KAM.zeichnen && hd.zeigt) {
+      if (!hs.strich) { hs.strich = { c:KAM.farbe, p:[] }; KAM.striche.push(hs.strich); if (KAM.striche.length > 300) KAM.striche.shift(); }
+      const l = hs.strich.p[hs.strich.p.length - 1];
+      if (!l || Math.hypot(l[0] * w - hd.pt.x, l[1] * h - hd.pt.y) > 2.5) { hs.strich.p.push([hd.pt.x / w, hd.pt.y / h]); KAM.stricheNeu = true; }
+    } else hs.strich = null;
+    // Handfläche ruhig zeigen = radiales Menü
+    if (hd.offen && !KAM.menueOffen && t > KAM.menueSperre && !folger.length && !aiTreffer(f.palm.x, f.palm.y)) {
+      if (!hs.ruhe || Math.hypot(f.palm.x - hs.ruhe.x, f.palm.y - hs.ruhe.y) > f.gr * .3) hs.ruhe = { x:f.palm.x, y:f.palm.y, t };
+      hd.menueLade = Math.min(1, (t - hs.ruhe.t) / 1100);
+      if (hd.menueLade >= 1) { kamMenue(f.palm.x / w, f.palm.y / h); hs.ruhe = null; hd.menueLade = 0; }
+    } else hs.ruhe = null;
+    // schnelles Wischen = weg (über Spotify: nächster/vorheriger Titel)
+    if (!(KAM.zeichnen && hd.zeigt)) {
+      const sp = (hs.spur = hs.spur.filter(q => t - q.t < 260)); sp.push({ x:hd.pt.x, y:hd.pt.y, t });
+      const a0 = sp[0], dx = hd.pt.x - a0.x, dts = (t - a0.t) / 1000;
+      if (t > KAM.sperre && dts > .06 && Math.abs(dx) > w * .16 && Math.abs(dx) / dts > w * 1.4 && Math.abs(dx) > Math.abs(hd.pt.y - a0.y) * 1.5) {
+        const opfer = aiTreffer((a0.x + hd.pt.x) / 2, (a0.y + hd.pt.y) / 2) || aiTreffer(a0.x, a0.y) || ziel;
+        if (opfer && !opfer._pin) {
+          if (opfer._art === 'spotify') kamSpotify(dx > 0 ? 'next' : 'prev'); else aiWeg(opfer, Math.sign(dx));
+          KAM.sperre = t + 700; hs.spur = [];
+        }
+      }
+    } else hs.spur = [];
+  }
+  for (const id in KAM.hs) if (!haende.some(hd => hd.id === id)) { kamLoslassen(KAM.hs[id], t, w, h); delete KAM.hs[id]; }   // Hand aus dem Bild = loslassen
+  // gegriffene Hologramme bewegen: eine Hand = verschieben (3D-Objekte drehen mit), zwei Hände = Größe + Drehung
   const proA = new Map();
-  for (const hd of haende) { const g = KAM.griffe[hd.id]; if (g && g.a && !g.a.classList.contains('weg')) { if (!proA.has(g.a)) proA.set(g.a, []); proA.get(g.a).push(hd); } }
+  for (const hd of haende) { const gf = KAM.hs[hd.id] && KAM.hs[hd.id].griff; if (gf && gf.a && !gf.a.classList.contains('weg')) { if (!proA.has(gf.a)) proA.set(gf.a, []); proA.get(gf.a).push(hd); } }
   proA.forEach((hs, a) => {
-    if (hs.length >= 2) {   // mit zwei Händen gegriffen: Abstand der Hände = Größe
-      const d = Math.hypot(hs[0].pt.x - hs[1].pt.x, hs[0].pt.y - hs[1].pt.y);
-      if (!a._zwei) a._zwei = { d0:Math.max(20, d), s0:a._s };
-      aiSetzen(a, (hs[0].pt.x + hs[1].pt.x) / 2 / w, (hs[0].pt.y + hs[1].pt.y) / 2 / h, a._zwei.s0 * d / a._zwei.d0);
+    if (hs.length >= 2) {
+      const [A, B] = hs, d = Math.hypot(A.pt.x - B.pt.x, A.pt.y - B.pt.y), wk = Math.atan2(B.pt.y - A.pt.y, B.pt.x - A.pt.x);
+      if (!a._zwei) a._zwei = { d0:Math.max(20, d), s0:a._s, w0:wk, r0:a._r || 0 };
+      aiSetzen(a, (A.pt.x + B.pt.x) / 2 / w, (A.pt.y + B.pt.y) / 2 / h, a._zwei.s0 * d / a._zwei.d0, a._zwei.r0 + kamWinkel(wk - a._zwei.w0) * 180 / Math.PI);
     } else {
-      const g = KAM.griffe[hs[0].id];
-      if (a._zwei) { a._zwei = null; g.dx = hs[0].pt.x - a._x * w; g.dy = hs[0].pt.y - a._y * h; }
-      aiSetzen(a, (hs[0].pt.x - g.dx) / w, (hs[0].pt.y - g.dy) / h);
+      const hd = hs[0], gf = KAM.hs[hd.id].griff;
+      if (a._zwei) { a._zwei = null; gf.dx = hd.pt.x - a._x * w; gf.dy = hd.pt.y - a._y * h; }
+      aiSetzen(a, (hd.pt.x - gf.dx) / w, (hd.pt.y - gf.dy) / h);
+      if (a._rot) {
+        const s = Math.max(dt, .008), vx = (hd.pt.x - gf.lx) / s, vy = (hd.pt.y - gf.ly) / s;
+        a._rot.vy += (vx * .012 - a._rot.vy) * .25; a._rot.vx += (vy * .012 - a._rot.vx) * .25;
+        a._rot.z = gf.rz0 - kamWinkel(kamRoll(hd.p) - gf.roll0);
+      }
+      gf.lx = hd.pt.x; gf.ly = hd.pt.y;
     }
   });
+  // „in meine Hand“: 3D-Objekt schwebt über der offenen Handfläche und folgt ihr
+  KAM.strahl = null;
+  if (folger.length) {
+    const hand = haende.find(hd => hd.offen) || haende.find(hd => !hd.pinch);
+    if (hand) {
+      const k = 1 - Math.pow(.00002, dt);
+      folger.forEach((a, i) => {
+        const tx = (hand.palm.x + (i - (folger.length - 1) / 2) * hand.gr * 1.7) / w, ty = (hand.palm.y - hand.gr * 1.55) / h, ts = Math.max(.35, hand.gr * 2.3 / 200);
+        aiSetzen(a, a._x + (tx - a._x) * k, a._y + (ty - a._y) * k, a._s + (ts - a._s) * k);
+      });
+      KAM.strahl = { x:hand.palm.x, y:hand.palm.y, gr:hand.gr, ziele:folger };
+    }
+  }
+  aiAlle().forEach(a => a.classList.toggle('ziel', ziele.has(a)));
+  $('kamh').querySelectorAll('[data-k].hand').forEach(k => { if (!knoepfe.has(k)) k.classList.remove('hand'); });
+  knoepfe.forEach(k => k.classList.add('hand'));
 }
-function kamZeichnen(g, haende) {
-  const c = KAM.farbe;
-  g.lineCap = 'round'; g.shadowColor = `rgba(${c},.9)`; g.shadowBlur = 8;
+function kamHandMalen(g, haende, w, h) {
+  const c = KAM.farbe; g.lineCap = 'round';
+  if (KAM.strahl) {   // Lichtkegel von der Handfläche zum schwebenden Objekt
+    const s = KAM.strahl;
+    for (const a of s.ziele) {
+      const ax = a._x * w, ay = a._y * h, r = 100 * a._s * .55, gr = g.createLinearGradient(s.x, s.y, ax, ay);
+      gr.addColorStop(0, `rgba(${c},.42)`); gr.addColorStop(1, `rgba(${c},0)`);
+      g.fillStyle = gr; g.beginPath(); g.moveTo(s.x - s.gr * .35, s.y); g.lineTo(ax - r, ay); g.lineTo(ax + r, ay); g.lineTo(s.x + s.gr * .35, s.y); g.closePath(); g.fill();
+    }
+    const rg = g.createRadialGradient(s.x, s.y, 0, s.x, s.y, s.gr * .8); rg.addColorStop(0, `rgba(${c},.45)`); rg.addColorStop(1, `rgba(${c},0)`);
+    g.fillStyle = rg; g.beginPath(); g.ellipse(s.x, s.y, s.gr * .8, s.gr * .35, 0, 0, 7); g.fill();
+  }
+  g.shadowColor = `rgba(${c},.9)`; g.shadowBlur = 8;
   for (const hd of haende) {
     g.lineWidth = 1.6; g.strokeStyle = `rgba(${c},.55)`; g.beginPath();
     for (const [a, b] of HAND_LINIEN) { g.moveTo(hd.p[a].x, hd.p[a].y); g.lineTo(hd.p[b].x, hd.p[b].y); }
     g.stroke();
     g.fillStyle = 'rgba(255,255,255,.85)';
     for (const i of [4, 8, 12, 16, 20]) { g.beginPath(); g.arc(hd.p[i].x, hd.p[i].y, 2.6, 0, 7); g.fill(); }
-    g.beginPath(); g.arc(hd.pt.x, hd.pt.y, hd.pinch ? 9 : 15, 0, 7); g.lineWidth = 2; g.strokeStyle = `rgba(${c},1)`; g.stroke();
-    if (hd.pinch) { g.fillStyle = `rgba(${c},.45)`; g.fill(); }
+    if (!hd.pt) continue;
+    g.lineWidth = 2; g.strokeStyle = `rgba(${c},1)`;
+    if (hd.zeigt) {   // Cursor mit Fadenkreuz, Ring füllt sich beim Verweilen über einem Knopf
+      g.beginPath(); g.arc(hd.pt.x, hd.pt.y, 11, 0, 7); g.stroke();
+      g.beginPath(); g.arc(hd.pt.x, hd.pt.y, 2.5, 0, 7); g.fillStyle = '#fff'; g.fill();
+      if (hd.lade) { g.lineWidth = 3.5; g.beginPath(); g.arc(hd.pt.x, hd.pt.y, 17, -Math.PI / 2, -Math.PI / 2 + hd.lade * Math.PI * 2); g.strokeStyle = 'rgba(255,255,255,.95)'; g.stroke(); }
+    } else {
+      g.beginPath(); g.arc(hd.pt.x, hd.pt.y, hd.pinch ? 9 : 15, 0, 7); g.stroke();
+      if (hd.pinch) { g.fillStyle = `rgba(${c},.45)`; g.fill(); }
+    }
+    if (hd.menueLade > .25) {   // Handfläche lädt das Menü
+      g.lineWidth = 3; g.strokeStyle = `rgba(${c},.95)`; g.beginPath();
+      g.arc(hd.palm.x, hd.palm.y, hd.gr * .75, -Math.PI / 2, -Math.PI / 2 + (hd.menueLade - .25) / .75 * Math.PI * 2); g.stroke();
+    }
   }
   g.shadowBlur = 0;
 }
@@ -2338,22 +2849,36 @@ function kamFoto(n) {   // kamera.ps1 hat um EIN Standbild gebeten (nur, wenn La
   fetch('/kamera/bild', { method:'POST', headers:{ 'Content-Type':'application/json' }, body:JSON.stringify({ bild:c.toDataURL('image/png') }) }).catch(() => {});
   hint('Ein Standbild für ORB – bleibt auf dem PC', 2500);
 }
-// Maus: ziehen = verschieben, Mausrad = Größe, Doppelklick = weg
+// Maus: ziehen = verschieben, Mausrad = Größe, Umschalt+Mausrad = drehen, Doppelklick = weg, Knöpfe anklicken
 kamEl('.ar').addEventListener('pointerdown', e => {
-  const a = e.target.closest('.ai'); if (!a || a.classList.contains('weg')) return; e.preventDefault();
+  const a = e.target.closest('.ai'); if (!a || a.classList.contains('weg') || e.target.closest('[data-k]') || a._pin) return; e.preventDefault();
+  if (a._park) aiAusparken(a); aiFolgt(a, false);
   const kb = kamEl('.kb').getBoundingClientRect(), dx = e.clientX - kb.left - a._x * kb.width, dy = e.clientY - kb.top - a._y * kb.height;
   a.setPointerCapture(e.pointerId); a.classList.add('greif'); a.style.zIndex = ++KAM.z;
   const mv = ev => aiSetzen(a, (ev.clientX - kb.left - dx) / kb.width, (ev.clientY - kb.top - dy) / kb.height);
-  const up = () => { a.classList.remove('greif'); a.removeEventListener('pointermove', mv); a.removeEventListener('pointerup', up); a.removeEventListener('pointercancel', up); };
+  const up = () => { a.classList.remove('greif'); a.removeEventListener('pointermove', mv); a.removeEventListener('pointerup', up); a.removeEventListener('pointercancel', up);
+    if ((a._x < .12 || a._x > .88) && (a._y < .2 || a._y > .8)) aiParken(a); };
   a.addEventListener('pointermove', mv); a.addEventListener('pointerup', up); a.addEventListener('pointercancel', up);
 });
-kamEl('.ar').addEventListener('wheel', e => { const a = e.target.closest('.ai'); if (!a) return; e.preventDefault(); aiSetzen(a, a._x, a._y, a._s * (e.deltaY < 0 ? 1.1 : 1 / 1.1)); }, { passive:false });
-kamEl('.ar').addEventListener('dblclick', e => { const a = e.target.closest('.ai'); if (a) aiWeg(a, a._x < .5 ? -1 : 1); });
+kamEl('.ar').addEventListener('wheel', e => { const a = e.target.closest('.ai'); if (!a || a._pin) return; e.preventDefault();
+  if (e.shiftKey) aiSetzen(a, a._x, a._y, a._s, (a._r || 0) + (e.deltaY < 0 ? 8 : -8)); else aiSetzen(a, a._x, a._y, a._s * (e.deltaY < 0 ? 1.1 : 1 / 1.1)); }, { passive:false });
+kamEl('.ar').addEventListener('dblclick', e => { const a = e.target.closest('.ai'); if (a && !a._pin && !e.target.closest('[data-k]')) aiWeg(a, a._x < .5 ? -1 : 1); });
+kamEl('.kb').addEventListener('click', e => {   // Knöpfe in Hologrammen und Menü (Maus, Zeigefinger oder Greifen)
+  const b = e.target.closest('[data-k]'); if (!b) return;
+  const k = b.dataset.k, a = b.closest('.ai');
+  if (k === 'zu' && a) aiWeg(a, a._x < .5 ? -1 : 1);
+  else if (k === 'pin' && a) aiPin(a, !a._pin);
+  else if (k === 'park' && a) { if (a._park) aiAusparken(a, true); else aiParken(a); }
+  else if (k.startsWith('sp:')) kamSpotify(k.slice(3));
+  else if (k.startsWith('m:')) { kamMenueZu(); kamZeigen({ art:k.slice(2) }); }
+});
 kamEl('.kk').addEventListener('click', e => {
   const b = e.target.closest('button'); if (!b) return;
   if (b.classList.contains('x')) return kameraAus();
-  const art = b.dataset.a; SFX.holo();
-  if (art === 'bild') aiBild(); else aiNeu(art, .5 + (Math.random() - .5) * .3, .45 + (Math.random() - .5) * .2);
+  const art = b.dataset.a;
+  if (art === 'menue') KAM.menueOffen ? kamMenueZu() : kamMenue(.5, .5);
+  else if (art === 'zeichnen') kamZeichnenSetzen(!KAM.zeichnen);
+  else if (art === 'gross') { $('kamh').classList.toggle('gross'); kamMerken(); }
 });
 $('kamlicht').addEventListener('click', kameraAus);
 addEventListener('pagehide', kameraAus);

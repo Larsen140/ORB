@@ -21,7 +21,7 @@ Voraussetzung für Antworten: [Claude Code](https://claude.com/claude-code) inst
 - **Web-Hologramme**: echte Webseiten zum Klicken, Scrollen und Tippen direkt im Hologramm (`web_zeigen.ps1`).
 - **Echte Farben**: Schalter im Bild-/Web-Hologramm (oder `-Rein` an `bild_zeigen.ps1`/`web_zeigen.ps1`) zeigt den Inhalt ohne Hologramm-Effekte; die Bild-Werkstatt (Port 8790) startet immer so.
 - **Gold live** („Jarvis, Gold“): XAU/USD jede Sekunde, mit Farbblitz pro Tick und mitlaufender Kurve.
-- **Kamera-Ansicht** („Jarvis, Kamera an“ / „Kamera aus“): Live-Webcam als Hologramm-Fenster mit schwebenden AR-Hologrammen (Uhr, Gold, Bild); per Hand greifen, verschieben, mit zwei Händen vergrößern, wegwischen (MediaPipe, rechnet lokal). Nur auf Befehl, rotes Kamera-Symbol solange an, nichts wird aufgenommen; `kamera.ps1` holt auf Larsens Frage ein einzelnes Standbild für Claude.
+- **Kamera-Ansicht** („Jarvis, Kamera an“ / „Kamera aus“): Live-Webcam (bis 1080p, Autofokus/-belichtung, Aufhellen bei wenig Licht) als Hologramm-Fenster. Alle Hologramme, Widgets (Uhr, Wetter, Termine, Spotify, Gold, System), Bilder, Text-Karten und 3D-Objekte (Sphäre, Würfel, Modell, WebGL) erscheinen darin und lassen sich per Hand greifen, verschieben, drehen, skalieren, anheften, in eine Ecke parken und wegwischen; Handfläche zeigen = radiales Menü, Zeigefinger = Cursor, Spotify per Geste, Zeichnen in der Luft; „Jarvis, Sphäre in meine Hand“ lässt eine Sphäre über der Handfläche schweben. Positionen werden gemerkt (MediaPipe, beide Hände, geglättet, rechnet lokal). `kamera_zeigen.ps1` schickt Inhalte hinein. Nur auf Befehl, rotes Kamera-Symbol solange an, nichts wird aufgenommen; `kamera.ps1` holt auf Larsens Frage ein einzelnes Standbild für Claude.
 - **Was ist neu?**: nach jedem Update (ORB oder Projekt) erscheint kurz ein kleines Hologramm mit den Neuerungen und wie man sie benutzt.
 - **Wissensbasis**: arbeitet im Ordner `Documents\Jarvis` und merkt sich dort alles.
 
@@ -38,6 +38,7 @@ Voraussetzung für Antworten: [Claude Code](https://claude.com/claude-code) inst
 | `fortschritt.ps1` | Entwickler meldet seinen Fortschritt (Prozent + Schritt) – ORB zeigt ihn als Balken im Entwickler-Hologramm |
 | `web_zeigen.ps1` | zeigt eine Webseite als echte, bedienbare Seite im Hologramm (sonst echte Webansicht darüber) |
 | `kamera.ps1` | ein Standbild aus der laufenden Kamera-Ansicht nach `%LOCALAPPDATA%\ORB\screen\kamera.png` (schaltet die Kamera nie ein) |
+| `kamera_zeigen.ps1` | schickt Widgets, Bilder, Texte oder 3D-Objekte in die laufende Kamera-Ansicht (schaltet die Kamera nie ein) |
 | `whatsapp.ps1` | WhatsApp-Nachricht (Text/Bild) in Sekunden vorbereiten, Abschicken erst nach Bestätigung |
 | `check.py` | prüft Code und Oberfläche vor jedem Update |
 | `update.ps1` | prüfen → hochladen → ORB aktualisiert sich → Kontrolle (bei Fehler automatisch zurück) |

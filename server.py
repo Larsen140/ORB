@@ -68,7 +68,7 @@ DEFAULT_CFG = {
 }
 # Damit ORB immer dein Claude-Code-Login (Max-Abo) nutzt und nie einen API-Schlüssel
 CLAUDE_ENV_DROP = ("ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "ANTHROPIC_BASE_URL")
-VERSION = "84"
+VERSION = "85"
 ORB_UI = ("Deine Oberfläche (die Larsen gerade sieht): in der Mitte du als flüssige leuchtende Kugel mit Tropfen, "
           "Orbit-Ringen und Sternenhimmel; links eine Uhr und darunter der Gesprächsverlauf mit Eingabefeld; rechts "
           "Karten für System (CPU, RAM, Akku), Wetter mit Stundenvorschau, Aktivität (was du gerade tust) und Vorschläge; "
@@ -369,7 +369,36 @@ KAMERA_REGELN = (
     "Kamera: Larsen schaltet sie selbst mit „Kamera an“/„Kamera aus“ ein und aus – du schaltest sie nie ein. Nur wenn die "
     "Kamera an ist UND Larsen ausdrücklich fragt, was du siehst (z. B. „Was hab ich in der Hand?“), holst du EIN Standbild: "
     "powershell -NoProfile -ExecutionPolicy Bypass -File \"$env:LOCALAPPDATA\\ORB\\app\\kamera.ps1\" und siehst dir "
-    "%LOCALAPPDATA%\\ORB\\screen\\kamera.png mit dem Read-Werkzeug an. Ist die Kamera aus, sag ihm, dass er „Kamera an“ sagen kann.")
+    "%LOCALAPPDATA%\\ORB\\screen\\kamera.png mit dem Read-Werkzeug an. Ist die Kamera aus, sag ihm, dass er „Kamera an“ sagen kann. "
+    "Solange die Kamera an ist, erscheinen holo.ps1-Hologramme und bild_zeigen.ps1-Bilder automatisch darin. Widgets, 3D-Objekte "
+    "oder kurze Texte schickst du mit powershell -NoProfile -ExecutionPolicy Bypass -File \"$env:LOCALAPPDATA\\ORB\\app\\kamera_zeigen.ps1\" "
+    "-Art uhr|wetter|termine|spotify|gold|system|bild|text|sphaere|wuerfel|modell [-Titel …] [-Text …] [-Punkte \"a|b\"] [-Bild Pfad] [-Hand].")
+
+
+KAM_INHALT = {"n": 0, "liste": []}   # Inhalte, die kamera_zeigen.ps1 in die Kamera-Ansicht schickt (nur im Speicher)
+KAM_ARTEN = {"uhr", "wetter", "termine", "spotify", "gold", "system", "bild", "text", "sphaere", "wuerfel", "modell",
+             "menue", "zeichnen", "aufraeumen"}
+
+
+def kamera_zeigen(b):
+    """kamera_zeigen.ps1: Hologramm/Widget/3D-Objekt in die laufende Kamera-Ansicht schicken (schaltet sie nie ein)."""
+    if not kamera_aktiv():
+        return {"ok": False, "fehler": "Die Kamera ist aus. Larsen kann „Kamera an“ sagen."}
+    art = str(b.get("art") or "text").lower().replace("ä", "ae").replace("ü", "ue").replace("ö", "oe")
+    if art not in KAM_ARTEN:
+        return {"ok": False, "fehler": "Unbekannte Art. Erlaubt: " + ", ".join(sorted(KAM_ARTEN))}
+    e = {"art": art, "id": str(b.get("id") or "")[:40], "titel": str(b.get("titel") or "")[:80],
+         "text": str(b.get("text") or "")[:2000], "punkte": [str(x)[:200] for x in (b.get("punkte") or [])][:30],
+         "hand": bool(b.get("hand")), "zu": bool(b.get("zu")), "pfad": ""}
+    if art == "bild" and b.get("pfad"):
+        pfad = os.path.abspath(str(b["pfad"]))
+        if not (pfad.lower().endswith(BILD_ENDUNGEN) and os.path.isfile(pfad)):
+            return {"ok": False, "fehler": "Bild nicht gefunden (png/jpg/webp/gif/bmp)"}
+        e["pfad"] = pfad
+    KAM_INHALT["n"] += 1
+    e["n"] = KAM_INHALT["n"]
+    KAM_INHALT["liste"] = (KAM_INHALT["liste"] + [e])[-20:]
+    return {"ok": True, "n": e["n"]}
 
 
 def kamera_aktiv():
@@ -1112,7 +1141,8 @@ class Brain:
                 except Exception as e:
                     print("Screenshot:", e)
             if kamera_aktiv():
-                text = "[Kamera ist an – Standbild nur auf ausdrückliche Frage über kamera.ps1.]\n" + text
+                text = ("[Kamera ist an – Standbild nur auf ausdrückliche Frage über kamera.ps1. Gezeigtes erscheint in der "
+                        "Kamera-Ansicht, Widgets/3D-Objekte über kamera_zeigen.ps1.]\n" + text)
             msg = {"type": "user", "message": {"role": "user", "content": [{"type": "text", "text": text}]}}
             try:
                 self.proc.stdin.write((json.dumps(msg, ensure_ascii=False) + "\n").encode("utf-8"))
@@ -2065,6 +2095,7 @@ class Handler(BaseHTTPRequestHandler):
             st["karten_v"] = KARTEN_V[0]   # Hintergrund-Aufgaben + Entwickler (je ein Hologramm)
             st["bild"] = {"n": BILD["n"], "name": BILD["name"], "rein": BILD["rein"]}   # Bild-Hologramm
             st["gold"] = GOLD["n"]   # Gold-Hologramm auf Zuruf
+            st["kam_n"] = KAM_INHALT["n"]   # neue Inhalte für die Kamera-Ansicht (kamera_zeigen.ps1)
             st["kamera_foto"] = KAMERA["foto"] if time.time() - KAMERA["foto_zeit"] < 15 else 0   # kamera.ps1 wartet auf ein Standbild
             st["web"] = {"n": WEB["n"], "url": WEB["url"], "titel": WEB["titel"], "modus": WEB["modus"],
                          "lebt": web_lebt(), "rein": WEB["rein"]}   # Web-Hologramm
@@ -2085,6 +2116,22 @@ class Handler(BaseHTTPRequestHandler):
             except Exception:
                 return self.send(404, b"", "text/plain")
             ext = os.path.splitext(pfad)[1].lower().lstrip(".")
+            self.send(200, data, "image/" + {"jpg": "jpeg"}.get(ext, ext))
+        elif u.path == "/kamera/inhalt":   # Oberfläche holt neue Kamera-Inhalte (ohne Dateipfade)
+            try:
+                seit = int(q.get("seit", "0") or 0)
+            except ValueError:
+                seit = 0
+            self.send(200, {"liste": [dict({k: v for k, v in e.items() if k != "pfad"}, datei=bool(e["pfad"]))
+                                      for e in KAM_INHALT["liste"] if e["n"] > seit]})
+        elif u.path == "/kamera/datei":   # Bild eines Kamera-Inhalts (beim Senden geprüft)
+            e = next((e for e in KAM_INHALT["liste"] if str(e["n"]) == q.get("n") and e["pfad"]), None)
+            try:
+                with open(e["pfad"], "rb") as f:
+                    data = f.read()
+            except Exception:
+                return self.send(404, b"", "text/plain")
+            ext = os.path.splitext(e["pfad"])[1].lower().lstrip(".")
             self.send(200, data, "image/" + {"jpg": "jpeg"}.get(ext, ext))
         elif u.path == "/bild":   # aktuelles Bild-Hologramm ausliefern
             pfad = BILD["pfad"]
@@ -2256,6 +2303,8 @@ class Handler(BaseHTTPRequestHandler):
             KAMERA["foto"] += 1
             KAMERA["foto_zeit"] = time.time()
             self.send(200, {"ok": True, "n": KAMERA["foto"]})
+        elif u.path == "/kamera/zeigen":   # kamera_zeigen.ps1: Inhalt in die Kamera-Ansicht schicken
+            self.send(200, kamera_zeigen(b if isinstance(b, dict) else {}))
         elif u.path == "/kamera/bild":   # Oberfläche liefert das angefragte Standbild
             self.send(200, {"ok": kamera_bild_speichern(b.get("bild"))})
         elif u.path == "/bild":   # bild_zeigen.ps1: Bild sofort als Hologramm einblenden
