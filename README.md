@@ -15,6 +15,7 @@ Voraussetzung für Antworten: [Claude Code](https://claude.com/claude-code) inst
 - **Antwortet laut** auf Deutsch (Microsoft-Neural-Stimmen), Satz für Satz, während die Antwort entsteht – jedes Stück vorab aufbereitet (Klang-EQ, einheitlich −14 LUFS, Limiter mit Vorschau – kein Übersteuern auch bei 300 %), Sätze nicht an Abkürzungen/Datumsangaben zerstückelt; hängt die Neural-Stimme, gibt es Wiederholversuche statt Ersatzstimme (Protokoll in `stimme.log`) (Lautstärke bis 300 %, ORB im Windows-Mixer immer auf 100 %).
 - **Apps & Webseiten öffnen**, Wetter, Termine, Spotify-Steuerung – ohne Token.
 - **iCloud-Kalender**: Termine eintragen, lesen und löschen (Einstellungen → iCloud-Kalender, app-spezifisches Passwort).
+- **iCloud-Kontakte & Erinnerungen** (gleiche Anmeldung): Kontakte suchen, anlegen, ändern (`kontakte.ps1`, gibt nur gesuchte Einträge aus, Löschen nur nach Bestätigung); Erinnerungen lesen, anlegen, abhaken, löschen (`erinnerungen.ps1`).
 - **Oberfläche** im Liquid-Glass-Stil mit Uhr, Gesprächsverlauf, System, Wetter, Termine, Spotify und Vorschlägen.
 - **Bild-Hologramme**: neue Bilder in `Bilder/ORB Bilder` (oder per `bild_zeigen.ps1`) erscheinen sofort als Holo-Karte.
 - **Web-Hologramme**: echte Webseiten zum Klicken, Scrollen und Tippen direkt im Hologramm (`web_zeigen.ps1`).
@@ -30,7 +31,7 @@ Voraussetzung für Antworten: [Claude Code](https://claude.com/claude-code) inst
 | `orb_launcher.py` | wird zur einzigen `ORB.exe`: installiert, lädt Code von GitHub, aktualisiert, setzt bei Fehlern zurück |
 | `orb_app.py` | Start, Fenster, Klatsch-Erkennung im Hintergrund, Autostart, Update-Prüfung |
 | `server.py` | lokaler Server: Zustand, Stimme, Claude-Anbindung, Wetter, Apps, Termine, Spotify |
-| `icloud.py` | iCloud-Kalender über CalDAV (Zugang in der Windows-Anmeldeinformationsverwaltung) |
+| `icloud.py` | iCloud-Kalender und -Erinnerungen über CalDAV, Kontakte über CardDAV (Zugang in der Windows-Anmeldeinformationsverwaltung) |
 | `hook.py` | Claude-Code-Hooks → zeigt in ORB an, was Claude gerade tut |
 | `index.html` | Oberfläche (WebGL-Kugel, Effekte, Sounds, Einstellungen) |
 | `neu.ps1` | Entwickler hinterlegt die Einführung „Was ist neu?“ (2–4 Punkte + wie benutzen) – ORB zeigt sie nach dem Update 30 s als kleines Hologramm und liest den ersten Punkt vor |

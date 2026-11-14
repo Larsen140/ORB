@@ -68,7 +68,7 @@ DEFAULT_CFG = {
 }
 # Damit ORB immer dein Claude-Code-Login (Max-Abo) nutzt und nie einen API-Schlüssel
 CLAUDE_ENV_DROP = ("ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "ANTHROPIC_BASE_URL")
-VERSION = "83"
+VERSION = "84"
 ORB_UI = ("Deine Oberfläche (die Larsen gerade sieht): in der Mitte du als flüssige leuchtende Kugel mit Tropfen, "
           "Orbit-Ringen und Sternenhimmel; links eine Uhr und darunter der Gesprächsverlauf mit Eingabefeld; rechts "
           "Karten für System (CPU, RAM, Akku), Wetter mit Stundenvorschau, Aktivität (was du gerade tust) und Vorschläge; "
@@ -105,7 +105,15 @@ KALENDER_REGELN = (
     "powershell -NoProfile -ExecutionPolicy Bypass -File \"$env:LOCALAPPDATA\\ORB\\app\\kalender.ps1\" <aktion>. "
     "Aktionen: status; liste -Von 2026-11-13 -Bis 2026-11-20 (ohne Angabe heute + 7 Tage); "
     "neu -Titel \"Zahnarzt\" -Start 2026-11-20T15:00 (optional -Ende, -Ort, -Notiz, -Kalender; nur Datum = ganztägig, "
-    "Ende sonst +1 Stunde); löschen = erst liste, dann loeschen -Id \"<id aus der Liste>\". Zeiten sind Ortszeit.")
+    "Ende sonst +1 Stunde); löschen = erst liste, dann loeschen -Id \"<id aus der Liste>\". Zeiten sind Ortszeit. "
+    "iCloud-Erinnerungen (iPhone-App Erinnerungen) über erinnerungen.ps1 im selben Ordner: liste [-Liste \"..\"] [-Alle]; "
+    "neu -Titel \"Milch kaufen\" [-Faellig 2026-11-20T18:00] [-Liste \"..\"] [-Notiz \"..\"] [-Wichtig]; "
+    "erledigt -Id \"<id>\" [-Offen]; loeschen -Id \"<id>\" (ids aus liste). "
+    "iCloud-Kontakte über kontakte.ps1 im selben Ordner: suche -Text \"Anna\" (Name, Firma, Mail oder Nummer – gib nie "
+    "das ganze Adressbuch aus, nur gesuchte Einträge); neu -Name \"Anna Muster\" [-Telefon \"..\"] [-Email \"..\"] "
+    "[-Firma] [-Adresse] [-Geburtstag 1990-05-01] [-Notiz]; aendern -Id \"<id aus suche>\" mit den zu ersetzenden Feldern "
+    "(-Dazu ergänzt Telefon/E-Mail statt sie zu ersetzen). Einen Kontakt löschen NUR, nachdem du Larsen den Kontakt "
+    "genannt und er ausdrücklich zugestimmt hat: loeschen -Id \"<id>\" -Bestaetigt. Alle Antworten sind JSON mit ok.")
 
 
 # ---------- Bild-Hologramme: neue Bilder (z. B. von Claude erstellt) sofort in ORB einblenden ----------
@@ -1286,6 +1294,61 @@ def termine_md():
     return out[:6]
 
 
+def _icloud_fehler(e):
+    if isinstance(e, urllib.error.HTTPError):
+        return {"ok": False, "fehler": "iCloud antwortet mit Fehler %d" % e.code}
+    return {"ok": False, "fehler": str(e)}
+
+
+def erinnerungen_aktion(b):
+    if not icloud.verbunden():
+        return {"ok": False, "fehler": "iCloud ist nicht verbunden (ORB-Einstellungen > iCloud-Kalender)"}
+    try:
+        a = str(b.get("aktion", "")).lower()
+        if a == "liste":
+            return {"ok": True, "erinnerungen": icloud.erinnerungen(b.get("liste", ""), bool(b.get("alle")))}
+        if a == "neu":
+            if not b.get("titel"):
+                return {"ok": False, "fehler": "titel nötig"}
+            return {"ok": True, "erinnerung": icloud.erinnerung_neu(b["titel"], b.get("faellig"), b.get("liste", ""),
+                                                                    b.get("notiz", ""), bool(b.get("wichtig")))}
+        if a == "erledigt":
+            return {"ok": icloud.erinnerung_erledigt(str(b.get("id", "")), not b.get("offen"))}
+        if a == "loeschen":
+            return {"ok": icloud.erinnerung_loeschen(str(b.get("id", "")))}
+        return {"ok": False, "fehler": "aktion muss liste, neu, erledigt oder loeschen sein"}
+    except Exception as e:
+        return _icloud_fehler(e)
+
+
+def kontakte_aktion(b):
+    if not icloud.verbunden():
+        return {"ok": False, "fehler": "iCloud ist nicht verbunden (ORB-Einstellungen > iCloud-Kalender)"}
+    try:
+        a = str(b.get("aktion", "")).lower()
+        felder = {k: b.get(k) for k in ("telefon", "email", "firma", "adresse", "geburtstag", "notiz")}
+        if a == "suche":
+            treffer, n = icloud.kontakte_suche(b.get("text", ""))
+            res = {"ok": True, "kontakte": treffer, "anzahl": n}
+            if n > len(treffer):
+                res["hinweis"] = "Nur die ersten %d von %d Treffern – genauer suchen" % (len(treffer), n)
+            return res
+        if a == "neu":
+            if not b.get("name"):
+                return {"ok": False, "fehler": "name nötig"}
+            return {"ok": True, "kontakt": icloud.kontakt_neu(b["name"], **felder)}
+        if a == "aendern":
+            return {"ok": True, "kontakt": icloud.kontakt_aendern(str(b.get("id", "")), name=b.get("name"),
+                                                                 dazu=bool(b.get("dazu")), **felder)}
+        if a == "loeschen":
+            if b.get("bestaetigt") is not True:
+                return {"ok": False, "fehler": "Löschen nur nach Larsens ausdrücklicher Bestätigung (-Bestaetigt)"}
+            return {"ok": icloud.kontakt_loeschen(str(b.get("id", "")))}
+        return {"ok": False, "fehler": "aktion muss suche, neu, aendern oder loeschen sein"}
+    except Exception as e:
+        return _icloud_fehler(e)
+
+
 def kalender_aktion(b):
     if not icloud.verbunden():
         return {"ok": False, "fehler": "iCloud ist nicht verbunden (ORB-Einstellungen > iCloud-Kalender)"}
@@ -2125,6 +2188,10 @@ class Handler(BaseHTTPRequestHandler):
             self.send(200, res)
         elif u.path == "/kalender":  # für Claude: Termine anlegen, lesen, löschen
             self.send(200, kalender_aktion(b))
+        elif u.path == "/erinnerungen":  # für Claude: iCloud-Erinnerungen
+            self.send(200, erinnerungen_aktion(b))
+        elif u.path == "/kontakte":  # für Claude: iCloud-Kontakte (nur gesuchte Einträge)
+            self.send(200, kontakte_aktion(b))
         elif u.path == "/greet":
             threading.Thread(target=lambda: write_answer(greeting(), heard="", holo=holo_for("Wetter abrufen", "")), daemon=True).start()
             threading.Thread(target=BRAIN.start, daemon=True).start()  # Gehirn schon mal aufwecken
