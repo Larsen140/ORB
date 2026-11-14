@@ -647,6 +647,75 @@
   body.kam-an #karten { opacity:0; pointer-events:none; }   /* freie Hologramme erscheinen solange in der Kamera-Ansicht */
   body.kam-an #karten * { pointer-events:none !important; }
   #kamh .kh.weg { opacity:0; }
+  /* Profil „Flüssig“: keine Glas-Unschärfe über dem Live-Bild (teuer bei 1440p) */
+  #kamh.fl, #kamh.fl .kh, #kamh.fl .ai, #kamh.fl .ai [data-k], #kamh.fl .km button { backdrop-filter:none; -webkit-backdrop-filter:none; }
+  #kamh.fl { background-color:rgba(16,18,28,.9); } #kamh.fl::after { animation:none; }
+  #kamh.fl .ai { background-color:rgba(12,14,24,.78); }
+  /* erkannte Geste: kleines Symbol oben links */
+  #kamh .kges { position:absolute; left:14px; top:14px; z-index:6; display:flex; align-items:center; gap:7px; padding:6px 12px 6px 8px; border-radius:999px; pointer-events:none;
+    background:rgba(8,10,18,.62); box-shadow:inset 0 0 0 1px rgba(var(--hl),.55), 0 0 18px rgba(var(--hl),.35); font-size:12.5px; font-weight:650;
+    opacity:0; transform:translateY(-6px) scale(.9); transition:opacity .25s, transform .35s var(--spring); }
+  #kamh .kges.on { opacity:1; transform:none; }
+  #kamh .kges svg { width:20px; height:20px; fill:none; stroke:rgb(var(--hl)); stroke-width:2; stroke-linecap:round; stroke-linejoin:round; }
+  /* geführte Einführung */
+  #kamh .ktour { position:absolute; left:50%; top:16px; z-index:7; width:min(440px, 86%); transform:translateX(-50%); padding:14px 16px 12px; border-radius:22px; text-align:center;
+    background:linear-gradient(160deg, rgba(255,255,255,.16), rgba(255,255,255,.03)), rgba(10,12,22,.86); box-shadow:inset 0 1px 0 rgba(255,255,255,.35), inset 0 0 0 1px rgba(var(--hl),.5), 0 10px 40px rgba(0,0,0,.45), 0 0 30px rgba(var(--hl),.25);
+    display:none; }
+  #kamh .ktour.on { display:block; animation:glasAuf .5s var(--ease) backwards; }
+  #kamh .ktour .tn { font-size:11.5px; font-weight:650; letter-spacing:.06em; text-transform:uppercase; color:rgb(var(--hl)); }
+  #kamh .ktour h3 { margin:4px 0 2px; font-size:22px; font-weight:750; }
+  #kamh .ktour p { margin:0 0 8px; font-size:15px; line-height:1.4; color:rgba(255,255,255,.88); }
+  #kamh .ktour .tp { display:flex; justify-content:center; gap:6px; margin:8px 0 10px; }
+  #kamh .ktour .tp i { width:22px; height:5px; border-radius:3px; background:rgba(255,255,255,.18); transition:background .3s; }
+  #kamh .ktour .tp i.ok { background:rgb(var(--hl)); box-shadow:0 0 10px rgba(var(--hl),.7); }
+  #kamh .ktour button { height:34px; padding:0 16px; border-radius:999px; border:0; font:inherit; font-size:13px; font-weight:650; color:#fff; cursor:pointer;
+    background:rgba(255,255,255,.1); box-shadow:inset 0 0 0 1px rgba(255,255,255,.2); margin:0 4px; transition:background .2s, transform .25s var(--spring); }
+  #kamh .ktour button:hover, #kamh .ktour button.hand { background:rgba(var(--hl),.5); transform:scale(1.06); }
+  #kamh .ktour .gs { display:none; font-size:30px; font-weight:800; color:#fff; text-shadow:0 0 22px rgba(var(--hl),.9); padding:10px 0 4px; }
+  #kamh .ktour.geschafft .gs { display:block; animation:tourJa .6s var(--spring); }
+  #kamh .ktour.geschafft :is(h3, p, .ta, .tb) { display:none; }
+  @keyframes tourJa { 0% { transform:scale(.5); opacity:0; } 100% { transform:none; opacity:1; } }
+  /* Mini-Animationen je Schritt: Karte (k), Finger-Punkte (a, b), Ring (r) */
+  #kamh .ta { position:relative; width:180px; height:78px; margin:4px auto 6px; border-radius:14px; background:rgba(255,255,255,.04); box-shadow:inset 0 0 0 1px rgba(255,255,255,.08); overflow:hidden; }
+  #kamh .ta i { position:absolute; display:block; }
+  #kamh .ta .k { left:66px; top:22px; width:48px; height:34px; border-radius:8px; background:rgba(var(--hl),.3); box-shadow:inset 0 0 0 1px rgba(var(--hl),.8); }
+  #kamh .ta .a, #kamh .ta .b { width:12px; height:12px; margin:-6px; border-radius:50%; background:#fff; box-shadow:0 0 10px rgba(var(--hl),1); left:90px; top:39px; }
+  #kamh .ta .r { width:52px; height:52px; margin:-26px; border-radius:50%; left:90px; top:39px; border:3px solid rgba(var(--hl),.9); opacity:0; }
+  #kamh .ta[data-s="greifen"] .a { animation:taA 2s ease-in-out infinite; } #kamh .ta[data-s="greifen"] .b { animation:taB 2s ease-in-out infinite; }
+  @keyframes taA { 0%, 20% { transform:translate(-18px, -14px); } 50%, 100% { transform:translate(-3px, -2px); } }
+  @keyframes taB { 0%, 20% { transform:translate(16px, 14px); } 50%, 100% { transform:translate(3px, 2px); } }
+  #kamh .ta[data-s="verschieben"] :is(.k, .a) { animation:taSchieb 2.4s ease-in-out infinite; } #kamh .ta[data-s="verschieben"] .b { display:none; }
+  @keyframes taSchieb { 0%, 15% { translate:-46px 0; } 60%, 75% { translate:46px 0; } 100% { translate:-46px 0; } }
+  #kamh .ta[data-s="groesse"] .k { animation:taGross 2.4s ease-in-out infinite; }
+  #kamh .ta[data-s="groesse"] .a { animation:taGa 2.4s ease-in-out infinite; } #kamh .ta[data-s="groesse"] .b { animation:taGb 2.4s ease-in-out infinite; }
+  @keyframes taGross { 0%, 15% { transform:scale(.7); } 60%, 80% { transform:scale(1.45); } 100% { transform:scale(.7); } }
+  @keyframes taGa { 0%, 15% { translate:-22px -12px; } 60%, 80% { translate:-48px -22px; } 100% { translate:-22px -12px; } }
+  @keyframes taGb { 0%, 15% { translate:22px 12px; } 60%, 80% { translate:48px 22px; } 100% { translate:22px 12px; } }
+  #kamh .ta[data-s="menue"] :is(.a, .b) { display:none; }
+  #kamh .ta[data-s="menue"] .k { left:72px; top:21px; width:36px; height:36px; border-radius:50%; }
+  #kamh .ta[data-s="menue"] .r { animation:taRing 2.2s ease-out infinite; }
+  @keyframes taRing { 0% { opacity:0; transform:scale(.6); } 40% { opacity:1; } 100% { opacity:0; transform:scale(1.5); } }
+  #kamh .ta[data-s="wischen"] .k { animation:taWisch 2.2s ease-in infinite; } #kamh .ta[data-s="wischen"] .a { animation:taWischH 2.2s ease-in infinite; } #kamh .ta[data-s="wischen"] .b { display:none; }
+  @keyframes taWisch { 0%, 35% { transform:none; opacity:1; } 70% { transform:translateX(120px) rotate(14deg); opacity:0; } 100% { opacity:0; } }
+  @keyframes taWischH { 0% { translate:-70px 0; } 35% { translate:-30px 0; } 70%, 100% { translate:90px 0; opacity:0; } }
+  /* große Übersichtskarte „Kamera-Hilfe“ */
+  #kamhilfe { position:fixed; left:50%; top:50%; z-index:30; width:min(94vw, 980px); max-height:calc(100vh - 40px); overflow:auto; padding:22px 24px 20px; border-radius:32px; color:#fff;
+    transform:translate(-50%, -50%) scale(.96); opacity:0; visibility:hidden; pointer-events:none; transition:opacity .3s, transform .45s var(--spring), visibility 0s .3s;
+    background:linear-gradient(160deg, rgba(255,255,255,.14), rgba(255,255,255,.03)), rgba(10,12,22,.97); box-shadow:inset 0 1px 0 rgba(255,255,255,.35), inset 0 0 0 1px rgba(var(--c),.45), 0 20px 80px rgba(0,0,0,.6), 0 0 50px rgba(var(--c),.2); }
+  #kamhilfe.on { opacity:1; visibility:visible; pointer-events:auto; transform:translate(-50%, -50%); transition:opacity .3s, transform .45s var(--spring); }
+  #kamhilfe .hk { display:flex; align-items:baseline; gap:14px; margin-bottom:16px; }
+  #kamhilfe .hk b { font-size:28px; font-weight:780; } #kamhilfe .hk small { flex:1; font-size:14px; color:var(--sub); }
+  #kamhilfe .x { width:46px; height:46px; border-radius:50%; border:0; font-size:18px; color:#fff; cursor:pointer; background:rgba(255,255,255,.1); box-shadow:inset 0 0 0 1px rgba(255,255,255,.2); }
+  #kamhilfe .x:hover, #kamhilfe .x.hand { background:rgba(var(--c),.5); }
+  #kamhilfe .hg { display:grid; grid-template-columns:repeat(auto-fill, minmax(280px, 1fr)); gap:12px; }
+  #kamhilfe .hg div { display:flex; gap:14px; align-items:center; padding:14px 16px; border-radius:20px; background:rgba(255,255,255,.06); box-shadow:inset 0 0 0 1px rgba(255,255,255,.1); }
+  #kamhilfe .hg svg { flex:none; width:44px; height:44px; padding:8px; border-radius:14px; background:rgba(var(--c),.22); fill:none; stroke:rgb(var(--c)); stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round; }
+  #kamhilfe .hg b { display:block; font-size:19px; font-weight:720; } #kamhilfe .hg span { display:block; font-size:15.5px; line-height:1.35; color:rgba(255,255,255,.82); }
+  #kamhilfe .hf { margin-top:16px; text-align:center; }
+  #kamhilfe .hf button { height:46px; padding:0 22px; border-radius:999px; border:0; font:inherit; font-size:15px; font-weight:650; color:#fff; cursor:pointer;
+    background:rgba(var(--c),.35); box-shadow:inset 0 0 0 1px rgba(var(--c),.8); }
+  #kamhilfe .hf button:hover, #kamhilfe .hf button.hand { background:rgba(var(--c),.6); }
+
   /* deutlich sichtbares Kamera-Symbol, solange die Kamera an ist – immer obenauf */
   #kamlicht { position:fixed; top:calc(var(--gap) + 6px); right:calc(var(--gap) + 4px); z-index:60; display:none; align-items:center; gap:8px; height:34px; padding:0 14px 0 12px;
     border-radius:999px; font-size:12px; font-weight:700; letter-spacing:.08em; color:#fff; cursor:pointer;
@@ -801,8 +870,9 @@
   <div class="gz"><i></i></div></div>
 <div id="kamlicht" title="Kamera ist an – klicken zum Ausschalten"><svg viewBox="0 0 24 24"><path d="M3 7.5h3l1.6-2.3h8.8L18 7.5h3v11.3H3z"/><circle cx="12" cy="13" r="3.6"/></svg><i class="kampunkt"></i>KAMERA AN</div>
 <div id="kamh"><div class="kk"><span><i class="kampunkt"></i>Kamera</span><small>nur lokal · nichts wird gespeichert</small>
-  <button data-a="menue" title="Hologramm-Menü (oder Handfläche ruhig zeigen)">+ Hologramm</button><button data-a="zeichnen" title="In der Luft zeichnen (Zeigefinger)">Zeichnen</button><button data-a="gross" title="Größere Ansicht">Groß</button><button class="x" title="Kamera aus">✕</button></div>
-  <div class="kb"><video muted playsinline></video><canvas class="zc"></canvas><div class="ar"></div><canvas class="hc"></canvas><div class="km"></div><div class="kh">Hand-Erkennung lädt …</div></div></div>
+  <button data-a="menue" title="Hologramm-Menü (oder Handfläche ruhig zeigen)">+ Hologramm</button><button data-a="zeichnen" title="In der Luft zeichnen (Zeigefinger)">Zeichnen</button><button data-a="gross" title="Größere Ansicht">Groß</button><button data-a="profil" title="Flüssig = schnell und ruckelfrei · Scharf = volle Auflösung">Flüssig</button><button data-a="hilfe" title="Alle Gesten auf einen Blick („Jarvis, Kamera-Hilfe“)">?</button><button class="x" title="Kamera aus">✕</button></div>
+  <div class="kb"><video muted playsinline></video><canvas class="zc"></canvas><div class="ar"></div><canvas class="hc"></canvas><div class="km"></div><div class="kges"><svg viewBox="0 0 24 24"></svg><span></span></div><div class="ktour"></div><div class="kh">Hand-Erkennung lädt …</div></div></div>
+<div id="kamhilfe"><div class="hk"><b>Kamera-Gesten</b><small>„Jarvis, Kamera-Hilfe“ zeigt diese Karte jederzeit</small><button class="x" data-k="hilfe-zu" title="Schließen">✕</button></div><div class="hg"></div><div class="hf"><button data-k="tour" title="Geführte Einführung noch einmal">Einführung starten</button></div></div>
 <div id="webh"><div class="wk"><i></i><span>Webseite</span><small></small><button class="ef" title="Ohne Hologramm-Effekte – so, wie es auf Handy/PC aussieht"><b></b>Echte Farben</button><button class="neu" title="Neu laden">⟳</button><button class="br" title="Im normalen Browser öffnen">Im Browser ↗</button><button class="x" title="Schließen">✕</button></div><div class="wb"><iframe sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox allow-modals allow-downloads allow-presentation" allow="fullscreen; clipboard-write; geolocation" referrerpolicy="no-referrer-when-downgrade"></iframe><div class="wf"><div>Diese Seite läuft in der echten Webansicht über dem Hologramm.</div><button class="vor">Nach vorne holen</button></div></div></div>
 <div id="dock" class="glass rim">
   <button class="ic" id="kb" title="Tippen (T)"><svg viewBox="0 0 24 24"><path d="M20 5H4a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2zm-9 3h2v2h-2V8zm0 3h2v2h-2v-2zM8 8h2v2H8V8zm0 3h2v2H8v-2zM5 8h2v2H5V8zm0 3h2v2H5v-2zm11 5H8v-2h8v2zm0-3h-2v-2h2v2zm0-3h-2V8h2v2zm3 3h-2v-2h2v2zm0-3h-2V8h2v2z"/></svg></button>
@@ -1694,6 +1764,8 @@ async function ask(text) {
   if (KAM_RE.test(t0)) { addMsg('me', text); if (KAM_AUS_RE.test(t0)) { kameraAus(); hint('Kamera ist aus', 2000); } else kameraAn(); return; }
   // „Sphäre in meine Hand“ (schaltet die Kamera dafür ein) und lokale Kamera-Befehle („zeig mir das Wetter“, „zeichnen“, „räum auf“)
   if (KAM_HAND_RE.test(t0)) { addMsg('me', text); kamInHand(/würfel/i.test(t0) ? 'wuerfel' : /modell/i.test(t0) ? 'modell' : 'sphaere'); return; }
+  if (KAM_HILFE_RE.test(t0)) { addMsg('me', text); kamHilfe(true); return; }   // „Jarvis, Kamera-Hilfe“ – große Gesten-Übersicht
+  if (KAM_TOUR_RE.test(t0)) { addMsg('me', text); kamTourStart(); return; }   // „Kamera-Einführung“ – geführte Einführung noch einmal
   if (KAM.an && kamSprache(t0)) { addMsg('me', text); return; }
   // „Schließ dich komplett“ → ORB ganz beenden (auch der Hintergrund-Lauscher ist dann aus)
   if (/^((orb|jarvis),?\s*)?(schlie(ß|ss)e? dich (komplett|ganz|vollständig)|beende dich( komplett| ganz)?|(komplett|ganz) (beenden|schlie(ß|ss)en)|mach dich (komplett|ganz) aus)$/i.test(t0)) {
@@ -2245,16 +2317,50 @@ const KAM_DAUER = ['uhr', 'gold', 'wetter', 'termine', 'spotify', 'system', 'sph
 const KAM_START = { uhr:[.84, .2], gold:[.16, .2] };
 const KAM_MENUE = [['uhr','Uhr'], ['wetter','Wetter'], ['termine','Termine'], ['spotify','Spotify'], ['gold','Gold'], ['system','System'],
   ['bild','Bild'], ['sphaere','Sphäre'], ['wuerfel','Würfel'], ['modell','Modell'], ['zeichnen','Zeichnen'], ['aufraeumen','Aufräumen']];
-const KAM_SPEICHER = 'orb_kam_layout';
+const KAM_SPEICHER = 'orb_kam_layout', KAM_PROFIL_KEY = 'orb_kam_profil', KAM_TOUR_KEY = 'orb_kam_tour';
+/* Leistung: Stufe 0 = Profil „Scharf“, ab Stufe 1 = „Flüssig“ (Standard). Fällt die Bildrate unter 30, regelt ORB selbst eine Stufe runter.
+   b×h/fps = Kamera, erk = Breite des Bildes für die Handerkennung (0 = volles Bild), abst = min. ms zwischen zwei Erkennungen, dpr = Pixeldichte der Zeichenflächen */
+const KAM_STUFEN = [{ b:1920, h:1080, fps:60, erk:0, abst:0, dpr:0 }, { b:1280, h:720, fps:60, erk:640, abst:30, dpr:1 },
+  { b:1280, h:720, fps:30, erk:480, abst:30, dpr:1 }, { b:960, h:540, fps:30, erk:384, abst:45, dpr:1 }];
+const KAM_GESTEN = {   // kleines Symbol für die gerade erkannte Geste
+  greifen:['Greifen', '<path d="M5 7l5 4.5M19 7l-5 4.5"/><circle cx="12" cy="13" r="2.6"/>'],
+  tippen:['Antippen', '<circle cx="12" cy="12" r="3"/><circle cx="12" cy="12" r="8" stroke-dasharray="3 3"/>'],
+  zeigen:['Zeigen', '<path d="M6 3l12 8-5 1.5L16 20l-2.5 1-3-7.5L6 17z"/>'],
+  hand:['Handfläche', '<path d="M7 13V7a1.5 1.5 0 0 1 3 0v4M10 11V4.5a1.5 1.5 0 0 1 3 0V11M13 11V5.5a1.5 1.5 0 0 1 3 0V12M16 12V8.5a1.5 1.5 0 0 1 3 0V14a7 7 0 0 1-7 7h-1a6 6 0 0 1-5.2-3L3.6 14a1.5 1.5 0 0 1 2.6-1.5L7 14"/>'],
+  menue:['Menü', '<circle cx="12" cy="12" r="7.5"/><circle cx="12" cy="4.5" r="1.4"/><circle cx="19.5" cy="12" r="1.4"/><circle cx="12" cy="19.5" r="1.4"/><circle cx="4.5" cy="12" r="1.4"/>'],
+  wischen:['Wegwischen', '<path d="M3 12h16M14 7l5 5-5 5"/>'],
+  groesse:['Größe & Drehen', '<path d="M4 10V4h6M20 14v6h-6M4 4l6 6M20 20l-6-6"/>'],
+  parken:['Parken', '<rect x="4" y="4" width="16" height="16" rx="3"/><rect x="12.5" y="12.5" width="5" height="5" rx="1"/>'],
+  zeichnen:['Zeichnen', '<path d="M4 20l4-1 11-11-3-3L5 16z"/>'] };
+const KAM_TOUR = [
+  { s:'greifen', t:'Greifen', p:'Daumen und Zeigefinger über einem Hologramm zusammendrücken – so hältst du es fest.' },
+  { s:'verschieben', t:'Verschieben', p:'Festhalten und die Hand bewegen – das Hologramm fliegt mit. Finger öffnen = loslassen.' },
+  { s:'groesse', t:'Größer machen', p:'Mit beiden Händen dasselbe Hologramm greifen und die Hände auseinanderziehen.' },
+  { s:'menue', t:'Menü öffnen', p:'Offene Handfläche zur Kamera zeigen und kurz ruhig halten, bis sich der Ring füllt.' },
+  { s:'wischen', t:'Wegwischen', p:'Die Hand schnell seitlich über das Hologramm wischen – weg ist es.' }];
+const KAM_HILFE = [['greifen', 'Greifen', 'Daumen + Zeigefinger über einem Hologramm zusammendrücken'],
+  ['zeigen', 'Verschieben', 'Festhalten und Hand bewegen · Finger öffnen = loslassen'],
+  ['groesse', 'Größer, kleiner, drehen', 'Mit beiden Händen greifen, auseinander- oder zusammenziehen, drehen'],
+  ['menue', 'Menü', 'Offene Handfläche ruhig zeigen, bis der Ring voll ist'],
+  ['wischen', 'Wegwischen', 'Schnell seitlich über ein Hologramm wischen'],
+  ['tippen', 'Knopf drücken', 'Zeigefinger kurz über den Knopf halten – oder kurz antippen'],
+  ['parken', 'Parken & Anheften', 'In eine Ecke ziehen = klein parken · Stecknadel = festmachen'],
+  ['zeichnen', 'Zeichnen', 'Knopf „Zeichnen“, dann malt der ausgestreckte Zeigefinger'],
+  ['hand', 'Sprechen', '„Zeig mir das Wetter“ · „Räum auf“ · „Sphäre in meine Hand“ · „Kamera aus“']];
+const KAM_HILFE_RE = new RegExp(KAM_VOR + '((zeig(e)?|öffne)\\s+(mir\\s+)?(die\\s+)?)?((kamera|gesten)\\s*-?\\s*(hilfe|übersicht|erklärung)|hilfe\\s+(zur|für\\s+die)\\s+kamera)(\\s+bitte)?$', 'i');
+const KAM_TOUR_RE = new RegExp(KAM_VOR + '((start(e)?|zeig(e)?)\\s+(mir\\s+)?(die\\s+)?)?(kamera|gesten)\\s*-?\\s*(einführung|tour|training)(\\s+(starten|bitte))?$', 'i');
 var KAM = { strom:null, an:false, haende:null, laedt:false, raf:0, puls:0, zeit:-1, erg:null, letzte:[], hs:{}, filter:{}, sperre:0, z:1, fotoN:null,
   tick:{}, lt:0, goldStart:null, farbe:'255,55,45', farbeT:0, inhaltN:null, menueOffen:false, menueBis:0, menueSperre:0,
-  zeichnen:false, striche:[], stricheNeu:false, licht:1, kartenWeg:new Set(), strahl:null };
+  zeichnen:false, striche:[], stricheNeu:false, licht:1, kartenWeg:new Set(), strahl:null,
+  profil:localStorage.getItem(KAM_PROFIL_KEY) === 'scharf' ? 'scharf' : 'fluessig', stufe:1, stufeSperre:0, langsam:0, fps:0, fpsN:0, fpsT:0,
+  erkT:0, erkMs:0, gpu:false, hcLeer:true, geste:null, gesteBis:0, tour:null };
 const kamEl = s => $('kamh').querySelector(s);
 function kamMelden(aktiv = true) { fetch('/kamera', { method:'POST', headers:{ 'Content-Type':'application/json' }, body:JSON.stringify({ aktiv }) }).catch(() => {}); }
 function kamHinweis(t, ms = 0) { const k = kamEl('.kh'); k.textContent = t; k.classList.remove('weg'); clearTimeout(kamHinweis._t); if (ms) kamHinweis._t = setTimeout(() => k.classList.add('weg'), ms); }
 /* Bildqualität: höchste sinnvolle Auflösung/Bildrate, Autofokus/-belichtung/-weißabgleich, sanftes Aufhellen bei wenig Licht */
 async function kamStrom() {
-  const wuensche = [{ width:{ ideal:1920 }, height:{ ideal:1080 }, frameRate:{ ideal:60 } }, { width:{ ideal:1920 }, height:{ ideal:1080 }, frameRate:{ ideal:30 } },
+  const st = KAM_STUFEN[KAM.stufe];
+  const wuensche = [{ width:{ ideal:st.b }, height:{ ideal:st.h }, frameRate:{ ideal:st.fps } }, { width:{ ideal:st.b }, height:{ ideal:st.h }, frameRate:{ ideal:30 } },
     { width:{ ideal:1280 }, height:{ ideal:720 } }, {}];
   let fehler;
   for (const w of wuensche) {
@@ -2271,11 +2377,94 @@ async function kamBildTunen(track) {
     if (Object.keys(adv).length) await track.applyConstraints({ advanced:[adv] }).catch(() => {});
     const s = track.getSettings();
     if (c.frameRate && c.frameRate.max > (s.frameRate || 0) + 1)   // volle Bildrate bei gleicher Auflösung, wenn die Kamera mehr kann
-      await track.applyConstraints({ width:{ ideal:s.width }, height:{ ideal:s.height }, frameRate:{ ideal:Math.min(60, c.frameRate.max) } }).catch(() => {});
+      await track.applyConstraints({ width:{ ideal:s.width }, height:{ ideal:s.height }, frameRate:{ ideal:Math.min(KAM_STUFEN[KAM.stufe].fps, c.frameRate.max) } }).catch(() => {});
   } catch (e) {}
-  const s = track.getSettings ? track.getSettings() : {};
-  kamEl('.kk small').textContent = 'nur lokal · nichts wird gespeichert' + (s.width ? ` · ${s.width}×${s.height}` + (s.frameRate ? ` · ${Math.round(s.frameRate)} fps` : '') : '');
+  kamStatus();
 }
+/* Leistung messen und anzeigen: Bildrate der Ansicht, Kamera-Auflösung, Dauer der Handerkennung */
+function kamStatus() {
+  const tr = KAM.strom && KAM.strom.getVideoTracks()[0], s = tr && tr.getSettings ? tr.getSettings() : {};
+  const txt = 'nur lokal · nichts wird gespeichert' + (s.width ? ` · ${s.width}×${s.height}` : '') + (KAM.fps ? ` · ${KAM.fps} fps` : '')
+    + (KAM.haende ? ` · Hände ${KAM.gpu ? 'GPU' : 'CPU'} ${Math.round(KAM.erkMs)} ms` : '');
+  const el = kamEl('.kk small'); if (el.textContent !== txt) el.textContent = txt;
+}
+function kamStufeAnwenden(mitKamera) {
+  const st = KAM_STUFEN[KAM.stufe], tr = KAM.strom && KAM.strom.getVideoTracks()[0];
+  $('kamh').classList.toggle('fl', KAM.stufe > 0);
+  const b = kamEl('.kk [data-a="profil"]'); if (b) b.textContent = KAM.profil === 'scharf' ? 'Scharf' : 'Flüssig';
+  if (mitKamera && tr) tr.applyConstraints({ width:{ ideal:st.b }, height:{ ideal:st.h }, frameRate:{ ideal:st.fps } }).catch(() => {}).then(kamStatus);
+  KAM.stufeSperre = performance.now() + 5000; KAM.langsam = 0; KAM.stricheNeu = true; KAM.hcLeer = false;
+}
+function kamProfil(p) {
+  KAM.profil = p; try { localStorage.setItem(KAM_PROFIL_KEY, p); } catch (e) {}
+  KAM.stufe = p === 'scharf' ? 0 : 1; kamStufeAnwenden(true);
+  kamHinweis(p === 'scharf' ? 'Profil Scharf – volle Auflösung (braucht mehr Leistung)' : 'Profil Flüssig – schnell und ruckelfrei', 2500);
+}
+function kamLeistung(t) {   // alle 2 s: Bildrate messen; zweimal hintereinander unter 30 fps → eine Stufe runter
+  KAM.fpsN++; if (!KAM.fpsT) KAM.fpsT = t;
+  if (t - KAM.fpsT < 2000) return;
+  KAM.fps = Math.round(KAM.fpsN * 1000 / (t - KAM.fpsT)); KAM.fpsN = 0; KAM.fpsT = t; kamStatus();
+  if (document.hidden || t < KAM.stufeSperre || KAM.stufe >= KAM_STUFEN.length - 1) { KAM.langsam = 0; return; }
+  KAM.langsam = KAM.fps < 30 ? KAM.langsam + 1 : 0;
+  if (KAM.langsam >= 2) { KAM.stufe++; kamStufeAnwenden(true); kamHinweis('Bild etwas reduziert, damit es flüssig bleibt', 2500); }
+}
+function kamErkBild(v, breite) {   // kleineres Bild für die Handerkennung (Landmarken sind relativ – Position bleibt exakt)
+  if (!breite || v.videoWidth <= breite) return v;
+  const c = kamErkBild._c || (kamErkBild._c = document.createElement('canvas')), hh = Math.round(breite * v.videoHeight / v.videoWidth);
+  if (c.width !== breite || c.height !== hh) { c.width = breite; c.height = hh; }
+  c.getContext('2d').drawImage(v, 0, 0, breite, hh); return c;
+}
+function kamGeste(n, t = performance.now()) {
+  const el = kamEl('.kges'); KAM.gesteBis = t + 1300;
+  if (KAM.geste === n) return; KAM.geste = n;
+  el.querySelector('svg').innerHTML = KAM_GESTEN[n][1]; el.querySelector('span').textContent = KAM_GESTEN[n][0]; el.classList.add('on');
+}
+/* Geführte Einführung beim ersten Kamera-Start: greifen → verschieben → größer → Menü → wegwischen, jeweils „Geschafft!“ */
+function kamTourStart() {
+  if (!KAM.an) { kameraAn().then(ok => { if (ok) kamTourStart(); }); return; }
+  kamHilfe(false); KAM.tour = { i:0, fertig:false }; kamTourZeigen();
+}
+function kamTourZeigen() {
+  const el = kamEl('.ktour'), i = KAM.tour.i, st = KAM_TOUR[i];
+  el.className = 'ktour on';
+  el.innerHTML = `<div class="tn">Einführung · Schritt ${i + 1} von ${KAM_TOUR.length}</div><h3>${st.t}</h3>`
+    + `<div class="ta" data-s="${st.s}"><i class="k"></i><i class="r"></i><i class="a"></i><i class="b"></i></div><p>${st.p}</p><div class="gs">Geschafft!</div>`
+    + `<div class="tp">${KAM_TOUR.map((_, j) => `<i class="${j < i ? 'ok' : ''}"></i>`).join('')}</div>`
+    + '<div class="tb"><button data-k="tour:weiter">Weiter</button><button data-k="tour:ende">Überspringen</button></div>';
+  const frei = aiAlle().filter(a => !a._pin && !a.classList.contains('weg') && !a._folgt);
+  if (st.s === 'wischen') aiNeu('text', .5, .58, { key:'tour', neu:true, titel:'Übung', text:'Wisch mich weg!' });
+  else if (!frei.length) aiNeu('uhr', .5, .58);
+}
+function kamTour(s) {   // ein Schritt wurde gemacht
+  if (!KAM.tour || KAM.tour.fertig || KAM_TOUR[KAM.tour.i].s !== s) return;
+  KAM.tour.fertig = true; const el = kamEl('.ktour'); el.classList.add('geschafft');
+  const p = el.querySelectorAll('.tp i')[KAM.tour.i]; if (p) p.classList.add('ok');
+  SFX.done(); setTimeout(kamTourWeiter, 1500);
+}
+function kamTourWeiter() {
+  if (!KAM.tour) return;
+  KAM.tour.i++; KAM.tour.fertig = false;
+  if (KAM.tour.i < KAM_TOUR.length) return kamTourZeigen();
+  kamTourEnde(); const el = kamEl('.ktour');
+  el.className = 'ktour on geschafft';
+  el.innerHTML = '<div class="tn">Einführung</div><div class="gs">Alles gelernt!</div><p style="display:block">Sag jederzeit „Jarvis, Kamera-Hilfe“ für die Übersicht.</p>';
+  setTimeout(() => { if (!KAM.tour) el.classList.remove('on'); }, 5000);
+}
+function kamTourEnde() {
+  try { localStorage.setItem(KAM_TOUR_KEY, '1'); } catch (e) {}
+  KAM.tour = null; kamEl('.ktour').classList.remove('on');
+}
+/* große Übersichtskarte aller Gesten („Jarvis, Kamera-Hilfe“) – geht auch ohne Kamera */
+function kamHilfe(an = true) {
+  const el = $('kamhilfe'), g = el.querySelector('.hg');
+  if (an && !g.childElementCount) g.innerHTML = KAM_HILFE.map(([ic, t, p]) => `<div><svg viewBox="0 0 24 24">${KAM_GESTEN[ic][1]}</svg><p style="margin:0"><b>${t}</b><span>${p}</span></p></div>`).join('');
+  el.classList.toggle('on', an); clearTimeout(kamHilfe._t);
+  if (an) { SFX.holo(); kamHilfe._t = setTimeout(() => kamHilfe(false), 60000); }
+}
+$('kamhilfe').addEventListener('click', e => {
+  const b = e.target.closest('[data-k]'); if (!b) return;
+  if (b.dataset.k === 'hilfe-zu') kamHilfe(false); else if (b.dataset.k === 'tour') kamTourStart();
+});
 function kamLicht() {   // mittlere Helligkeit messen → dunkles Bild sanft aufhellen (rein in der Anzeige)
   const v = kamEl('video'); if (!v.videoWidth) return;
   const c = kamLicht._c || (kamLicht._c = Object.assign(document.createElement('canvas'), { width:32, height:18 })), g = c.getContext('2d', { willReadFrequently:true });
@@ -2290,6 +2479,7 @@ async function kameraAn() {
   if (KAM.an) { hint('Kamera ist schon an'); return true; }
   if (KAM.startet) return false;
   KAM.startet = true; let strom;
+  KAM.stufe = KAM.profil === 'scharf' ? 0 : 1; KAM.fps = KAM.fpsN = KAM.fpsT = 0;
   try { strom = await kamStrom(); }
   catch (e) { KAM.startet = false; hint(e && e.name === 'NotAllowedError' ? 'Kamera-Zugriff wurde nicht erlaubt' : 'Keine Kamera gefunden', 4000); return false; }
   KAM.startet = false; KAM.strom = strom; KAM.an = true;
@@ -2304,7 +2494,8 @@ async function kameraAn() {
   KAM.tick = {}; KAM.goldStart = null; KAM.licht = 1;
   if (!aiAlle().length) (Array.isArray(L.offen) ? L.offen : ['uhr', 'gold']).filter(a => KAM_DAUER.includes(a)).forEach(a => aiNeu(a, ...(KAM_START[a] || [])));
   kamHinweis(KAM.haende ? HAND_TIPP : 'Hand-Erkennung lädt …', KAM.haende ? 10000 : 0);
-  kamHaendeLaden();
+  kamStufeAnwenden(false); kamHaendeLaden();
+  if (!localStorage.getItem(KAM_TOUR_KEY)) setTimeout(() => { if (KAM.an && !KAM.tour) kamTourStart(); }, 1200);
   cancelAnimationFrame(KAM.raf); KAM.lt = 0; KAM.raf = requestAnimationFrame(kamSchleife);
   return true;
 }
@@ -2314,6 +2505,7 @@ function kameraAus() {   // sofort: Kamera-Spur stoppen, dann Fenster ausblenden
   clearInterval(KAM.puls); cancelAnimationFrame(KAM.raf); KAM.hs = {}; KAM.filter = {}; KAM.erg = null; KAM.letzte = []; KAM.strahl = null;
   kamMelden(false); $('kamlicht').classList.remove('on'); document.body.classList.remove('kam-an');
   kamMenueZu(); kamZeichnenSetzen(false, true); KAM.striche = []; KAM.stricheNeu = true;
+  KAM.tour = null; kamEl('.ktour').classList.remove('on'); kamEl('.kges').classList.remove('on'); KAM.geste = null; KAM.hcLeer = false;
   const el = $('kamh'); el.classList.add('zu'); SFX.close();
   clearTimeout(kameraAus._t); kameraAus._t = setTimeout(() => {
     el.classList.remove('on', 'zu'); kamEl('video').srcObject = null;
@@ -2329,8 +2521,8 @@ async function kamHaendeLaden() {
     // beide Hände, strengere Erkennung (weniger Fehlgriffe), Verfolgung bleibt flott; Zittern glättet danach ein 1-Euro-Filter
     const opt = d => ({ baseOptions:{ modelAssetPath:'https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task', delegate:d },
       runningMode:'VIDEO', numHands:2, minHandDetectionConfidence:.7, minHandPresenceConfidence:.6, minTrackingConfidence:.6 });
-    try { KAM.haende = await mp.HandLandmarker.createFromOptions(fs, opt('GPU')); }
-    catch (e) { KAM.haende = await mp.HandLandmarker.createFromOptions(fs, opt('CPU')); }
+    try { KAM.haende = await mp.HandLandmarker.createFromOptions(fs, opt('GPU')); KAM.gpu = true; }   // Grafikkarte rechnet – CPU nur als Ersatz
+    catch (e) { KAM.haende = await mp.HandLandmarker.createFromOptions(fs, opt('CPU')); KAM.gpu = false; }
     if (KAM.an) kamHinweis(HAND_TIPP, 10000);
   } catch (e) {
     console.warn('Hand-Erkennung:', e);
@@ -2572,6 +2764,7 @@ function kamMenue(x, y) {
     `<button data-k="m:${art}" style="--w:${(i / KAM_MENUE.length * 360 - 90).toFixed(1)}deg; --i:${i}">${n}</button>`).join('');
   m.style.left = Math.min(.82, Math.max(.18, x)) * 100 + '%'; m.style.top = Math.min(.74, Math.max(.26, y)) * 100 + '%';
   m.classList.add('on'); KAM.menueOffen = true; KAM.menueBis = performance.now() + 7000; SFX.holo();
+  if (KAM.an) { kamGeste('menue'); kamTour('menue'); }
 }
 function kamMenueZu() { const m = kamEl('.km'); if (!KAM.menueOffen) return; m.classList.remove('on'); KAM.menueOffen = false; KAM.menueSperre = performance.now() + 1800; }
 /* Zeichnen in der Luft: ausgestreckter Zeigefinger malt, Hand öffnen/Faust = absetzen (nur im Fenster, nichts wird gespeichert) */
@@ -2660,18 +2853,19 @@ function aiTreffer(x, y) {   // oberstes Hologramm unter einem Bühnen-Punkt (mi
     const r = a.getBoundingClientRect(); return px >= r.left - 16 && px <= r.right + 16 && py >= r.top - 16 && py <= r.bottom + 16; });
 }
 function kamKnopf(x, y) {   // Knopf (data-k) unter einem Bildschirm-Punkt, mit etwas Spielraum
-  for (const [dx, dy] of [[0, 0], [12, 0], [-12, 0], [0, 12], [0, -12]]) {
+  for (const [dx, dy] of [[0, 0], [16, 0], [-16, 0], [0, 16], [0, -16]]) {   // großzügiger Spielraum: Knöpfe leichter treffen
     const e = document.elementFromPoint(x + dx, y + dy), k = e && e.closest('[data-k]');
-    if (k && $('kamh').contains(k)) return k;
+    if (k && ($('kamh').contains(k) || $('kamhilfe').contains(k))) return k;
   }
   return null;
 }
 function kamDruecken(el) { el.classList.add('druck'); setTimeout(() => el.classList.remove('druck'), 240); SFX.click(); el.click(); }
 function kamForm(p) {   // Handform: offen, zeigt (nur Zeigefinger), Abstand Daumen–Zeigefinger
   const d = (a, b) => Math.hypot(p[a].x - p[b].x, p[a].y - p[b].y), gr = d(0, 9) || 1;
-  const aus = [[8, 6], [12, 10], [16, 14], [20, 18]].map(([t, j]) => d(t, 0) > d(j, 0) * 1.12);
+  // tolerant: Finger gilt schon leicht gestreckt als „aus“; Zeigen erlaubt einen halb offenen Ring-/kleinen Finger
+  const aus = [[8, 6], [12, 10], [16, 14], [20, 18]].map(([t, j]) => d(t, 0) > d(j, 0) * 1.06);
   const n = aus.filter(Boolean).length;
-  return { gr, ab:d(4, 8) / gr, offen:n === 4 && d(4, 17) > gr * .7, zeigt:aus[0] && !aus[1] && !aus[2] && !aus[3],
+  return { gr, ab:d(4, 8) / gr, offen:n === 4 && d(4, 17) > gr * .6, zeigt:aus[0] && d(8, 0) > d(6, 0) * 1.1 && !aus[1] && !(aus[2] && aus[3]),
     palm:{ x:(p[0].x + p[5].x + p[9].x + p[13].x + p[17].x) / 5, y:(p[0].y + p[5].y + p[9].y + p[13].y + p[17].y) / 5 } };
 }
 const kamRoll = p => Math.atan2(p[17].y - p[5].y, p[17].x - p[5].x);
@@ -2679,17 +2873,21 @@ const kamWinkel = w => Math.atan2(Math.sin(w), Math.cos(w));
 function kamSchleife() {
   if (!KAM.an) return; KAM.raf = requestAnimationFrame(kamSchleife);
   const t = performance.now(), dt = KAM.lt ? Math.min(.1, (t - KAM.lt) / 1000) : .016; KAM.lt = t;
+  kamLeistung(t); const st = KAM_STUFEN[KAM.stufe];
+  if (KAM.geste && t > KAM.gesteBis) { KAM.geste = null; kamEl('.kges').classList.remove('on'); }
   for (const art in KAM_TAKT) if (t - (KAM.tick[art] || 0) > KAM_TAKT[art] && kamEl('.ai.' + art + ':not(.weg)')) { KAM.tick[art] = t; KAM_LADEN[art](); }
   if (t - KAM.farbeT > 1000) { KAM.farbeT = t; KAM.farbe = getComputedStyle(document.documentElement).getPropertyValue('--c').trim() || KAM.farbe; kamKarten(); kamLicht(); }
   if (KAM.menueOffen && t > KAM.menueBis) kamMenueZu();
-  const kb = kamEl('.kb'), v = kamEl('video'), cv = kamEl('.hc'), zc = kamEl('.zc'), w = kb.clientWidth, h = kb.clientHeight, z = devicePixelRatio || 1;
+  const kb = kamEl('.kb'), v = kamEl('video'), cv = kamEl('.hc'), zc = kamEl('.zc'), w = kb.clientWidth, h = kb.clientHeight,
+    z = st.dpr ? Math.min(st.dpr, devicePixelRatio || 1) : devicePixelRatio || 1;
+  let neu = false;
   if (cv.width !== Math.round(w * z) || cv.height !== Math.round(h * z)) {
-    cv.width = zc.width = Math.round(w * z); cv.height = zc.height = Math.round(h * z); KAM.stricheNeu = true; }
-  const g = cv.getContext('2d'); g.setTransform(z, 0, 0, z, 0, 0); g.clearRect(0, 0, w, h);
+    cv.width = zc.width = Math.round(w * z); cv.height = zc.height = Math.round(h * z); KAM.stricheNeu = true; neu = true; }
   aiAlle().forEach(a => { if (a._gl) kam3DMalen(a, dt); });
-  if (KAM.haende && v.readyState >= 2 && v.videoWidth && v.currentTime !== KAM.zeit) {
-    KAM.zeit = v.currentTime; let erg = null;
-    try { erg = KAM.haende.detectForVideo(v, t); } catch (e) {}
+  // Handerkennung nur auf neuen Kamerabildern, im Profil „Flüssig“ höchstens ~30× pro Sekunde und auf einem kleineren Bild
+  if (KAM.haende && v.readyState >= 2 && v.videoWidth && v.currentTime !== KAM.zeit && t - KAM.erkT >= st.abst - 4) {
+    KAM.zeit = v.currentTime; KAM.erkT = t; neu = true; let erg = null;
+    try { const q = kamErkBild(v, st.erk), t1 = performance.now(); erg = KAM.haende.detectForVideo(q, t); KAM.erkMs += (performance.now() - t1 - KAM.erkMs) * .1; } catch (e) {}
     // Kamerakoordinaten → Bühnen-Pixel (Bild füllt die Bühne und ist gespiegelt wie ein Spiegel), dann geglättet
     const k = Math.max(w / v.videoWidth, h / v.videoHeight), dw = v.videoWidth * k, dh = v.videoHeight * k, ox = (w - dw) / 2, oy = (h - dh) / 2, ids = new Set();
     KAM.letzte = ((erg && erg.landmarks) || []).map((lm, i) => {
@@ -2700,14 +2898,20 @@ function kamSchleife() {
     for (const id in KAM.filter) if (!ids.has(id)) delete KAM.filter[id];
   }
   const haende = KAM.haende ? KAM.letzte : [];
-  kamGesten(haende, w, h, t, dt); kamHandMalen(g, haende, w, h);
+  kamGesten(haende, w, h, t, dt);
+  // Hand-Ebene nur neu zeichnen, wenn sich etwas geändert hat
+  const da = haende.length || KAM.strahl;
+  if (da ? neu || KAM.strahl || haende.some(hd => hd.lade || hd.menueLade > .25) : !KAM.hcLeer) {
+    const g = cv.getContext('2d'); g.setTransform(z, 0, 0, z, 0, 0); g.clearRect(0, 0, w, h);
+    if (da) kamHandMalen(g, haende, w, h, !st.dpr); KAM.hcLeer = !da;
+  }
   if (KAM.stricheNeu) kamStricheMalen();
 }
 function kamLoslassen(hs, t, w, h, hd) {
   const gf = hs.griff; hs.griff = null; const a = gf && gf.a; if (!a) return;
   a.classList.remove('greif'); a._zwei = null;
   if (hd && t - gf.t0 < 320 && Math.hypot(hd.pt.x - gf.x0, hd.pt.y - gf.y0) < 18 && a._art === 'spotify') kamSpotify('play');   // kurz antippen = Play/Pause
-  else if ((a._x < .12 || a._x > .88) && (a._y < .2 || a._y > .8)) aiParken(a);   // in eine Ecke gezogen = parken
+  else if ((a._x < .12 || a._x > .88) && (a._y < .2 || a._y > .8)) { aiParken(a); kamGeste('parken', t); }   // in eine Ecke gezogen = parken
   kamMerken();
 }
 function kamGesten(haende, w, h, t, dt) {
@@ -2716,9 +2920,9 @@ function kamGesten(haende, w, h, t, dt) {
     const p = hd.p, f = kamForm(p), hs = KAM.hs[hd.id] || (KAM.hs[hd.id] = { spur:[], zeigtN:0, offenN:0 });
     Object.assign(hd, f); hd.lade = 0; hd.menueLade = 0;
     const gf = hs.griff;
-    hd.pinch = gf ? f.ab < .48 : f.ab < .28;   // greifen mit Hysterese – kein Flattern
+    hd.pinch = gf ? f.ab < .55 : f.ab < .34;   // greifen mit Hysterese – kein Flattern, aber tolerant
     hs.zeigtN = f.zeigt && !hd.pinch ? hs.zeigtN + 1 : 0; hs.offenN = f.offen && !hd.pinch ? hs.offenN + 1 : 0;
-    hd.zeigt = hs.zeigtN >= 3; hd.offen = hs.offenN >= 3;   // Form erst nach ein paar Bildern übernehmen
+    hd.zeigt = hs.zeigtN >= 2; hd.offen = hs.offenN >= 2;   // Form erst nach ein paar Bildern übernehmen
     hd.pt = hd.pinch || gf ? { x:(p[4].x + p[8].x) / 2, y:(p[4].y + p[8].y) / 2 } : { x:p[8].x, y:p[8].y };
     const knopf = kamKnopf(kb.left + hd.pt.x, kb.top + hd.pt.y);
     if (hd.pinch && !gf) {   // Griff beginnt: Knopf drücken – oder Hologramm greifen
@@ -2727,18 +2931,19 @@ function kamGesten(haende, w, h, t, dt) {
         const a = aiTreffer(hd.pt.x, hd.pt.y);
         if (a && a._pin) { kamHinweis('Angeheftet – zum Lösen die Stecknadel antippen', 1800); hs.griff = { klick:true }; }
         else {
-          if (a) { if (a._park) aiAusparken(a); aiFolgt(a, false); a.classList.add('greif'); a.style.zIndex = ++KAM.z; }
+          if (a) { if (a._park) aiAusparken(a); aiFolgt(a, false); a.classList.add('greif'); a.style.zIndex = ++KAM.z; kamTour('greifen'); }
           hs.griff = { a, t0:t, x0:hd.pt.x, y0:hd.pt.y, lx:hd.pt.x, ly:hd.pt.y, dx:a ? hd.pt.x - a._x * w : 0, dy:a ? hd.pt.y - a._y * h : 0,
             roll0:kamRoll(p), rz0:a && a._rot ? a._rot.z : 0 };
         }
       }
     } else if (!hd.pinch && gf) kamLoslassen(hs, t, w, h, hd);
-    if (hd.pinch) { hs.spur = []; hs.verweil = null; hs.strich = null; hs.ruhe = null; continue; }
+    if (hd.pinch) { kamGeste(hs.griff && hs.griff.a ? 'greifen' : 'tippen', t); hs.spur = []; hs.verweil = null; hs.strich = null; hs.ruhe = null; continue; }
+    if (hd.zeigt) kamGeste(KAM.zeichnen ? 'zeichnen' : 'zeigen', t); else if (hd.offen) kamGeste('hand', t);
     const ziel = hd.zeigt || hd.offen ? aiTreffer(hd.pt.x, hd.pt.y) : null; if (ziel) ziele.add(ziel);
     // Zeigefinger = Cursor: kurz über einem Knopf verweilen = drücken
     if (hd.zeigt && knopf && !KAM.zeichnen) {
       knoepfe.add(knopf);
-      if (hs.verweil && hs.verweil.el === knopf) { hd.lade = Math.min(1, (t - hs.verweil.t) / 650); if (hd.lade >= 1 && !hs.verweil.fertig) { hs.verweil.fertig = true; kamDruecken(knopf); } }
+      if (hs.verweil && hs.verweil.el === knopf) { hd.lade = Math.min(1, (t - hs.verweil.t) / 600); if (hd.lade >= 1 && !hs.verweil.fertig) { hs.verweil.fertig = true; kamDruecken(knopf); } }
       else hs.verweil = { el:knopf, t };
     } else hs.verweil = null;
     // Zeichnen in der Luft
@@ -2749,18 +2954,19 @@ function kamGesten(haende, w, h, t, dt) {
     } else hs.strich = null;
     // Handfläche ruhig zeigen = radiales Menü
     if (hd.offen && !KAM.menueOffen && t > KAM.menueSperre && !folger.length && !aiTreffer(f.palm.x, f.palm.y)) {
-      if (!hs.ruhe || Math.hypot(f.palm.x - hs.ruhe.x, f.palm.y - hs.ruhe.y) > f.gr * .3) hs.ruhe = { x:f.palm.x, y:f.palm.y, t };
-      hd.menueLade = Math.min(1, (t - hs.ruhe.t) / 1100);
+      if (!hs.ruhe || Math.hypot(f.palm.x - hs.ruhe.x, f.palm.y - hs.ruhe.y) > f.gr * .45) hs.ruhe = { x:f.palm.x, y:f.palm.y, t };
+      hd.menueLade = Math.min(1, (t - hs.ruhe.t) / 900);
       if (hd.menueLade >= 1) { kamMenue(f.palm.x / w, f.palm.y / h); hs.ruhe = null; hd.menueLade = 0; }
     } else hs.ruhe = null;
     // schnelles Wischen = weg (über Spotify: nächster/vorheriger Titel)
     if (!(KAM.zeichnen && hd.zeigt)) {
-      const sp = (hs.spur = hs.spur.filter(q => t - q.t < 260)); sp.push({ x:hd.pt.x, y:hd.pt.y, t });
+      const sp = (hs.spur = hs.spur.filter(q => t - q.t < 320)); sp.push({ x:hd.pt.x, y:hd.pt.y, t });
       const a0 = sp[0], dx = hd.pt.x - a0.x, dts = (t - a0.t) / 1000;
-      if (t > KAM.sperre && dts > .06 && Math.abs(dx) > w * .16 && Math.abs(dx) / dts > w * 1.4 && Math.abs(dx) > Math.abs(hd.pt.y - a0.y) * 1.5) {
+      if (t > KAM.sperre && dts > .06 && Math.abs(dx) > w * .12 && Math.abs(dx) / dts > w * 1.0 && Math.abs(dx) > Math.abs(hd.pt.y - a0.y) * 1.2) {
         const opfer = aiTreffer((a0.x + hd.pt.x) / 2, (a0.y + hd.pt.y) / 2) || aiTreffer(a0.x, a0.y) || ziel;
         if (opfer && !opfer._pin) {
-          if (opfer._art === 'spotify') kamSpotify(dx > 0 ? 'next' : 'prev'); else aiWeg(opfer, Math.sign(dx));
+          kamGeste('wischen', t);
+          if (opfer._art === 'spotify') kamSpotify(dx > 0 ? 'next' : 'prev'); else { aiWeg(opfer, Math.sign(dx)); kamTour('wischen'); }
           KAM.sperre = t + 700; hs.spur = [];
         }
       }
@@ -2774,11 +2980,13 @@ function kamGesten(haende, w, h, t, dt) {
     if (hs.length >= 2) {
       const [A, B] = hs, d = Math.hypot(A.pt.x - B.pt.x, A.pt.y - B.pt.y), wk = Math.atan2(B.pt.y - A.pt.y, B.pt.x - A.pt.x);
       if (!a._zwei) a._zwei = { d0:Math.max(20, d), s0:a._s, w0:wk, r0:a._r || 0 };
+      kamGeste('groesse', t); if (d / a._zwei.d0 > 1.2 || d / a._zwei.d0 < .83) kamTour('groesse');
       aiSetzen(a, (A.pt.x + B.pt.x) / 2 / w, (A.pt.y + B.pt.y) / 2 / h, a._zwei.s0 * d / a._zwei.d0, a._zwei.r0 + kamWinkel(wk - a._zwei.w0) * 180 / Math.PI);
     } else {
       const hd = hs[0], gf = KAM.hs[hd.id].griff;
       if (a._zwei) { a._zwei = null; gf.dx = hd.pt.x - a._x * w; gf.dy = hd.pt.y - a._y * h; }
       aiSetzen(a, (hd.pt.x - gf.dx) / w, (hd.pt.y - gf.dy) / h);
+      if (Math.hypot(hd.pt.x - gf.x0, hd.pt.y - gf.y0) > w * .1) kamTour('verschieben');
       if (a._rot) {
         const s = Math.max(dt, .008), vx = (hd.pt.x - gf.lx) / s, vy = (hd.pt.y - gf.ly) / s;
         a._rot.vy += (vx * .012 - a._rot.vy) * .25; a._rot.vx += (vy * .012 - a._rot.vx) * .25;
@@ -2801,10 +3009,10 @@ function kamGesten(haende, w, h, t, dt) {
     }
   }
   aiAlle().forEach(a => a.classList.toggle('ziel', ziele.has(a)));
-  $('kamh').querySelectorAll('[data-k].hand').forEach(k => { if (!knoepfe.has(k)) k.classList.remove('hand'); });
+  document.querySelectorAll('#kamh [data-k].hand, #kamhilfe [data-k].hand').forEach(k => { if (!knoepfe.has(k)) k.classList.remove('hand'); });
   knoepfe.forEach(k => k.classList.add('hand'));
 }
-function kamHandMalen(g, haende, w, h) {
+function kamHandMalen(g, haende, w, h, glanz = true) {
   const c = KAM.farbe; g.lineCap = 'round';
   if (KAM.strahl) {   // Lichtkegel von der Handfläche zum schwebenden Objekt
     const s = KAM.strahl;
@@ -2816,7 +3024,7 @@ function kamHandMalen(g, haende, w, h) {
     const rg = g.createRadialGradient(s.x, s.y, 0, s.x, s.y, s.gr * .8); rg.addColorStop(0, `rgba(${c},.45)`); rg.addColorStop(1, `rgba(${c},0)`);
     g.fillStyle = rg; g.beginPath(); g.ellipse(s.x, s.y, s.gr * .8, s.gr * .35, 0, 0, 7); g.fill();
   }
-  g.shadowColor = `rgba(${c},.9)`; g.shadowBlur = 8;
+  g.shadowColor = `rgba(${c},.9)`; g.shadowBlur = glanz ? 8 : 0;   // Leuchten nur im Profil „Scharf“ (Schatten sind teuer)
   for (const hd of haende) {
     g.lineWidth = 1.6; g.strokeStyle = `rgba(${c},.55)`; g.beginPath();
     for (const [a, b] of HAND_LINIEN) { g.moveTo(hd.p[a].x, hd.p[a].y); g.lineTo(hd.p[b].x, hd.p[b].y); }
@@ -2854,15 +3062,17 @@ kamEl('.ar').addEventListener('pointerdown', e => {
   const a = e.target.closest('.ai'); if (!a || a.classList.contains('weg') || e.target.closest('[data-k]') || a._pin) return; e.preventDefault();
   if (a._park) aiAusparken(a); aiFolgt(a, false);
   const kb = kamEl('.kb').getBoundingClientRect(), dx = e.clientX - kb.left - a._x * kb.width, dy = e.clientY - kb.top - a._y * kb.height;
-  a.setPointerCapture(e.pointerId); a.classList.add('greif'); a.style.zIndex = ++KAM.z;
-  const mv = ev => aiSetzen(a, (ev.clientX - kb.left - dx) / kb.width, (ev.clientY - kb.top - dy) / kb.height);
+  a.setPointerCapture(e.pointerId); a.classList.add('greif'); a.style.zIndex = ++KAM.z; kamTour('greifen');
+  const x0 = e.clientX, y0 = e.clientY;
+  const mv = ev => { aiSetzen(a, (ev.clientX - kb.left - dx) / kb.width, (ev.clientY - kb.top - dy) / kb.height);
+    if (Math.hypot(ev.clientX - x0, ev.clientY - y0) > kb.width * .1) kamTour('verschieben'); };
   const up = () => { a.classList.remove('greif'); a.removeEventListener('pointermove', mv); a.removeEventListener('pointerup', up); a.removeEventListener('pointercancel', up);
     if ((a._x < .12 || a._x > .88) && (a._y < .2 || a._y > .8)) aiParken(a); };
   a.addEventListener('pointermove', mv); a.addEventListener('pointerup', up); a.addEventListener('pointercancel', up);
 });
 kamEl('.ar').addEventListener('wheel', e => { const a = e.target.closest('.ai'); if (!a || a._pin) return; e.preventDefault();
-  if (e.shiftKey) aiSetzen(a, a._x, a._y, a._s, (a._r || 0) + (e.deltaY < 0 ? 8 : -8)); else aiSetzen(a, a._x, a._y, a._s * (e.deltaY < 0 ? 1.1 : 1 / 1.1)); }, { passive:false });
-kamEl('.ar').addEventListener('dblclick', e => { const a = e.target.closest('.ai'); if (a && !a._pin && !e.target.closest('[data-k]')) aiWeg(a, a._x < .5 ? -1 : 1); });
+  if (e.shiftKey) aiSetzen(a, a._x, a._y, a._s, (a._r || 0) + (e.deltaY < 0 ? 8 : -8)); else { aiSetzen(a, a._x, a._y, a._s * (e.deltaY < 0 ? 1.1 : 1 / 1.1)); kamTour('groesse'); } }, { passive:false });
+kamEl('.ar').addEventListener('dblclick', e => { const a = e.target.closest('.ai'); if (a && !a._pin && !e.target.closest('[data-k]')) { aiWeg(a, a._x < .5 ? -1 : 1); kamTour('wischen'); } });
 kamEl('.kb').addEventListener('click', e => {   // Knöpfe in Hologrammen und Menü (Maus, Zeigefinger oder Greifen)
   const b = e.target.closest('[data-k]'); if (!b) return;
   const k = b.dataset.k, a = b.closest('.ai');
@@ -2871,6 +3081,8 @@ kamEl('.kb').addEventListener('click', e => {   // Knöpfe in Hologrammen und Me
   else if (k === 'park' && a) { if (a._park) aiAusparken(a, true); else aiParken(a); }
   else if (k.startsWith('sp:')) kamSpotify(k.slice(3));
   else if (k.startsWith('m:')) { kamMenueZu(); kamZeigen({ art:k.slice(2) }); }
+  else if (k === 'tour:weiter') { if (KAM.tour && !KAM.tour.fertig) kamTourWeiter(); }
+  else if (k === 'tour:ende') kamTourEnde();
 });
 kamEl('.kk').addEventListener('click', e => {
   const b = e.target.closest('button'); if (!b) return;
@@ -2879,6 +3091,8 @@ kamEl('.kk').addEventListener('click', e => {
   if (art === 'menue') KAM.menueOffen ? kamMenueZu() : kamMenue(.5, .5);
   else if (art === 'zeichnen') kamZeichnenSetzen(!KAM.zeichnen);
   else if (art === 'gross') { $('kamh').classList.toggle('gross'); kamMerken(); }
+  else if (art === 'profil') kamProfil(KAM.profil === 'scharf' ? 'fluessig' : 'scharf');
+  else if (art === 'hilfe') kamHilfe(!$('kamhilfe').classList.contains('on'));
 });
 $('kamlicht').addEventListener('click', kameraAus);
 addEventListener('pagehide', kameraAus);
@@ -3436,7 +3650,8 @@ function frame(now) {
   requestAnimationFrame(frame);
   const speaking = speakingNow();
   const active = speaking || listening || convoRec || S.mode === 'denkt' || S.mode === 'auftrag' || S.mode === 'wartet' || S.boot < 1 || waves.length || sparks.length;
-  const fps = S.sleep && S.sleepVis > .95 && !active ? 24 : active ? [30, 60, 120][Q()] : [24, 40, 60][Q()];   // im Leerlauf weniger Bilder = weniger CPU
+  const fps = Math.min(KAM.an ? (KAM.stufe ? 20 : 30) : 999,   // Kamera-Ansicht verdeckt die Kugel fast ganz → Kugel sparsam, damit die Kamera flüssig läuft
+    S.sleep && S.sleepVis > .95 && !active ? 24 : active ? [30, 60, 120][Q()] : [24, 40, 60][Q()]);   // im Leerlauf weniger Bilder = weniger CPU
   if (now - lastT < 1000 / fps - 3) return;
   const t = now / 1000, dt = Math.min(.08, (now - lastT) / 1000); lastT = now;
   if (innerWidth < 2 || innerHeight < 2) return;
@@ -3714,8 +3929,10 @@ addEventListener('keydown', e => {
     if ($('set').classList.contains('on')) return toggleSettings(false);
     if ($('bildh').classList.contains('on') && !$('bildh').classList.contains('zu')) return bildZu();
     if ($('goldh').classList.contains('on') && !$('goldh').classList.contains('zu')) return goldZu();
+    if ($('kamhilfe').classList.contains('on')) return kamHilfe(false);
     if (speakingNow()) { stopAudio(); caption(''); }
     else if (S.busy) { fetch('/stop', { method:'POST' }); hint('Stoppe …'); }
+
     else if (convo) stopConvo();
   }
   if (k === 'f') toggleFs();
