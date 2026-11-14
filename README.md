@@ -20,6 +20,7 @@ Voraussetzung für Antworten: [Claude Code](https://claude.com/claude-code) inst
 - **Web-Hologramme**: echte Webseiten zum Klicken, Scrollen und Tippen direkt im Hologramm (`web_zeigen.ps1`).
 - **Echte Farben**: Schalter im Bild-/Web-Hologramm (oder `-Rein` an `bild_zeigen.ps1`/`web_zeigen.ps1`) zeigt den Inhalt ohne Hologramm-Effekte; die Bild-Werkstatt (Port 8790) startet immer so.
 - **Gold live** („Jarvis, Gold“): XAU/USD jede Sekunde, mit Farbblitz pro Tick und mitlaufender Kurve.
+- **Kamera-Ansicht** („Jarvis, Kamera an“ / „Kamera aus“): Live-Webcam als Hologramm-Fenster mit schwebenden AR-Hologrammen (Uhr, Gold, Bild); per Hand greifen, verschieben, mit zwei Händen vergrößern, wegwischen (MediaPipe, rechnet lokal). Nur auf Befehl, rotes Kamera-Symbol solange an, nichts wird aufgenommen; `kamera.ps1` holt auf Larsens Frage ein einzelnes Standbild für Claude.
 - **Was ist neu?**: nach jedem Update (ORB oder Projekt) erscheint kurz ein kleines Hologramm mit den Neuerungen und wie man sie benutzt.
 - **Wissensbasis**: arbeitet im Ordner `Documents\Jarvis` und merkt sich dort alles.
 
@@ -35,6 +36,7 @@ Voraussetzung für Antworten: [Claude Code](https://claude.com/claude-code) inst
 | `neu.ps1` | Entwickler hinterlegt die Einführung „Was ist neu?“ (2–4 Punkte + wie benutzen) – ORB zeigt sie nach dem Update 30 s als kleines Hologramm und liest den ersten Punkt vor |
 | `fortschritt.ps1` | Entwickler meldet seinen Fortschritt (Prozent + Schritt) – ORB zeigt ihn als Balken im Entwickler-Hologramm |
 | `web_zeigen.ps1` | zeigt eine Webseite als echte, bedienbare Seite im Hologramm (sonst echte Webansicht darüber) |
+| `kamera.ps1` | ein Standbild aus der laufenden Kamera-Ansicht nach `%LOCALAPPDATA%\ORB\screen\kamera.png` (schaltet die Kamera nie ein) |
 | `whatsapp.ps1` | WhatsApp-Nachricht (Text/Bild) in Sekunden vorbereiten, Abschicken erst nach Bestätigung |
 | `check.py` | prüft Code und Oberfläche vor jedem Update |
 | `update.ps1` | prüfen → hochladen → ORB aktualisiert sich → Kontrolle (bei Fehler automatisch zurück) |

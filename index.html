@@ -318,31 +318,31 @@
   /* ===== Holo-Projektion (Pepper's Ghost: schräge, durchsichtige Projektionsfläche über der Kugel) ===== */
   /* ===== Hologramme im Liquid-Glass-Stil: echtes Glas, feine helle Kante, weicher Schatten, dezentes Leuchten, leichter Holo-Schimmer ===== */
   /* Gemeinsame Basis (Farbton je Hologramm über --hg als „r,g,b“ bzw. Farbwert) */
-  #holo, .karte, .th:not(.devmini), #bildh, #webh, #goldh { isolation:isolate;
+  #holo, .karte, .th:not(.devmini), #bildh, #webh, #goldh, #kamh { isolation:isolate;
     background:linear-gradient(160deg, rgba(255,255,255,.13) 0%, rgba(255,255,255,.05) 36%, rgba(255,255,255,.025) 64%, var(--hgt, rgba(255,255,255,.04)) 100%), rgba(14,16,26,.56);
     backdrop-filter:blur(30px) saturate(190%) brightness(1.04); -webkit-backdrop-filter:blur(30px) saturate(190%) brightness(1.04);
     border:0; box-shadow:inset 0 1px 0 rgba(255,255,255,.42), inset 0 0 0 1px rgba(255,255,255,.1), inset 0 -1px 0 rgba(255,255,255,.05),
       0 2px 4px rgba(0,0,0,.22), 0 26px 60px rgba(0,0,0,.46), 0 0 46px var(--hgg, transparent); }
   /* Glanzlicht oben links + Farbschein unten rechts */
-  #holo::before, .karte::before, .th:not(.devmini)::before, #bildh::before, #webh::before, #goldh::before {
+  #holo::before, .karte::before, .th:not(.devmini)::before, #bildh::before, #webh::before, #goldh::before, #kamh::before {
     content:''; position:absolute; inset:0; border-radius:inherit; pointer-events:none; z-index:-1; opacity:1; animation:none;
     background:radial-gradient(85% 55% at 18% -10%, rgba(255,255,255,.2), transparent 62%), radial-gradient(75% 60% at 100% 112%, var(--hgt, transparent), transparent 70%); }
   /* Holo-Schimmer: ein feiner, langsam wandernder Lichtzug auf der Kante */
-  #holo::after, .karte::after, .th:not(.devmini)::after, #bildh::after, #webh::after, #goldh::after {
+  #holo::after, .karte::after, .th:not(.devmini)::after, #bildh::after, #webh::after, #goldh::after, #kamh::after {
     content:''; position:absolute; inset:0; top:0; height:auto; border-radius:inherit; padding:1px; pointer-events:none; z-index:3; animation:rim 9s linear infinite;
     background:conic-gradient(from var(--a), transparent 0deg, rgba(255,255,255,.55) 26deg, var(--hgk, rgba(255,255,255,.4)) 52deg, transparent 96deg,
       transparent 190deg, rgba(150,220,255,.22) 225deg, rgba(255,150,230,.22) 250deg, transparent 290deg);
     -webkit-mask:linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite:xor; mask-composite:exclude; opacity:.75; }
-  body.lite :is(#holo, .karte, .th:not(.devmini), #bildh, #webh, #goldh) { backdrop-filter:none; -webkit-backdrop-filter:none; background-color:rgba(18,20,28,.93); }
-  body.lite :is(#holo, .karte, .th:not(.devmini), #bildh, #webh, #goldh)::after { animation:none; }
+  body.lite :is(#holo, .karte, .th:not(.devmini), #bildh, #webh, #goldh, #kamh) { backdrop-filter:none; -webkit-backdrop-filter:none; background-color:rgba(18,20,28,.93); }
+  body.lite :is(#holo, .karte, .th:not(.devmini), #bildh, #webh, #goldh, #kamh)::after { animation:none; }
   /* sanftes Einblenden: leicht wachsen + einblenden – Ausblenden umgekehrt */
   @keyframes glasAuf { 0% { opacity:0; scale:.94; translate:0 10px; } 100% { opacity:1; scale:1; translate:0 0; } }
   @keyframes glasAb { 0% { opacity:1; scale:1; translate:0 0; } 100% { opacity:0; scale:.95; translate:0 8px; } }
   /* kleiner runder Schließen-Knopf */
-  .karte .kh button, .th:not(.devmini) .x, #bildh .x, #goldh .x, #webh .wk .x { width:26px; height:26px; padding:0; border-radius:50%; display:grid; place-items:center;
+  .karte .kh button, .th:not(.devmini) .x, #bildh .x, #goldh .x, #kamh .x, #webh .wk .x { width:26px; height:26px; padding:0; border-radius:50%; display:grid; place-items:center;
     font-size:11px; line-height:1; color:rgba(255,255,255,.78); opacity:1; background:rgba(255,255,255,.08); box-shadow:inset 0 0 0 1px rgba(255,255,255,.1);
     backdrop-filter:blur(10px); -webkit-backdrop-filter:blur(10px); transition:background .25s, color .25s, transform .35s var(--spring); }
-  .karte .kh button:hover, .th:not(.devmini) .x:hover, #bildh .x:hover, #goldh .x:hover, #webh .wk .x:hover { background:rgba(255,255,255,.18); color:#fff; transform:scale(1.08); }
+  .karte .kh button:hover, .th:not(.devmini) .x:hover, #bildh .x:hover, #goldh .x:hover, #kamh .x:hover, #webh .wk .x:hover { background:rgba(255,255,255,.18); color:#fff; transform:scale(1.08); }
 
   #holo { --hg:var(--c3); --hgt:rgba(var(--hg),.1); --hgg:rgba(var(--hg),.14); --hgk:rgba(var(--hg),.7);
     position:fixed; left:50%; top:30%; z-index:4; pointer-events:none; min-width:200px; max-width:420px;
@@ -542,6 +542,53 @@
   #goldh .gz { height:2px; border-radius:2px; background:rgba(var(--hl),.15); overflow:hidden; }
   #goldh .gz i { display:block; height:100%; width:100%; background:rgb(var(--hl)); box-shadow:0 0 8px rgb(var(--hl)); transform-origin:left; }
   #goldh .x { position:absolute; top:12px; right:12px; z-index:2; width:24px; height:24px; cursor:pointer; }
+  /* Kamera-Ansicht („Kamera an“): Live-Bild als Hologramm-Fenster, darin schwebende AR-Hologramme, per Hand steuerbar */
+  #kamh { --hl:var(--c); position:fixed; left:50%; top:50%; z-index:8; width:min(92vw, 1180px); padding:12px; border-radius:30px; color:#fff;
+    opacity:0; visibility:hidden; pointer-events:none; transform:translate(-50%, -50%);
+    --hgt:rgba(var(--hl),.12); --hgg:rgba(var(--hl),.16); --hgk:rgba(var(--hl),.85); }
+  #kamh.on { opacity:1; visibility:visible; pointer-events:auto; animation:glasAuf .6s var(--ease) backwards; }
+  #kamh.zu { animation:glasAb .3s var(--ease) forwards; pointer-events:none; }
+  #kamh > * { position:relative; z-index:1; }
+  #kamh .kk { display:flex; align-items:center; gap:8px; margin:2px 4px 10px 8px; font-size:13px; font-weight:650; letter-spacing:.01em; }
+  #kamh .kk > span { display:flex; align-items:center; gap:8px; }
+  #kamh .kk small { flex:1; min-width:0; font-size:11.5px; font-weight:550; color:var(--sub); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  #kamh .kk button:not(.x) { height:28px; padding:0 12px; border-radius:999px; font:inherit; font-size:12px; font-weight:600; color:rgba(255,255,255,.86); cursor:pointer;
+    background:rgba(255,255,255,.08); box-shadow:inset 0 0 0 1px rgba(255,255,255,.12); border:0; transition:background .25s, transform .35s var(--spring); }
+  #kamh .kk button:not(.x):hover { background:rgba(var(--hl),.28); transform:translateY(-1px); }
+  #kamh .x { border:0; cursor:pointer; margin-left:4px; }
+  .kampunkt { width:9px; height:9px; border-radius:50%; flex:none; background:#ff3b30; box-shadow:0 0 0 3px rgba(255,59,48,.22), 0 0 12px rgba(255,59,48,.9); animation:goldPuls 1.4s ease-in-out infinite; }
+  #kamh .kb { position:relative; aspect-ratio:16/9; max-height:calc(100vh - 140px); margin:0 auto; border-radius:20px; overflow:hidden; background:#05060a;
+    box-shadow:inset 0 0 0 1px rgba(255,255,255,.1), 0 0 0 1px rgba(var(--hl),.18); touch-action:none; }
+  #kamh video { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; transform:scaleX(-1); filter:saturate(1.05) contrast(1.03); }
+  #kamh canvas { position:absolute; inset:0; width:100%; height:100%; pointer-events:none; z-index:2; }
+  /* feine Holo-Rasterlinien + Rand-Vignette über dem Kamerabild */
+  #kamh .kb::after { content:''; position:absolute; inset:0; z-index:1; pointer-events:none;
+    background:repeating-linear-gradient(0deg, rgba(var(--hl),.045) 0 1px, transparent 1px 4px), radial-gradient(120% 90% at 50% 50%, transparent 58%, rgba(var(--hl),.16)); }
+  #kamh .ar { position:absolute; inset:0; z-index:3; }
+  .ai { position:absolute; left:calc(var(--x) * 100%); top:calc(var(--y) * 100%); transform:translate(-50%, -50%) scale(var(--s, 1)); transform-origin:center;
+    padding:12px 16px; border-radius:20px; cursor:grab; user-select:none; color:#fff; min-width:120px;
+    background:linear-gradient(160deg, rgba(255,255,255,.16), rgba(255,255,255,.04) 50%, rgba(var(--ah, var(--hl)),.14)), rgba(10,12,20,.38);
+    backdrop-filter:blur(14px) saturate(170%); -webkit-backdrop-filter:blur(14px) saturate(170%);
+    box-shadow:inset 0 1px 0 rgba(255,255,255,.45), inset 0 0 0 1px rgba(255,255,255,.12), 0 14px 36px rgba(0,0,0,.4), 0 0 30px rgba(var(--ah, var(--hl)),.28);
+    transition:box-shadow .3s, opacity .3s; animation:aiAuf .55s var(--spring) backwards; }
+  .ai.greif { cursor:grabbing; box-shadow:inset 0 1px 0 rgba(255,255,255,.6), inset 0 0 0 1.5px rgba(var(--ah, var(--hl)),.9), 0 22px 50px rgba(0,0,0,.45), 0 0 46px rgba(var(--ah, var(--hl)),.6); }
+  .ai.ziel { box-shadow:inset 0 1px 0 rgba(255,255,255,.55), inset 0 0 0 1px rgba(var(--ah, var(--hl)),.7), 0 14px 36px rgba(0,0,0,.4), 0 0 38px rgba(var(--ah, var(--hl)),.45); }
+  .ai.weg { transition:transform .45s var(--ease), opacity .45s; opacity:0; pointer-events:none; }
+  @keyframes aiAuf { 0% { opacity:0; scale:.7; } 100% { opacity:1; scale:1; } }
+  .ai .ak { font-size:10px; font-weight:700; letter-spacing:.16em; text-transform:uppercase; color:rgba(var(--ah, var(--hl)),1); filter:brightness(1.5); opacity:.9; }
+  .ai .aw { font-size:30px; font-weight:700; font-variant-numeric:tabular-nums; letter-spacing:-.01em; line-height:1.15; text-shadow:0 0 18px rgba(var(--ah, var(--hl)),.55); }
+  .ai .as { font-size:11.5px; color:rgba(255,255,255,.66); font-variant-numeric:tabular-nums; }
+  .ai.gold { --ah:255,196,70; } .ai.gold .as.up { color:rgb(70,230,140); } .ai.gold .as.dn { color:rgb(255,90,90); }
+  .ai.bild { padding:8px; } .ai.bild img { display:block; width:220px; max-height:220px; object-fit:cover; border-radius:14px; pointer-events:none; }
+  #kamh .kh { position:absolute; left:50%; bottom:14px; transform:translateX(-50%); z-index:4; padding:6px 14px; border-radius:999px; font-size:11.5px; color:rgba(255,255,255,.8);
+    background:rgba(8,10,18,.5); backdrop-filter:blur(10px); -webkit-backdrop-filter:blur(10px); white-space:nowrap; pointer-events:none; transition:opacity .6s; }
+  #kamh .kh.weg { opacity:0; }
+  /* deutlich sichtbares Kamera-Symbol, solange die Kamera an ist – immer obenauf */
+  #kamlicht { position:fixed; top:calc(var(--gap) + 6px); right:calc(var(--gap) + 4px); z-index:60; display:none; align-items:center; gap:8px; height:34px; padding:0 14px 0 12px;
+    border-radius:999px; font-size:12px; font-weight:700; letter-spacing:.08em; color:#fff; cursor:pointer;
+    background:rgba(120,14,10,.55); backdrop-filter:blur(16px); -webkit-backdrop-filter:blur(16px); box-shadow:inset 0 0 0 1px rgba(255,90,80,.55), 0 0 22px rgba(255,59,48,.45); }
+  #kamlicht.on { display:flex; animation:glasAuf .4s var(--ease) backwards; }
+  #kamlicht svg { width:16px; height:16px; fill:none; stroke:#fff; stroke-width:2; stroke-linejoin:round; }
   /* Web-Hologramm: echte, bedienbare Webseite (iframe – oder echte Webansicht darüber, wenn die Seite Einbetten verbietet) */
   #webh { --hl:var(--c3); --hgt:rgba(var(--hl),.08); --hgg:rgba(var(--hl),.1); --hgk:rgba(var(--hl),.7);
     position:fixed; left:var(--mid,50%); top:50%; z-index:55; width:min(calc(100vw - 80px), 1240px); height:min(calc(100vh - 150px), 880px);
@@ -688,6 +735,10 @@
   <svg viewBox="0 0 240 54" preserveAspectRatio="none"><defs><linearGradient id="goldVerlauf" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="rgb(255,196,70)" stop-opacity=".35"/><stop offset="1" stop-color="rgb(255,196,70)" stop-opacity="0"/></linearGradient></defs>
     <line class="ba" x1="0" x2="240" y1="27" y2="27"/><g class="zug"><path class="ar"/><path class="ln"/><circle r="3" cx="-10" cy="27"/></g></svg>
   <div class="gz"><i></i></div></div>
+<div id="kamlicht" title="Kamera ist an – klicken zum Ausschalten"><svg viewBox="0 0 24 24"><path d="M3 7.5h3l1.6-2.3h8.8L18 7.5h3v11.3H3z"/><circle cx="12" cy="13" r="3.6"/></svg><i class="kampunkt"></i>KAMERA AN</div>
+<div id="kamh"><div class="kk"><span><i class="kampunkt"></i>Kamera</span><small>nur lokal · nichts wird gespeichert</small>
+  <button data-a="uhr" title="Uhr-Hologramm einblenden">+ Uhr</button><button data-a="gold" title="Goldkurs-Hologramm einblenden">+ Gold</button><button data-a="bild" title="Letztes Bild als Hologramm einblenden">+ Bild</button><button class="x" title="Kamera aus">✕</button></div>
+  <div class="kb"><video muted playsinline></video><canvas></canvas><div class="ar"></div><div class="kh">Hand-Erkennung lädt …</div></div></div>
 <div id="webh"><div class="wk"><i></i><span>Webseite</span><small></small><button class="ef" title="Ohne Hologramm-Effekte – so, wie es auf Handy/PC aussieht"><b></b>Echte Farben</button><button class="neu" title="Neu laden">⟳</button><button class="br" title="Im normalen Browser öffnen">Im Browser ↗</button><button class="x" title="Schließen">✕</button></div><div class="wb"><iframe sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox allow-modals allow-downloads allow-presentation" allow="fullscreen; clipboard-write; geolocation" referrerpolicy="no-referrer-when-downgrade"></iframe><div class="wf"><div>Diese Seite läuft in der echten Webansicht über dem Hologramm.</div><button class="vor">Nach vorne holen</button></div></div></div>
 <div id="dock" class="glass rim">
   <button class="ic" id="kb" title="Tippen (T)"><svg viewBox="0 0 24 24"><path d="M20 5H4a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2zm-9 3h2v2h-2V8zm0 3h2v2h-2v-2zM8 8h2v2H8V8zm0 3h2v2H8v-2zM5 8h2v2H5V8zm0 3h2v2H5v-2zm11 5H8v-2h8v2zm0-3h-2v-2h2v2zm0-3h-2V8h2v2zm3 3h-2v-2h2v2zm0-3h-2V8h2v2z"/></svg></button>
@@ -1508,7 +1559,7 @@ const startListening = () => cfg.dauerzuhoeren ? startConvo() : listenOnce();
 /* ---------- Schlafen & Aufwachen ---------- */
 function goSleep(silent, grund = 'unbekannt') {
   if (S.sleep) return;
-  S.sleep = true; document.body.classList.add('sleeping');
+  S.sleep = true; document.body.classList.add('sleeping'); kameraAus();
   stopAudio(); stopWake(); stopConvo(true); killBarge(); if (listening && rec) { pttEnd = false; rec.abort(); }
   if (!silent) SFX.sleep();
   caption(''); fetch('/sleep', { method:'POST', headers:{ 'Content-Type':'application/json' }, body:JSON.stringify({ grund }) }).catch(() => {});
@@ -1574,6 +1625,8 @@ async function ask(text) {
   lastAct = performance.now();
   if (S.sleep) { S.sleep = false; document.body.classList.remove('sleeping'); }
   const t0 = text.replace(/[.!?,]+$/g, '').trim();
+  // „Kamera an“ / „Kamera aus“ – nur auf ausdrücklichen Befehl, „aus“ beendet sofort
+  if (KAM_RE.test(t0)) { addMsg('me', text); if (KAM_AUS_RE.test(t0)) { kameraAus(); hint('Kamera ist aus', 2000); } else kameraAn(); return; }
   // „Schließ dich komplett“ → ORB ganz beenden (auch der Hintergrund-Lauscher ist dann aus)
   if (/^((orb|jarvis),?\s*)?(schlie(ß|ss)e? dich (komplett|ganz|vollständig)|beende dich( komplett| ganz)?|(komplett|ganz) (beenden|schlie(ß|ss)en)|mach dich (komplett|ganz) aus)$/i.test(t0)) {
     addMsg('me', text); SFX.sleep(); hint('ORB wird komplett beendet', 2000);
@@ -1961,7 +2014,7 @@ async function poll() {
     const resp = await fetch('/state?aktiv=' + aktiv, { cache:'no-store', signal:ctl.signal });
     if (resp.status === 403 && !poll._reload) { poll._reload = true; setTimeout(() => location.reload(), 300); }   // ORB neu gestartet → neues Token
     const st = await resp.json(); lastOk = performance.now(); S.busy = !!st.busy; renderTasks(st.aufgaben);
-    if (st.karten_v !== undefined && st.karten_v !== kartenV) { kartenV = st.karten_v; ladeKarten(); } if (st.bild) bildHolo(st.bild); if (st.gold !== undefined) goldHolo(st.gold); if (st.web) webHolo(st.web);
+    if (st.karten_v !== undefined && st.karten_v !== kartenV) { kartenV = st.karten_v; ladeKarten(); } if (st.bild) bildHolo(st.bild); if (st.gold !== undefined) goldHolo(st.gold); if (st.kamera_foto !== undefined) kamFoto(st.kamera_foto); if (st.web) webHolo(st.web);
     if (!!st.anruf !== !!S.call) { S.call = !!st.anruf; if (S.call) { stopWake(); killConvoRec(); killBarge(); hint('Meeting erkannt – ich höre nicht zu', 3500); } else if (cfg.steuerung === 'wort') startWake(); }
     // neue ORB-Version läuft → Seite neu laden (sonst sieht man Änderungen erst nach Fenster-Neustart)
     if (st.version) { if (!poll._v) poll._v = st.version; else if (st.version !== poll._v) { location.replace(S.sleep ? '/#schlaf' : '/#wake'); location.reload(); return; } }
@@ -2098,6 +2151,212 @@ function goldHolo(n) {
   goldHolen();
 }
 $('goldh').querySelector('.x').addEventListener('click', goldZu);
+/* ---------- Kamera-Ansicht: Live-Bild + AR-Hologramme; Hände greifen, verschieben, vergrößern, wischen weg ----------
+   Datenschutz: Kamera nur auf ausdrücklichen Befehl („Kamera an“), rotes Kamera-Symbol solange sie läuft, nichts wird
+   aufgenommen oder gesendet. Die Handerkennung (MediaPipe) rechnet komplett hier im Fenster – nur ihr Programmcode wird
+   beim ersten Mal geladen. Ausnahme auf Larsens Frage: kamera.ps1 bittet um EIN Standbild (bleibt auf dem PC). */
+const KAM_RE = new RegExp('^((' + NAME_VARIANTEN + '|orb),?\\s*)?(bitte\\s+)?((mach|schalt(e)?|stell)\\s+(die\\s+)?)?(kamera|webcam)(\\s+bitte)?\\s+'
+  + '(an|ein|einschalten|anschalten|anmachen|starten|öffnen|aus|ausschalten|ausmachen|stoppen|beenden|schließen|zu)(\\s+bitte)?$', 'i');
+const KAM_AUS_RE = /\b(aus|ausschalten|ausmachen|stoppen|beenden|schließen|zu)(\s+bitte)?$/i;
+const MP_URL = 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14';
+const HAND_TIPP = 'Daumen + Zeigefinger zusammen = greifen · mit zwei Händen größer ziehen · schnell wischen = weg';
+const HAND_LINIEN = [[0,1],[1,2],[2,3],[3,4],[0,5],[5,6],[6,7],[7,8],[5,9],[9,10],[10,11],[11,12],[9,13],[13,14],[14,15],[15,16],[13,17],[17,18],[18,19],[19,20],[0,17]];
+var KAM = { strom:null, an:false, haende:null, laedt:false, raf:0, puls:0, zeit:-1, erg:null, griffe:{}, spuren:{}, sperre:0, z:1, fotoN:null, uhrT:0, goldT:0, goldStart:null, farbe:'255,55,45', farbeT:0 };
+const kamEl = s => $('kamh').querySelector(s);
+function kamMelden(aktiv = true) { fetch('/kamera', { method:'POST', headers:{ 'Content-Type':'application/json' }, body:JSON.stringify({ aktiv }) }).catch(() => {}); }
+function kamHinweis(t, ms = 0) { const k = kamEl('.kh'); k.textContent = t; k.classList.remove('weg'); clearTimeout(kamHinweis._t); if (ms) kamHinweis._t = setTimeout(() => k.classList.add('weg'), ms); }
+async function kameraAn() {
+  if (KAM.an || KAM.startet) return hint('Kamera ist schon an');
+  KAM.startet = true; let strom;
+  try { strom = await navigator.mediaDevices.getUserMedia({ video:{ width:{ ideal:1280 }, height:{ ideal:720 }, facingMode:'user' }, audio:false }); }
+  catch (e) { KAM.startet = false; return hint(e && e.name === 'NotAllowedError' ? 'Kamera-Zugriff wurde nicht erlaubt' : 'Keine Kamera gefunden', 4000); }
+  KAM.startet = false; KAM.strom = strom; KAM.an = true;
+  const el = $('kamh'), v = kamEl('video');
+  v.srcObject = strom; v.play().catch(() => {});
+  strom.getVideoTracks().forEach(t => t.addEventListener('ended', () => kameraAus()));
+  clearTimeout(kameraAus._t); el.classList.remove('zu'); el.classList.add('on'); $('kamlicht').classList.add('on');
+  SFX.holo(); ripple(.6);
+  kamMelden(true); clearInterval(KAM.puls); KAM.puls = setInterval(kamMelden, 2500);
+  if (!kamEl('.ar').childElementCount) { aiNeu('uhr', .84, .2); aiNeu('gold', .16, .2); }
+  kamHinweis(KAM.haende ? HAND_TIPP : 'Hand-Erkennung lädt …', KAM.haende ? 9000 : 0);
+  kamHaendeLaden();
+  cancelAnimationFrame(KAM.raf); KAM.raf = requestAnimationFrame(kamSchleife);
+}
+function kameraAus() {   // sofort: Kamera-Spur stoppen, dann Fenster ausblenden
+  if (!window.KAM || !KAM.an) return; KAM.an = false;
+  if (KAM.strom) KAM.strom.getTracks().forEach(t => t.stop()); KAM.strom = null;
+  clearInterval(KAM.puls); cancelAnimationFrame(KAM.raf); KAM.griffe = {}; KAM.spuren = {}; KAM.erg = null;
+  kamMelden(false); $('kamlicht').classList.remove('on');
+  const el = $('kamh'); el.classList.add('zu'); SFX.close();
+  clearTimeout(kameraAus._t); kameraAus._t = setTimeout(() => {
+    el.classList.remove('on', 'zu'); kamEl('video').srcObject = null;
+    kamEl('.ar').querySelectorAll('.ai').forEach(a => { if (a._url) URL.revokeObjectURL(a._url); a.remove(); });
+  }, 320);
+}
+async function kamHaendeLaden() {
+  if (KAM.haende || KAM.laedt) return; KAM.laedt = true;
+  try {
+    const mp = await import(MP_URL + '/vision_bundle.mjs');
+    const fs = await mp.FilesetResolver.forVisionTasks(MP_URL + '/wasm');
+    const opt = d => ({ baseOptions:{ modelAssetPath:'https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task', delegate:d },
+      runningMode:'VIDEO', numHands:2, minHandDetectionConfidence:.6, minHandPresenceConfidence:.5, minTrackingConfidence:.5 });
+    try { KAM.haende = await mp.HandLandmarker.createFromOptions(fs, opt('GPU')); }
+    catch (e) { KAM.haende = await mp.HandLandmarker.createFromOptions(fs, opt('CPU')); }
+    if (KAM.an) kamHinweis(HAND_TIPP, 9000);
+  } catch (e) {
+    console.warn('Hand-Erkennung:', e);
+    if (KAM.an) kamHinweis('Hand-Erkennung nicht verfügbar – mit der Maus ziehen, Mausrad = Größe, Doppelklick = weg', 9000);
+  }
+  KAM.laedt = false;
+}
+/* AR-Hologramme: Position als Anteil der Bühne (x/y = Mitte), Größe s */
+const aiAlle = () => [...kamEl('.ar').querySelectorAll('.ai:not(.weg)')];
+function aiSetzen(a, x, y, s = a._s) {
+  a._x = Math.min(.97, Math.max(.03, x)); a._y = Math.min(.97, Math.max(.03, y)); a._s = Math.min(3.5, Math.max(.4, s || 1));
+  a.style.setProperty('--x', a._x); a.style.setProperty('--y', a._y); a.style.setProperty('--s', a._s);
+}
+function aiNeu(art, x, y) {
+  const a = document.createElement('div'); a.className = 'ai ' + art;
+  a.innerHTML = art === 'uhr' ? '<div class="ak">Uhrzeit</div><div class="aw">--:--:--</div><div class="as"></div>'
+    : art === 'gold' ? '<div class="ak">Gold · XAU/USD</div><div class="aw">–</div><div class="as">lädt …</div>' : '<img alt="">';
+  a.style.zIndex = ++KAM.z; kamEl('.ar').appendChild(a); aiSetzen(a, x, y, 1);
+  if (art === 'uhr') aiUhren(); if (art === 'gold') KAM.goldT = 0;
+  return a;
+}
+function aiWeg(a, richtung = 1) {
+  if (!a || a.classList.contains('weg')) return;
+  a.classList.add('weg'); a.style.transform = `translate(calc(-50% + ${richtung * 45}vw), -50%) rotate(${richtung * 12}deg) scale(${a._s * .8})`;
+  SFX.close(); setTimeout(() => { if (a._url) URL.revokeObjectURL(a._url); a.remove(); }, 470);
+}
+async function aiBild() {
+  try {
+    const r = await fetch('/bild?n=' + Date.now(), { cache:'no-store' }); if (!r.ok) throw 0;
+    const url = URL.createObjectURL(await r.blob()), a = aiNeu('bild', .5 + (Math.random() - .5) * .3, .55);
+    a._url = url; a.querySelector('img').src = url;
+  } catch (e) { hint('Noch kein Bild da – erst ein Bild zeigen lassen', 3500); }
+}
+function aiUhren() {
+  const d = new Date(), z = d.toLocaleTimeString('de-DE'), t = d.toLocaleDateString('de-DE', { weekday:'long', day:'numeric', month:'long' });
+  kamEl('.ar').querySelectorAll('.ai.uhr').forEach(a => { a.querySelector('.aw').textContent = z; a.querySelector('.as').textContent = t; });
+}
+async function aiGold() {
+  try {
+    const j = await (await fetch('/gold', { cache:'no-store' })).json(); if (typeof j.preis !== 'number') return;
+    if (KAM.goldStart === null) KAM.goldStart = j.preis;
+    const d = j.preis - KAM.goldStart;
+    kamEl('.ar').querySelectorAll('.ai.gold').forEach(a => {
+      a.querySelector('.aw').textContent = '$ ' + goldZahl(j.preis);
+      const s = a.querySelector('.as'); s.className = 'as ' + (d > 0 ? 'up' : d < 0 ? 'dn' : '');
+      s.textContent = (d >= 0 ? '▲ +' : '▼ −') + goldZahl(Math.abs(d)) + ' seit Kamera an';
+    });
+  } catch (e) {}
+}
+function aiTreffer(x, y) {   // oberstes Hologramm unter einem Bühnen-Punkt (mit etwas Spielraum)
+  const kb = kamEl('.kb').getBoundingClientRect(), px = x + kb.left, py = y + kb.top;
+  return aiAlle().sort((a, b) => b.style.zIndex - a.style.zIndex).find(a => {
+    const r = a.getBoundingClientRect(); return px >= r.left - 16 && px <= r.right + 16 && py >= r.top - 16 && py <= r.bottom + 16; });
+}
+function kamSchleife() {
+  if (!KAM.an) return; KAM.raf = requestAnimationFrame(kamSchleife);
+  const t = performance.now();
+  if (t - KAM.uhrT > 250) { KAM.uhrT = t; aiUhren(); }
+  if (t - KAM.goldT > 2000 && kamEl('.ai.gold')) { KAM.goldT = t; aiGold(); }
+  if (t - KAM.farbeT > 1000) { KAM.farbeT = t; KAM.farbe = getComputedStyle(document.documentElement).getPropertyValue('--c').trim() || KAM.farbe; }
+  const kb = kamEl('.kb'), v = kamEl('video'), cv = kamEl('canvas'), w = kb.clientWidth, h = kb.clientHeight, z = devicePixelRatio || 1;
+  if (cv.width !== Math.round(w * z) || cv.height !== Math.round(h * z)) { cv.width = Math.round(w * z); cv.height = Math.round(h * z); }
+  const g = cv.getContext('2d'); g.setTransform(z, 0, 0, z, 0, 0); g.clearRect(0, 0, w, h);
+  if (!KAM.haende || v.readyState < 2 || !v.videoWidth) return;
+  if (v.currentTime !== KAM.zeit) { KAM.zeit = v.currentTime; try { KAM.erg = KAM.haende.detectForVideo(v, t); } catch (e) { KAM.erg = null; } }
+  const erg = KAM.erg; if (!erg || !erg.landmarks) return;
+  // Kamerakoordinaten → Bühnen-Pixel (Bild füllt die Bühne und ist gespiegelt wie ein Spiegel)
+  const k = Math.max(w / v.videoWidth, h / v.videoHeight), dw = v.videoWidth * k, dh = v.videoHeight * k, ox = (w - dw) / 2, oy = (h - dh) / 2;
+  const ids = new Set();
+  const haende = erg.landmarks.map((lm, i) => {
+    let id = ((erg.handedness || erg.handednesses || [])[i] || [])[0]?.categoryName || 'h' + i; if (ids.has(id)) id += i; ids.add(id);
+    return { id, p:lm.map(q => ({ x:ox + (1 - q.x) * dw, y:oy + q.y * dh })) };
+  });
+  kamGesten(haende, w, h, t); kamZeichnen(g, haende);
+}
+function kamGesten(haende, w, h, t) {
+  aiAlle().forEach(a => a.classList.remove('ziel'));
+  for (const hd of haende) {
+    const p = hd.p, gr = Math.hypot(p[0].x - p[9].x, p[0].y - p[9].y) || 1, ab = Math.hypot(p[4].x - p[8].x, p[4].y - p[8].y) / gr;
+    const g = KAM.griffe[hd.id];
+    hd.pinch = g ? ab < .5 : ab < .3;   // Daumen an Zeigefinger = greifen (loslassen erst etwas weiter auf – kein Flattern)
+    hd.pt = hd.pinch || g ? { x:(p[4].x + p[8].x) / 2, y:(p[4].y + p[8].y) / 2 } : { x:p[8].x, y:p[8].y };
+    if (hd.pinch && !g) {
+      const a = aiTreffer(hd.pt.x, hd.pt.y);
+      KAM.griffe[hd.id] = { a, dx:a ? hd.pt.x - a._x * w : 0, dy:a ? hd.pt.y - a._y * h : 0 };
+      if (a) { a.classList.add('greif'); a.style.zIndex = ++KAM.z; }
+    } else if (!hd.pinch && g) { if (g.a) { g.a.classList.remove('greif'); g.a._zwei = null; } delete KAM.griffe[hd.id]; }
+    if (!hd.pinch) {   // offene Hand: Ziel anzeigen und schnelles Wischen erkennen
+      const ziel = aiTreffer(hd.pt.x, hd.pt.y); if (ziel) ziel.classList.add('ziel');
+      const sp = (KAM.spuren[hd.id] = (KAM.spuren[hd.id] || []).filter(q => t - q.t < 260)); sp.push({ x:hd.pt.x, y:hd.pt.y, t });
+      const a0 = sp[0], dx = hd.pt.x - a0.x, dt = (t - a0.t) / 1000;
+      if (t > KAM.sperre && dt > .06 && Math.abs(dx) > w * .16 && Math.abs(dx) / dt > w * 1.4 && Math.abs(dx) > Math.abs(hd.pt.y - a0.y) * 1.5) {
+        const opfer = aiTreffer((a0.x + hd.pt.x) / 2, (a0.y + hd.pt.y) / 2) || aiTreffer(a0.x, a0.y) || ziel;
+        if (opfer) { aiWeg(opfer, Math.sign(dx)); KAM.sperre = t + 700; KAM.spuren[hd.id] = []; }
+      }
+    } else KAM.spuren[hd.id] = [];
+  }
+  for (const id in KAM.griffe) if (!haende.some(hd => hd.id === id)) {   // Hand aus dem Bild = loslassen
+    const g = KAM.griffe[id]; if (g.a) { g.a.classList.remove('greif'); g.a._zwei = null; } delete KAM.griffe[id]; }
+  const proA = new Map();
+  for (const hd of haende) { const g = KAM.griffe[hd.id]; if (g && g.a && !g.a.classList.contains('weg')) { if (!proA.has(g.a)) proA.set(g.a, []); proA.get(g.a).push(hd); } }
+  proA.forEach((hs, a) => {
+    if (hs.length >= 2) {   // mit zwei Händen gegriffen: Abstand der Hände = Größe
+      const d = Math.hypot(hs[0].pt.x - hs[1].pt.x, hs[0].pt.y - hs[1].pt.y);
+      if (!a._zwei) a._zwei = { d0:Math.max(20, d), s0:a._s };
+      aiSetzen(a, (hs[0].pt.x + hs[1].pt.x) / 2 / w, (hs[0].pt.y + hs[1].pt.y) / 2 / h, a._zwei.s0 * d / a._zwei.d0);
+    } else {
+      const g = KAM.griffe[hs[0].id];
+      if (a._zwei) { a._zwei = null; g.dx = hs[0].pt.x - a._x * w; g.dy = hs[0].pt.y - a._y * h; }
+      aiSetzen(a, (hs[0].pt.x - g.dx) / w, (hs[0].pt.y - g.dy) / h);
+    }
+  });
+}
+function kamZeichnen(g, haende) {
+  const c = KAM.farbe;
+  g.lineCap = 'round'; g.shadowColor = `rgba(${c},.9)`; g.shadowBlur = 8;
+  for (const hd of haende) {
+    g.lineWidth = 1.6; g.strokeStyle = `rgba(${c},.55)`; g.beginPath();
+    for (const [a, b] of HAND_LINIEN) { g.moveTo(hd.p[a].x, hd.p[a].y); g.lineTo(hd.p[b].x, hd.p[b].y); }
+    g.stroke();
+    g.fillStyle = 'rgba(255,255,255,.85)';
+    for (const i of [4, 8, 12, 16, 20]) { g.beginPath(); g.arc(hd.p[i].x, hd.p[i].y, 2.6, 0, 7); g.fill(); }
+    g.beginPath(); g.arc(hd.pt.x, hd.pt.y, hd.pinch ? 9 : 15, 0, 7); g.lineWidth = 2; g.strokeStyle = `rgba(${c},1)`; g.stroke();
+    if (hd.pinch) { g.fillStyle = `rgba(${c},.45)`; g.fill(); }
+  }
+  g.shadowBlur = 0;
+}
+function kamFoto(n) {   // kamera.ps1 hat um EIN Standbild gebeten (nur, wenn Larsen fragt) – bleibt auf dem PC
+  if (KAM.fotoN === null) { KAM.fotoN = n; return; }   // beim Start keine alte Anfrage bedienen
+  if (n === KAM.fotoN) return; KAM.fotoN = n;
+  const v = kamEl('video'); if (!n || !KAM.an || !v.videoWidth) return;
+  const f = Math.min(1, 1280 / v.videoWidth), c = document.createElement('canvas');
+  c.width = Math.round(v.videoWidth * f); c.height = Math.round(v.videoHeight * f); c.getContext('2d').drawImage(v, 0, 0, c.width, c.height);
+  fetch('/kamera/bild', { method:'POST', headers:{ 'Content-Type':'application/json' }, body:JSON.stringify({ bild:c.toDataURL('image/png') }) }).catch(() => {});
+  hint('Ein Standbild für ORB – bleibt auf dem PC', 2500);
+}
+// Maus: ziehen = verschieben, Mausrad = Größe, Doppelklick = weg
+kamEl('.ar').addEventListener('pointerdown', e => {
+  const a = e.target.closest('.ai'); if (!a || a.classList.contains('weg')) return; e.preventDefault();
+  const kb = kamEl('.kb').getBoundingClientRect(), dx = e.clientX - kb.left - a._x * kb.width, dy = e.clientY - kb.top - a._y * kb.height;
+  a.setPointerCapture(e.pointerId); a.classList.add('greif'); a.style.zIndex = ++KAM.z;
+  const mv = ev => aiSetzen(a, (ev.clientX - kb.left - dx) / kb.width, (ev.clientY - kb.top - dy) / kb.height);
+  const up = () => { a.classList.remove('greif'); a.removeEventListener('pointermove', mv); a.removeEventListener('pointerup', up); a.removeEventListener('pointercancel', up); };
+  a.addEventListener('pointermove', mv); a.addEventListener('pointerup', up); a.addEventListener('pointercancel', up);
+});
+kamEl('.ar').addEventListener('wheel', e => { const a = e.target.closest('.ai'); if (!a) return; e.preventDefault(); aiSetzen(a, a._x, a._y, a._s * (e.deltaY < 0 ? 1.1 : 1 / 1.1)); }, { passive:false });
+kamEl('.ar').addEventListener('dblclick', e => { const a = e.target.closest('.ai'); if (a) aiWeg(a, a._x < .5 ? -1 : 1); });
+kamEl('.kk').addEventListener('click', e => {
+  const b = e.target.closest('button'); if (!b) return;
+  if (b.classList.contains('x')) return kameraAus();
+  const art = b.dataset.a; SFX.holo();
+  if (art === 'bild') aiBild(); else aiNeu(art, .5 + (Math.random() - .5) * .3, .45 + (Math.random() - .5) * .2);
+});
+$('kamlicht').addEventListener('click', kameraAus);
+addEventListener('pagehide', kameraAus);
 /* ---------- Web-Hologramm: echte Webseite zum Klicken, Scrollen und Tippen ---------- */
 let webN = null, webLebte = false, webModus = '';
 const webOffen = () => { const el = $('webh'); return el.classList.contains('on') && !el.classList.contains('zu'); };

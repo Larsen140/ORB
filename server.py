@@ -68,7 +68,7 @@ DEFAULT_CFG = {
 }
 # Damit ORB immer dein Claude-Code-Login (Max-Abo) nutzt und nie einen API-Schlüssel
 CLAUDE_ENV_DROP = ("ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "ANTHROPIC_BASE_URL")
-VERSION = "82"
+VERSION = "83"
 ORB_UI = ("Deine Oberfläche (die Larsen gerade sieht): in der Mitte du als flüssige leuchtende Kugel mit Tropfen, "
           "Orbit-Ringen und Sternenhimmel; links eine Uhr und darunter der Gesprächsverlauf mit Eingabefeld; rechts "
           "Karten für System (CPU, RAM, Akku), Wetter mit Stundenvorschau, Aktivität (was du gerade tust) und Vorschläge; "
@@ -352,6 +352,43 @@ WEB_REGELN = (
     "Larsen kann darin klicken, scrollen und tippen.")
 
 
+# ---------- Kamera-Ansicht (Webcam + AR-Hologramme) ----------
+# Die Kamera läuft nur in der Oberfläche und nur auf Larsens ausdrücklichen Befehl („Kamera an“). Es wird nichts
+# aufgenommen oder gesendet. Einzige Ausnahme: kamera.ps1 bittet die Oberfläche um EIN Standbild (nur, wenn Larsen fragt).
+KAMERA = {"aktiv": False, "zeit": 0.0, "foto": 0, "foto_zeit": 0.0}
+KAMERA_BILD = os.path.join(os.environ.get("LOCALAPPDATA", os.path.expanduser("~")), "ORB", "screen", "kamera.png")
+KAMERA_REGELN = (
+    "Kamera: Larsen schaltet sie selbst mit „Kamera an“/„Kamera aus“ ein und aus – du schaltest sie nie ein. Nur wenn die "
+    "Kamera an ist UND Larsen ausdrücklich fragt, was du siehst (z. B. „Was hab ich in der Hand?“), holst du EIN Standbild: "
+    "powershell -NoProfile -ExecutionPolicy Bypass -File \"$env:LOCALAPPDATA\\ORB\\app\\kamera.ps1\" und siehst dir "
+    "%LOCALAPPDATA%\\ORB\\screen\\kamera.png mit dem Read-Werkzeug an. Ist die Kamera aus, sag ihm, dass er „Kamera an“ sagen kann.")
+
+
+def kamera_aktiv():
+    """Kamera gilt nur als an, solange die Oberfläche das regelmäßig bestätigt (Fenster zu → aus)."""
+    return KAMERA["aktiv"] and time.time() - KAMERA["zeit"] < 6
+
+
+def kamera_bild_speichern(b64):
+    """Standbild der Oberfläche (data-URL/Base64-PNG) nach screen/kamera.png – nur nach einer Anfrage über kamera.ps1."""
+    import base64
+    if not KAMERA["foto"] or time.time() - KAMERA["foto_zeit"] > 15 or not kamera_aktiv():
+        return False
+    try:
+        data = base64.b64decode(str(b64 or "").split(",", 1)[-1])
+    except Exception:
+        return False
+    if not data.startswith(b"\x89PNG") or len(data) > 12 * 1024 * 1024:
+        return False
+    os.makedirs(os.path.dirname(KAMERA_BILD), exist_ok=True)
+    tmp = KAMERA_BILD + ".tmp"
+    with open(tmp, "wb") as f:
+        f.write(data)
+    os.replace(tmp, KAMERA_BILD)
+    KAMERA["foto_zeit"] = 0.0   # Anfrage erledigt
+    return True
+
+
 def system_prompt(cfg):
     """Persönlichkeit aus der Wissensbasis + Sprechregeln."""
     persona = ""
@@ -366,7 +403,7 @@ def system_prompt(cfg):
         kal = ""
     return ((persona + "\n\n" if persona else "") + ORB_UI + "\n\n"
             + (KURZ_REGELN if cfg.get("laenge") == "kurz" else LANG_REGELN) + "\n\n" + AUFGABEN_REGELN + "\n\n"
-            + MAIL_REGELN + "\n\n" + BILD_REGELN + "\n\n" + WEB_REGELN + kal)
+            + MAIL_REGELN + "\n\n" + BILD_REGELN + "\n\n" + WEB_REGELN + "\n\n" + KAMERA_REGELN + kal)
 
 
 KURZ_PROMPT = ("Du sprichst gerade über ORB, eine Sprachoberfläche; deine Antwort wird laut vorgelesen. "
@@ -1066,6 +1103,8 @@ class Brain:
                             "Bildschirm betrifft.]\n" % os.path.join(os.environ.get("LOCALAPPDATA", ""), "ORB", "screen", "bildschirm.png")) + text
                 except Exception as e:
                     print("Screenshot:", e)
+            if kamera_aktiv():
+                text = "[Kamera ist an – Standbild nur auf ausdrückliche Frage über kamera.ps1.]\n" + text
             msg = {"type": "user", "message": {"role": "user", "content": [{"type": "text", "text": text}]}}
             try:
                 self.proc.stdin.write((json.dumps(msg, ensure_ascii=False) + "\n").encode("utf-8"))
@@ -1942,9 +1981,10 @@ class Handler(BaseHTTPRequestHandler):
         if u.path in ("/", "/index.html"):
             with open(PAGE, "rb") as f:
                 page = f.read()
-            # Token in die eigene Seite einbetten; alle fetch()-Aufrufe der Seite senden es automatisch mit
-            inject = ("<script>(()=>{const T='%s',f=window.fetch;window.fetch=(u,o={})=>{o.headers=Object.assign({},"
-                      "o.headers||{},{'X-ORB-Token':T});return f(u,o)}})()</script>" % TOKEN).encode()
+            # Token in die eigene Seite einbetten; fetch()-Aufrufe an ORB selbst senden es automatisch mit (nie an fremde Server)
+            inject = ("<script>(()=>{const T='%s',f=window.fetch;window.fetch=(u,o={})=>{const s=String(u&&u.url||u);"
+                      "if(/^[a-z][a-z0-9+.-]*:/i.test(s)&&!s.startsWith(location.origin+'/'))return f(u,o);"
+                      "o.headers=Object.assign({},o.headers||{},{'X-ORB-Token':T});return f(u,o)}})()</script>" % TOKEN).encode()
             self.send(200, page.replace(b"<head>", b"<head>" + inject, 1), "text/html; charset=utf-8")
         elif u.path == "/state":
             LAST_POLL[0] = time.time()
@@ -1962,6 +2002,7 @@ class Handler(BaseHTTPRequestHandler):
             st["karten_v"] = KARTEN_V[0]   # Hintergrund-Aufgaben + Entwickler (je ein Hologramm)
             st["bild"] = {"n": BILD["n"], "name": BILD["name"], "rein": BILD["rein"]}   # Bild-Hologramm
             st["gold"] = GOLD["n"]   # Gold-Hologramm auf Zuruf
+            st["kamera_foto"] = KAMERA["foto"] if time.time() - KAMERA["foto_zeit"] < 15 else 0   # kamera.ps1 wartet auf ein Standbild
             st["web"] = {"n": WEB["n"], "url": WEB["url"], "titel": WEB["titel"], "modus": WEB["modus"],
                          "lebt": web_lebt(), "rein": WEB["rein"]}   # Web-Hologramm
             st["anruf"] = in_call()   # während Meet/Teams/Zoom nicht zuhören
@@ -2137,6 +2178,19 @@ class Handler(BaseHTTPRequestHandler):
             self.send(200, {"ok": neu_nach_entwickler(str(b.get("art", "orb")), b.get("satz"))})
         elif u.path == "/karte":   # holo.ps1: freies Hologramm anlegen/ändern/schließen
             self.send(200, karte_setzen(b if isinstance(b, dict) else {}))
+        elif u.path == "/kamera":   # Oberfläche: Kamera an/aus (wird alle paar Sekunden bestätigt)
+            KAMERA["aktiv"], KAMERA["zeit"] = bool(b.get("aktiv")), time.time()
+            if not KAMERA["aktiv"]:
+                KAMERA["foto_zeit"] = 0.0
+            self.send(200, {"ok": True})
+        elif u.path == "/kamera/foto":   # kamera.ps1: um EIN Standbild bitten (nur wenn die Kamera schon an ist)
+            if not kamera_aktiv():
+                return self.send(200, {"ok": False, "fehler": "Die Kamera ist aus. Larsen kann „Kamera an“ sagen."})
+            KAMERA["foto"] += 1
+            KAMERA["foto_zeit"] = time.time()
+            self.send(200, {"ok": True, "n": KAMERA["foto"]})
+        elif u.path == "/kamera/bild":   # Oberfläche liefert das angefragte Standbild
+            self.send(200, {"ok": kamera_bild_speichern(b.get("bild"))})
         elif u.path == "/bild":   # bild_zeigen.ps1: Bild sofort als Hologramm einblenden
             self.send(200, {"ok": bild_zeigen(b.get("pfad"), b.get("rein"))})
         elif u.path == "/web":   # web_zeigen.ps1: Webseite als bedienbares Hologramm
