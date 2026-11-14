@@ -884,7 +884,7 @@
 <aside id="set" class="glass">
   <div class="sh"><span>Einstellungen</span><button class="done" id="setx">Fertig</button></div>
   <div class="grp"><h4>Wecken &amp; Gespräch</h4><div class="card">
-    <div class="row">2× klatschen weckt ORB · Schnipsen schickt ihn weg<span class="v">immer an</span></div>
+    <div class="row">2× klatschen weckt ORB · 2× schnipsen schickt ihn weg<span class="v">immer an</span></div>
     <div class="row">„Jarvis“ rufen – ORB hört jederzeit zu<input type="checkbox" class="sw" id="s_jarvis"></div>
     <div class="row col"><div class="lbl">Klatsch-Empfindlichkeit<span class="v" id="v_empf"></span></div><input type="range" id="s_empf" min="1" max="10" step="1"></div>
     <div class="row col"><div class="lbl">Schnips-Empfindlichkeit<span class="v" id="v_sempf"></span></div><input type="range" id="s_sempf" min="1" max="10" step="1"></div>
@@ -899,7 +899,7 @@
     <div class="row">Einschlafen nach<select id="s_schlaf"><option value="0">nie</option><option value="2">2 Min.</option><option value="5">5 Min.</option><option value="10">10 Min.</option><option value="30">30 Min.</option></select></div>
     <div class="row">Dein Name<input type="text" id="s_name" placeholder="optional"></div>
     <div class="row">Ort fürs Wetter<input type="text" id="s_ort" placeholder="automatisch"></div>
-  </div><p class="note">Alles gleichzeitig aktiv: 2× klatschen = ORB erscheint · Schnipsen = ORB schläft im Hintergrund · „Jarvis“ = ORB hört zu, auch aus dem Schlaf · „Stopp“ beendet</p></div>
+  </div><p class="note">Alles gleichzeitig aktiv: 2× klatschen = ORB erscheint · 2× schnipsen = ORB schläft im Hintergrund · „Jarvis“ = ORB hört zu, auch aus dem Schlaf · „Stopp“ beendet</p></div>
   <div class="grp"><h4>Start</h4><div class="card">
     <div class="row">Mit Windows starten (lauscht im Hintergrund)<input type="checkbox" class="sw" id="s_auto"></div>
     <div class="row">Im Vollbild öffnen<input type="checkbox" class="sw" id="s_voll"></div>
@@ -1569,6 +1569,24 @@ function snapFertig(c) {
     : stimmeT > c.t - 1500 ? 'gerade wurde gesprochen' : f.hell < hellMin ? 'klang nicht hell genug' : f.kurz > kurzMax ? 'hallte zu lange nach' : '';
   c.streng = !c.warum; c.win = null; c.fertig = true;
 }
+// Doppel-Schnipsen (gegen Fehlalarme durch Lüfter direkt am Mikro, 14.11.: 3× ausgelöst ohne Schnipsen):
+// 1) jeder Schnipser muss klar über dem gemessenen Rauschen liegen (Spitze und Pegel),
+// 2) zwei solche Schnipser 180–750 ms nacheinander, ähnlich laut, dazwischen still.
+let snapErster = null;   // { t, pk } des ersten klaren Schnipsers
+const snapFaktor = () => 4 + (10 - (+cfg.schnips_empf || 6)) * .5;   // Empfindlichkeit 6 → 6× (≈16 dB) über den Rausch-Spitzen
+const snapAbstand = c => (c.pk / Math.max(RAUSCH.pk, 1e-6)).toFixed(1) + '×/' + (c.rms / Math.max(floorRms, 1e-6)).toFixed(1) + '×';
+function snapKlar(c) {
+  const f = snapFaktor();
+  return c.pk > Math.max(RAUSCH.pk * f, knallSchwelle(12)) && c.rms > floorRms * f * .8;
+}
+function snapDoppel(c) {
+  const e = snapErster;
+  if (!e) return false;
+  const dt = c.t - e.t, q = c.pk / (e.pk || 1e-9);
+  if (dt < 180 || dt > 750 || q < .33 || q > 3) return false;
+  // zwischen den beiden Schnipsern muss es still sein (kein Knistern, Tippen, Sprechen)
+  return lautBl.filter(x => x[0] > e.t + 60 && x[0] < c.t - 30 && x[1] > Math.min(e.pk, c.pk) * .3).length <= 1;
+}
 // Test-Modus in den Einstellungen: zeigt nur an, ob ein Schnipser erkannt wurde
 function snapInfo(txt, ok) {
   if (performance.now() > snapTest) return;
@@ -1578,7 +1596,7 @@ function snapInfo(txt, ok) {
 // Nach einem Schnipser erst ~1 s Hinweis mit ablaufendem Balken – Sprechen oder Klatschen bricht ab (Fehlauslöser)
 let snapPending = null, stimmeT = -1e9, lautBl = [];   // stimmeT: zuletzt Sprache erkannt · lautBl: [Zeit, Spitze] lauter Mikro-Blöcke
 function onSnap() {
-  if (performance.now() < snapTest) return snapInfo('✓ Schnipsen erkannt', true);
+  if (performance.now() < snapTest) return snapInfo('✓ Doppel-Schnipsen erkannt', true);
   if (S.sleep || snapPending) return;
   const el = $('hint');
   hint('Schnipsen erkannt – gleich weg · sprechen oder klatschen bricht ab', 1300);
@@ -1654,13 +1672,26 @@ function clapTick(tBlock) {
       const zweiterHeller = snapT && cand.t - snapT > 150 && cand.t - snapT < 1100;
       // Schnipsen nur, wenn ORB sichtbar ist und nicht selbst spricht – sonst zählt ein heller Knall als Klatscher
       const schnippOk = !ownSpeak && (testet || !verborgen || !S.sleep);
-      if (knall && cand.snap && !mouse && zweiterHeller && schnippOk && !nachKlatscher) {}   // gehört zum ersten Schnipser
+      // Doppel-Schnipsen: nur zwei klare Schnipser kurz hintereinander zählen (Lüfter erzeugen einzelne helle Knacker)
+      const klar = snapKlar(cand), doppel = klar && cand.snap && cand.ruhig && cand.streng && snapDoppel(cand);
+      if (knall && cand.snap && !mouse && zweiterHeller && schnippOk && !nachKlatscher && !doppel) {}   // gehört zum ersten Schnipser
       else if (knall && cand.snap && !mouse && (nachKlatscher || !schnippOk)) {
         snapT = 0; clapPk.push([cand.t, cand.pk]); clapPk = clapPk.slice(-4); checkSysMouse(cand.t);
       }
-      else if (knall && cand.snap && cand.ruhig && cand.streng && !mouse && schnippOk) {   // auch im Schlaf (Fenster sichtbar), beim Arbeiten
-        // Schnipser: kurz warten – bleibt es still und kommt kein zweiter Knall, verschwindet ORB
-        const t = cand.t, pkT = cand.pk; snapT = t; snapRms = cand.rms; snapLaut = 0; snapPk = cand.pk;
+      else if (knall && cand.snap && cand.ruhig && cand.streng && !mouse && schnippOk && !klar) {
+        if (testet) snapInfo('Knall gehört – aber nicht klar lauter als das Lüfterrauschen');
+        else slog('Schnipsen? nein: nicht klar lauter als das Lüfterrauschen' + werte + ' · Abstand ' + snapAbstand(cand));
+      }
+      else if (knall && cand.snap && cand.ruhig && cand.streng && !mouse && schnippOk && !doppel) {
+        // erster Schnipser: nur merken – ORB reagiert erst auf den zweiten (Doppel-Schnipsen)
+        snapErster = { t:cand.t, pk:cand.pk }; snapT = cand.t; snapRms = cand.rms; snapLaut = 0; snapPk = cand.pk;
+        snapInfo('Ein Schnipser gehört – jetzt gleich noch einmal schnipsen');
+        const t1 = cand.t; setTimeout(() => { if (snapT === t1) snapT = 0; }, 1100);
+      }
+      else if (knall && doppel && !mouse && schnippOk) {   // auch im Schlaf (Fenster sichtbar), beim Arbeiten
+        // zweiter Schnipser: kurz warten – bleibt es still und kommt kein weiterer Knall, verschwindet ORB
+        const t = cand.t, pkT = cand.pk, info = werte + ' · Abstand ' + snapAbstand(cand) + ' · Pause ' + Math.round(t - snapErster.t) + ' ms';
+        snapErster = null; snapT = t; snapRms = cand.rms; snapLaut = 0; snapPk = Math.max(snapPk, cand.pk);
         setTimeout(() => { if (snapT !== t) return;
           snapT = 0;
           if (lastClap > t + 50) return snapInfo('Zwei Knalle gehört – das zählt als Klatschen');
@@ -1668,7 +1699,7 @@ function clapTick(tBlock) {
           if (stimmeT > t - 1500) return nein('gleichzeitig wurde gesprochen');
           if (lautBl.filter(x => x[0] > t + 120 && x[1] > pkT * .3).length > 5) return nein('danach ging das Geräusch weiter');
           // nicht beim Tippen oder Klicken (klingt ähnlich hell); im Zweifel bleibt ORB da
-          fetch('/mouse').then(r => r.json()).then(j => { if (j.eingabe > 2 && j.ago > 1.5) { hlog('Schnipsen erkannt'); onSnap(); } else nein('Maus/Tastatur war gerade in Benutzung'); }).catch(() => {}); }, 900);
+          fetch('/mouse').then(r => r.json()).then(j => { if (j.eingabe > 2 && j.ago > 1.5) { hlog('Schnipsen erkannt (doppelt)' + info); onSnap(); } else nein('Maus/Tastatur war gerade in Benutzung'); }).catch(() => {}); }, 900);
       }
       else if (knall && !cand.snap && testet) snapInfo('Knall gehört – klang eher dumpf wie Klatschen');
       else if (knall && !cand.snap && !mouse && snapT && cand.t - snapT < 1100 && cand.pk * 3 < snapPk) {}   // leiser dumpfer Nachklang gehört zum Schnipser
@@ -4039,7 +4070,7 @@ $('s_empf').oninput = e => saveCfg({ empfindlichkeit:+e.target.value });
 $('s_sempf').oninput = e => saveCfg({ schnips_empf:+e.target.value });
 $('snaptest').onclick = () => {
   snapTest = performance.now() + 15000; ensureMic().then(startClap).catch(() => {});
-  const el = $('snap_test'); el.className = 'note'; el.textContent = 'Jetzt schnipsen … (15 Sekunden)';
+  const el = $('snap_test'); el.className = 'note'; el.textContent = 'Jetzt zweimal kurz hintereinander schnipsen … (15 Sekunden)';
   clearTimeout(snapTestT);
   snapTestT = setTimeout(() => { el.textContent = el.className === 'note' ? 'Test beendet – kein Knall gehört. Empfindlichkeit erhöhen?' : el.textContent + ' · Test beendet'; }, 15000);
 };
