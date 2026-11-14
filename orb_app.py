@@ -187,9 +187,18 @@ def window_watch():
             gemeldet = False
 
 
-def snap_ratio(x, sr):
+def snap_ratio(x, sr, rausch=None):
     """Helle (2–5,5 kHz) zu volle Energie (150–1500 Hz) – Schnipsen > 1,4, Klatschen darunter.
-    Goertzel auf wenigen Frequenzen, nur für Knall-Kandidaten berechnet."""
+    Goertzel auf wenigen Frequenzen, nur für Knall-Kandidaten berechnet. rausch=(tief, hell) wird vorher abgezogen
+    (Lüfter-Rauschprofil), damit ein Knall im Rauschen nicht dumpfer oder heller wirkt, als er ist."""
+    lo, hi = baender(x, sr)
+    if rausch:
+        lo, hi = max(lo - rausch[0], lo * .05), max(hi - rausch[1], 0.0)
+    return (hi * 3500) / ((lo * 1350) or 1e-9)
+
+
+def baender(x, sr):
+    """Mittlere Goertzel-Leistung tief (200–1400 Hz) und hell (2–5,2 kHz)."""
     import math
 
     def power(f):
@@ -199,17 +208,116 @@ def snap_ratio(x, sr):
             s1, s2 = v + w * s1 - s2, s1
         return s1 * s1 + s2 * s2 - w * s1 * s2
 
-    lo = sum(power(f) for f in range(200, 1500, 200)) / 7
-    hi = sum(power(f) for f in range(2000, 5500, 400)) / 9
-    return (hi * 3500) / ((lo * 1350) or 1e-9)
+    return (sum(power(f) for f in range(200, 1500, 200)) / 7, sum(power(f) for f in range(2000, 5500, 400)) / 9)
+
+
+class KlatschErkenner:
+    """Doppelklatschen im Dauerrauschen (z. B. zwei Lüfter direkt am Mikro).
+    Misst laufend das Grundrauschen (Pegel, Spitzen, Helligkeit, Klangprofil), zieht es ab und setzt alle Schwellen
+    RELATIV dazu – in einem stillen Raum bleibt alles wie bisher, bei lautem Rauschen sinken die festen Faktoren
+    auf einen sicheren Abstand über den Rausch-Spitzen. Eingabe: 16-Bit-Blöcke (array 'h'), Ausgabe True = Doppelklatscher."""
+    KAL = 40   # erste ~1 s nur messen (Kalibrierung), dann erkennen
+
+    def __init__(self, sr=16000, rausch=None):
+        self.sr = sr
+        r = rausch or {}
+        self.floor, self.npk = r.get("floor", .0003), r.get("npk", .001)
+        self.nhf, self.nprof = r.get("nhf", 1.0), r.get("nprof")
+        self.n = 0 if not rausch else self.KAL
+        self.kal = []
+        self.cand, self.last, self.claps, self.pks, self.hist = None, 0.0, [], [], []
+        self.thr_base, self.prof_n = .0024, 0
+
+    def rausch(self):
+        return {"floor": self.floor, "npk": self.npk, "nhf": self.nhf, "nprof": self.nprof}
+
+    def schwellen(self):
+        """(Spitze, Pegel) für einen Klatscher – nie unter den alten Werten im stillen Raum, im Rauschen relativ."""
+        f, tb = self.floor, self.thr_base
+        pk = max(tb, min(f * 40, max(self.npk * 6, .012)))
+        rms = max(tb * .2, f * 4, min(f * 10, .003))
+        return pk, rms
+
+    def feed(self, x, now, maus_ok=True):
+        import math
+        n = len(x)
+        e = float(sum(v * v for v in x)) or 1.0
+        pk = max(max(x), -min(x)) / 32768.0
+        rms = math.sqrt(e / n) / 32768.0
+        self.n += 1
+        if self.n <= self.KAL:   # Kalibrierung: Rauschpegel aus der ruhigsten Hälfte der ersten Sekunde
+            self.kal.append((rms, pk, sum((x[i] - x[i - 1]) ** 2 for i in range(1, n)) / e))
+            if self.n == self.KAL:
+                k = sorted(self.kal)[:self.KAL // 2]
+                self.floor = max(1e-5, k[len(k) // 2][0])
+                self.npk = max(self.floor * 2, sorted(p for _, p, _ in k)[len(k) // 2])
+                self.nhf = sorted(h for _, _, h in k)[len(k) // 2]
+                self.kal = []
+            self.hist = (self.hist + [rms])[-8:]
+            return False
+        f = self.floor
+        pre = sum(self.hist[-6:-1]) / 5 if len(self.hist) >= 6 else 1.0   # Lautstärke 25–150 ms vorher
+        self.hist = (self.hist + [rms])[-8:]
+        treffer = False
+        if self.cand:
+            c = self.cand
+            if now - c[0] < .075:   # lautesten Block merken und den ZWEITEN Block danach (Klatschen ist nach 25–50 ms fast weg)
+                if rms > c[1]:
+                    self.cand = c = (c[0], rms, max(c[2], pk), [])
+                elif len(c[3]) < 2:
+                    c[3].append(rms)
+            else:
+                if len(c[3]) >= 2 and c[3][1] - f > (c[1] - f) * .5:
+                    rms = max(rms, c[1])   # klang nicht sofort ab (Silbe/Ton) -> kein Knall
+                # Klatschen klingt kurz nach (auf Rauschniveau zurück); Mausklick im selben Moment -> verwerfen
+                if rms < max(c[1] * .35, f * 1.7) and maus_ok:
+                    self.last = c[0]
+                    self.claps = [t for t in self.claps if self.last - t < 1.1] + [self.last]
+                    self.pks = (self.pks + [c[2]])[-2:]
+                    p = self.pks
+                    gleich = len(p) < 2 or (p[0] / p[1] < 3 and p[1] / p[0] < 3)   # zwei ähnlich laute Klatscher
+                    if len(self.claps) >= 2 and .22 < self.claps[-1] - self.claps[-2] < 1.0 and gleich:
+                        self.claps = []
+                        treffer = True
+                elif rms >= max(c[1] * .35, f * 1.7):
+                    self.claps = []   # Dauergeräusch statt Knall
+                self.cand = None
+        else:
+            thr_pk, thr_rms = self.schwellen()
+            if now - self.last > .14 and pk > thr_pk and rms > thr_rms:
+                # Klatschen ist breitbandig; ein Mausklick ist fast nur hohes Klicken – Helligkeit OHNE Rauschanteil
+                d = sum((x[i] - x[i - 1]) ** 2 for i in range(1, n))
+                rn = (f * 32768.0) ** 2 * n                       # Energie des Grundrauschens in diesem Block
+                hf = max(d - rn * self.nhf, 0.0) / max(e - rn, e * .05)
+                ex_pre = max(pre - f * 1.1, 0.0)                   # was vorher ÜBER dem Rauschen lag (Sprache/Musik)
+                ex_rms = rms - f
+                if (hf < 2.6 and pk / rms < 18 and ex_pre < ex_rms * .3 and maus_ok
+                        and snap_ratio(x, self.sr, self.nprof) < 1.4):
+                    self.cand = (now, rms, pk, [])
+        # Grundrauschen nachführen: Stille schnell übernehmen, nach oben langsam und ohne Knall-Ausreißer
+        if rms < f:
+            self.floor = f * .7 + rms * .3
+        else:
+            self.floor = f * .995 + min(rms, f * 2.5, .2) * .005
+        if rms < self.floor * 1.6 and not self.cand:   # reiner Rauschblock: Spitzen, Helligkeit und Klangprofil lernen
+            self.npk = self.npk * .97 + pk * .03
+            self.nhf = self.nhf * .97 + (sum((x[i] - x[i - 1]) ** 2 for i in range(1, n)) / e) * .03 if self.n % 4 == 0 else self.nhf
+            self.prof_n += 1
+            if self.prof_n % 20 == 1:   # Rauschprofil (Goertzel tief/hell) ~2× pro Sekunde
+                lo, hi = baender(x, self.sr)
+                self.nprof = (lo, hi) if not self.nprof else (self.nprof[0] * .8 + lo * .2, self.nprof[1] * .8 + hi * .2)
+        return treffer
+
+
+_RAUSCH = None   # gemessenes Grundrauschen (bleibt beim erneuten Lauschen erhalten – keine neue Kalibrierung nötig)
 
 
 def clap_loop():
     """Lauscht nur, solange das Fenster zu ist – erkennt zwei kurze, laute Knalle kurz hintereinander.
-    Ohne numpy (spart Speicher): rohe 16-Bit-Werte."""
+    Ohne numpy (spart Speicher): rohe 16-Bit-Werte. Schwellen relativ zum gemessenen Grundrauschen (Lüfter)."""
+    global _RAUSCH
     try:
         import array
-        import math
         import sounddevice as sd
     except Exception as e:
         print("Klatsch-Erkennung im Hintergrund nicht verfügbar:", e)
@@ -219,8 +327,7 @@ def clap_loop():
         if window_open():   # Klatschen ist nie abschaltbar
             time.sleep(1)
             continue
-        floor, cand, last, claps, cfg_t, thr_base = .0003, None, 0.0, [], 0.0, .0024
-        hist, pks = [], []
+        k, cfg_t = KlatschErkenner(sr, _RAUSCH), 0.0
         try:
             with sd.RawInputStream(samplerate=sr, channels=1, dtype="int16", blocksize=block) as st:
                 while not window_open():
@@ -229,42 +336,20 @@ def clap_loop():
                     now = time.time()
                     if now - cfg_t > 3:
                         cfg_t = now
-                        # Empfindlichkeit 1..10 -> Schwelle 0.31..0.04 (leises Laptop-Mikro)
-                        thr_base = .0006 * (11 - float(server.load_cfg().get("empfindlichkeit", 6)))   # leise Laptop-Mikros: Klatscher kommen nur mit ~0,003–0,01 an
+                        if k.n >= k.KAL:
+                            _RAUSCH = k.rausch()
+                        # Empfindlichkeit 1..10 -> Grundschwelle (leise Laptop-Mikros: Klatscher kommen nur mit ~0,003–0,01 an)
+                        k.thr_base = .0006 * (11 - float(server.load_cfg().get("empfindlichkeit", 6)))
                         try:   # läuft Musik, zählen nur deutliche Knalle (Beats sind kein Klatschen)
                             if server.load_cfg().get("musik_schutz", True) and server.musik_status().get("an"):
-                                thr_base *= 2.5
+                                k.thr_base *= 2.5
                         except Exception:
                             pass
-                    pk = max(max(x), -min(x)) / 32768.0
-                    rms = math.sqrt(sum(v * v for v in x) / len(x)) / 32768.0
-                    pre = sum(hist[-6:-1]) / 5 if len(hist) >= 6 else 1.0   # Lautstärke 25–150 ms vorher
-                    hist = (hist + [rms])[-8:]
-                    if cand:
-                        if now - cand[0] >= .075:
-                            # Klatschen klingt kurz nach; Mausklick im selben Moment -> verwerfen
-                            if rms < cand[1] * .35 and server.mouse_ago() > .4:
-                                last = cand[0]
-                                claps = [c for c in claps if last - c < 1.1] + [last]
-                                pks = (pks + [cand[2]])[-2:]
-                                gleich = len(pks) < 2 or (pks[0] / pks[1] < 3 and pks[1] / pks[0] < 3)   # zwei ähnlich laute Klatscher
-                                if len(claps) >= 2 and .22 < claps[-1] - claps[-2] < 1.0 and gleich:
-                                    claps = []
-                                    show(wake=True)
-                                    break
-                            elif rms >= cand[1] * .35:
-                                claps = []   # Dauergeräusch statt Knall
-                            cand = None
-                    elif now - last > .14 and pk > max(thr_base, floor * 40) and rms > max(floor * 10, thr_base * .2):
-                        # Klatschen ist breitbandig; ein Mausklick ist fast nur hohes Klicken
-                        e = sum(v * v for v in x) or 1
-                        hf = sum((x[i] - x[i - 1]) ** 2 for i in range(1, len(x))) / e
-                        # Schnipser (hell, Energie bei 2–5 kHz) zählen nicht als Klatschen
-                        # Knall aus der Stille (Sprache/Musik hat davor schon Energie) und keine Tastatur/Maus gerade
-                        if (hf < 2.6 and pk / rms < 18 and pre < rms * .3 and server.mouse_ago() > .4
-                                and server.input_ago() > .4 and snap_ratio(x, sr) < 1.4):
-                            cand = (now, rms, pk)
-                    floor = rms if rms < floor else floor * .995 + min(rms, .2) * .005   # Stille sofort übernehmen
+                    maus_ok = server.mouse_ago() > .4 and server.input_ago() > .4
+                    if k.feed(x, now, maus_ok):
+                        _RAUSCH = k.rausch()
+                        show(wake=True)
+                        break
         except Exception as e:
             print("Mikrofon:", e)
             time.sleep(5)

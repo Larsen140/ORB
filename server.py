@@ -68,7 +68,7 @@ DEFAULT_CFG = {
 }
 # Damit ORB immer dein Claude-Code-Login (Max-Abo) nutzt und nie einen API-Schlüssel
 CLAUDE_ENV_DROP = ("ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "ANTHROPIC_BASE_URL")
-VERSION = "86"
+VERSION = "87"
 ORB_UI = ("Deine Oberfläche (die Larsen gerade sieht): in der Mitte du als flüssige leuchtende Kugel mit Tropfen, "
           "Orbit-Ringen und Sternenhimmel; links eine Uhr und darunter der Gesprächsverlauf mit Eingabefeld; rechts "
           "Karten für System (CPU, RAM, Akku), Wetter mit Stundenvorschau, Aktivität (was du gerade tust) und Vorschläge; "
@@ -727,37 +727,70 @@ def write_answer(text, **kw):
 
 # ---------- Sprachausgabe ----------
 STIMM_LOG = os.path.join(HOME, "stimme.log")   # Neural-Stimme: Fehler, Wiederholversuche, Ersatzstimme (Fehlersuche „klingt komisch“)
-_edge_sem = threading.BoundedSemaphore(3)       # nicht zu viele gleichzeitige Verbindungen (sonst drosselt der Dienst)
+_edge_sem = threading.BoundedSemaphore(5)       # nicht zu viele gleichzeitige Verbindungen (sonst drosselt der Dienst)
+
+
+def _edge_einmal(text, cfg, frist):
+    """Ein Versuch bei der Neural-Stimme. Hängt der Dienst, merkt man es am ersten Audio-Stück: kommt es nicht
+    binnen 5 s, ist dieser Versuch tot (vorher wartete ORB bis zu 12 s → lange Pausen zwischen Sätzen)."""
+    import asyncio
+    import edge_tts
+
+    async def run():
+        buf = bytearray()
+        com = edge_tts.Communicate(text, cfg["stimme"], rate=cfg["tempo"], pitch=cfg["hoehe"])
+        it = com.stream().__aiter__()
+        while True:
+            try:
+                chunk = await asyncio.wait_for(it.__anext__(), 5 if not buf else 6)
+            except StopAsyncIteration:
+                break
+            if chunk["type"] == "audio":
+                buf.extend(chunk["data"])
+        return bytes(buf)
+
+    with _edge_sem:
+        return asyncio.run(asyncio.wait_for(run(), frist))
 
 
 def synth(text, cfg=None):
-    """Microsoft-Neural-Stimme (online, mit Wiederholversuchen) → Windows-Stimme nur, wenn alles scheitert."""
+    """Microsoft-Neural-Stimme mit „gestaffelten“ Versuchen: Ist nach ~2,5 s noch nichts da (oder scheitert ein Versuch),
+    startet sofort ein zweiter parallel – der schnellere gewinnt. So entstehen keine Lücken zwischen den Sätzen,
+    wenn der Dienst kurz hängt. Windows-Stimme nur, wenn alle Versuche scheitern."""
+    import queue
     cfg = cfg or load_cfg()
-    fehler = []
-    for versuch, frist in enumerate((12, 15, 20)):
+    fehler, q, t0 = [], queue.Queue(), time.time()
+    gestaffelt = (0, 2.5 + len(text) * .012, 7, 13)   # Startzeit je Versuch (s nach Beginn)
+
+    def versuch(nr):
         try:
-            import asyncio
-            import edge_tts
-
-            async def run():
-                buf = bytearray()
-                com = edge_tts.Communicate(text, cfg["stimme"], rate=cfg["tempo"], pitch=cfg["hoehe"])
-                async for chunk in com.stream():
-                    if chunk["type"] == "audio":
-                        buf.extend(chunk["data"])
-                return bytes(buf)
-
-            with _edge_sem:
-                data = asyncio.run(asyncio.wait_for(run(), frist))
-            if len(data) > 400:   # leere/abgeschnittene Antwort zählt als Fehler
-                if fehler:
-                    log_close("Neural-Stimme ok im %d. Versuch nach: %s | %s" % (versuch + 1, "; ".join(fehler), text[:60]), STIMM_LOG)
-                return data
-            fehler.append("leere Antwort")
+            data = _edge_einmal(text, cfg, 18)
+            q.put((nr, data if len(data) > 400 else None, None if len(data) > 400 else "leere Antwort"))   # leer = Fehler
         except Exception as e:
-            fehler.append("%s: %s" % (type(e).__name__, str(e)[:120] or "Zeitüberschreitung"))
-        time.sleep(.4 + .6 * versuch)
-    log_close("ERSATZSTIMME (Windows) nach 3 Fehlversuchen: %s | %s" % ("; ".join(fehler), text[:60]), STIMM_LOG)
+            q.put((nr, None, "%s: %s" % (type(e).__name__, str(e)[:120] or "Zeitüberschreitung")))
+
+    gestartet, offen = 0, 0
+    while True:
+        if gestartet < len(gestaffelt) and (offen == 0 or time.time() - t0 >= gestaffelt[gestartet]):
+            threading.Thread(target=versuch, args=(gestartet,), daemon=True).start()
+            gestartet, offen = gestartet + 1, offen + 1
+        if offen == 0:
+            break
+        warte = (t0 + gestaffelt[gestartet] - time.time()) if gestartet < len(gestaffelt) else 25
+        try:
+            nr, data, f = q.get(timeout=max(.05, warte))
+        except queue.Empty:
+            if gestartet >= len(gestaffelt):
+                break
+            continue
+        offen -= 1
+        if data:
+            if fehler or nr:
+                log_close("Neural-Stimme ok mit Versuch %d nach %.1f s%s | %s" % (nr + 1, time.time() - t0,
+                          (": " + "; ".join(fehler)) if fehler else " (erster hing)", text[:60]), STIMM_LOG)
+            return data
+        fehler.append(f)
+    log_close("ERSATZSTIMME (Windows) nach %d Fehlversuchen: %s | %s" % (gestartet, "; ".join(fehler) or "keine Antwort", text[:60]), STIMM_LOG)
     print("Neural-Stimme nicht verfügbar, nutze Windows-Stimme:", fehler)
     return synth_windows(text)
 

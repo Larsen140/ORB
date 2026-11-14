@@ -1212,14 +1212,16 @@ function lufs(x, sr) {
 // gleichmäßige Lautheit (-14 LUFS, pro Stimme geglättet, damit kurze Stücke nicht lauter/leiser springen),
 // Lautstärke über 100 % und ein Limiter mit 5 ms Vorschau: Spitzen bleiben unter -1 dBFS, ohne Verzerren oder Pumpen.
 const vGain = {};
-async function prepVoice(buf) {
+async function prepVoice(buf, text) {
   try {
     const sr = buf.sampleRate, nc = buf.numberOfChannels, x0 = buf.getChannelData(0), thr = .003;
     let a = 0, b = x0.length - 1;
     while (a < b && Math.abs(x0[a]) < thr) a++;
     while (b > a && Math.abs(x0[b]) < thr) b--;
     if (b - a < sr * .05) return buf;
-    a = Math.max(0, a - Math.round(sr * .04)); b = Math.min(x0.length, b + Math.round(sr * .22));
+    // natürlicher Fluss: Pause nach dem Stück passend zum Satzzeichen (Satzende kurz absetzen, Komma/Teilstück fast nahtlos)
+    const ende = typeof text === 'string' ? text.trim() : '.', pause = /[.!?…:]["»“”')]*$/.test(ende) ? .2 : /[,;–—-]$/.test(ende) ? .1 : .06;
+    a = Math.max(0, a - Math.round(sr * .03)); b = Math.min(x0.length, b + Math.round(sr * pause));
     const len = b - a, fade = Math.round(sr * .005);
     // 1) Klang-EQ offline (wie bisher: Rumpeln weg, weniger Mulm, mehr Präsenz und Luft)
     const oc = new OfflineAudioContext(nc, len, sr), inp = oc.createBuffer(nc, len, sr);
@@ -1379,7 +1381,7 @@ function onParts(st, first) {
 async function fetchPart(aid, i, text) {
   let buf = null;
   if (voiceOn && audioOk()) {
-    try { const r = await fetch(`/tts?aid=${encodeURIComponent(aid)}&i=${i}`); if (r.ok) buf = await prepVoice(await ac.decodeAudioData(await r.arrayBuffer())); } catch (e) {}
+    try { const r = await fetch(`/tts?aid=${encodeURIComponent(aid)}&i=${i}`); if (r.ok) buf = await prepVoice(await ac.decodeAudioData(await r.arrayBuffer()), text); } catch (e) {}
   }
   if (aid !== curAid || aid === mutedAid) return;
   pending[i] = { buf, text }; scheduleReady();
@@ -1409,7 +1411,7 @@ async function ensureMic() {
 }
 /* Eigener Mikrofon-Zugang MIT Echo- und Rauschunterdrückung: misst, ob Larsen spricht, während ORB redet
    (ORBs eigene Stimme aus den Lautsprechern wird dabei weitgehend herausgerechnet) */
-let sprechAn = null, sprechBuf = null, sprechPegel = [], echoBoden = .004;
+let sprechAn = null, sprechBuf = null, sprechPegel = [], echoBoden = .004, ruheBoden = .002;   // ruheBoden: Rest-Rauschen (Lüfter), wenn ORB schweigt
 async function startSprechMic() {
   if (sprechAn || !ac) return;
   try {
@@ -1417,20 +1419,25 @@ async function startSprechMic() {
     sprechAn = ac.createAnalyser(); sprechAn.fftSize = 1024; sprechBuf = new Float32Array(sprechAn.fftSize);
     ac.createMediaStreamSource(st).connect(sprechAn);
     setInterval(() => {
-      if (!speakingNow()) { sprechPegel = []; return; }
       sprechAn.getFloatTimeDomainData(sprechBuf); let s = 0;
       for (const v of sprechBuf) s += v * v;
       const v = Math.sqrt(s / sprechBuf.length), now = performance.now();
+      // Grundrauschen messen, solange ORB schweigt (Minimum schnell, nach oben langsam – Sprache zählt kaum)
+      if (!speakingNow()) { sprechPegel = []; ruheBoden = v < ruheBoden ? ruheBoden * .8 + v * .2 : ruheBoden * .995 + Math.min(v, ruheBoden * 2) * .005; return; }
       sprechPegel.push({ t:now, v }); while (sprechPegel.length && now - sprechPegel[0].t > 2000) sprechPegel.shift();
       echoBoden = echoBoden * .97 + Math.min(v, echoBoden * 3) * .03;   // Rest-Echo/Raum – Sprachspitzen zählen kaum
     }, 50);
   } catch (e) { sprechAn = null; }
 }
-// Spricht gerade jemand deutlich lauter als ORBs Rest-Echo? (ohne Messung entscheidet nur der Textabgleich)
+// Spricht gerade jemand deutlich lauter als ORBs Rest-Echo UND das Lüfterrauschen? (ohne Messung entscheidet nur der Textabgleich)
+// Während ORB spricht gilt eine höhere Schwelle und eine Mindestdauer echter Sprache: ~300 ms laut, davon ~200 ms am Stück
 function sprichtJemand() {
   if (!sprechAn) return true;
-  const now = performance.now(), schwelle = Math.max(.01, echoBoden * 3);
-  return sprechPegel.filter(p => now - p.t < 1500 && p.v > schwelle).length >= 3;   // mind. ~150 ms echte Stimme
+  const now = performance.now(), schwelle = Math.max(.012, echoBoden * 4, ruheBoden * 6);
+  const p = sprechPegel.filter(x => now - x.t < 1500);
+  let laut = 0, folge = 0, best = 0;
+  for (const x of p) { if (x.v > schwelle) { laut++; folge++; best = Math.max(best, folge); } else folge = 0; }
+  return laut >= 6 && best >= 4;
 }
 /* Mikro-Pegel der letzten ~20 s: erkennt, ob jemand nah ins Mikro spricht oder nur Hintergrund läuft */
 const pegel = []; let pegelNah = 0, pegelN = 0;
@@ -1447,6 +1454,14 @@ function pegelLernen(pk) {   // lernt aus Sätzen mit „Jarvis“, wie laut Lar
   try { localStorage.setItem('orbPegel', JSON.stringify({ nah:pegelNah, n:pegelN })); } catch (e) {}
 }
 let clapAn = null, clapBuf = null, clapTimer = null, claps = [], floorRms = .0003, cand = null, lastClap = 0;
+/* Rausch-Profil (z. B. zwei Lüfter direkt am Mikro): Grundpegel, typische Rausch-Spitze, Helligkeit und Spektrum (tief/hell)
+   werden laufend in ruhigen Blöcken gemessen, abgezogen und gemerkt. Alle Knall-Schwellen gelten RELATIV dazu –
+   im stillen Raum bleibt alles wie bisher, bei lautem Rauschen gilt ein sicherer Abstand über den Rausch-Spitzen. */
+const RAUSCH = { pk:.001, hf:1, lo:0, hi:0, n:0, kal:0, t:0 };
+try { const r = JSON.parse(localStorage.getItem('orbRausch') || 'null'); if (r && r.floor > 0) { floorRms = r.floor; Object.assign(RAUSCH, { pk:r.pk, hf:r.hf, lo:r.lo || 0, hi:r.hi || 0, kal:100 }); } } catch (e) {}
+const knallSchwelle = k => Math.min(floorRms * k, Math.max(RAUSCH.pk * k / 6.5, .0003 * k));   // Spitze: still = floor·k, laut = ~k/6,5 × Rausch-Spitze
+const pegelSchwelle = k => Math.max(floorRms * Math.min(k, 4), Math.min(floorRms * k, .0003 * k));   // Pegel: mind. 4× (12 dB) über dem Rauschen
+const ueber = v => Math.max(v - floorRms, 0);   // Anteil über dem Grundrauschen
 const CLAP_WORKLET = `class K extends AudioWorkletProcessor {
   constructor() { super(); this.b = new Float32Array(512); this.n = 0; }
   process(inp) { const c = inp[0] && inp[0][0]; if (c) for (let i = 0; i < c.length; i++) { this.b[this.n++] = c[i];
@@ -1512,13 +1527,32 @@ function snapMerkmale(win, B) {
   for (let i = B; i < 3 * B && i < win.length; i++) { const a = Math.abs(win[i]); if (a > m) { m = a; p = i; } }
   const sr = ac.sampleRate, n5 = Math.round(sr * .005);
   const E = (a, b) => { a = Math.max(a, 0); b = Math.min(b, win.length); let s = 0; for (let i = a; i < b; i++) s += win[i] * win[i]; return Math.sqrt(s / Math.max(b - a, 1)); };
-  const kurz = E(p + n5, p + 3 * n5) / (E(p - (n5 >> 1), p + (n5 >> 1)) || 1e-9);   // Nachklang 5–15 ms nach der Spitze
-  const re = new Float64Array(512), im = new Float64Array(512);
-  for (let i = 0; i < 512; i++) { const k = p - 256 + i; re[i] = (k >= 0 && k < win.length ? win[k] : 0) * (.5 - .5 * Math.cos(2 * Math.PI * i / 511)); }
+  const nach = E(p + n5, p + 3 * n5), fl2 = floorRms * floorRms;   // Nachklang 5–15 ms nach der Spitze – ohne Rauschanteil
+  const kurz = Math.sqrt(Math.max(nach * nach - fl2, 0)) / (E(p - (n5 >> 1), p + (n5 >> 1)) || 1e-9);
+  const { lo, hi } = baender512(win, p - 256);
+  // Lüfter-Spektrum abziehen: sonst wirkt ein Schnipser im Rauschen dumpfer (Brummen) oder heller (Zischen), als er ist
+  const lo2 = Math.max(lo - RAUSCH.lo, lo * .05), hi2 = Math.max(hi - RAUSCH.hi, 0);
+  return { hell:hi2 / (lo2 || 1e-12), kurz, pk:m };
+}
+function baender512(win, a) {   // Energie tief (100–1500 Hz) und hell (ab 1,5 kHz), Hann-Fenster über 512 Werte ab a
+  const sr = ac.sampleRate, re = new Float64Array(512), im = new Float64Array(512);
+  for (let i = 0; i < 512; i++) { const k = a + i; re[i] = (k >= 0 && k < win.length ? win[k] : 0) * (.5 - .5 * Math.cos(2 * Math.PI * i / 511)); }
   fft512(re, im);
   let lo = 0, hi = 0;
   for (let k = 1; k < 256; k++) { const f = k * sr / 512, e = re[k] * re[k] + im[k] * im[k]; if (f >= 1500) hi += e; else if (f >= 100) lo += e; }
-  return { hell:hi / (lo || 1e-12), kurz, pk:m };
+  return { lo, hi };
+}
+// ruhiger Block (nur Rauschen): Rausch-Spitze, -Helligkeit und -Spektrum nachführen, ab und zu merken
+function rauschLernen(buf, pk, s, d) {
+  RAUSCH.pk = RAUSCH.pk * .97 + pk * .03; RAUSCH.hf = RAUSCH.hf * .97 + d / (s || 1e-12) * .03;
+  if (++RAUSCH.n % 25 === 1 && buf.length >= 512) {   // Spektrum ~4× pro Sekunde
+    const b = baender512(buf, 0); RAUSCH.lo = RAUSCH.lo ? RAUSCH.lo * .8 + b.lo * .2 : b.lo; RAUSCH.hi = RAUSCH.hi ? RAUSCH.hi * .8 + b.hi * .2 : b.hi;
+  }
+  const now = performance.now();
+  if (now - RAUSCH.t > 10000) { RAUSCH.t = now;
+    try { localStorage.setItem('orbRausch', JSON.stringify({ floor:floorRms, pk:RAUSCH.pk, hf:RAUSCH.hf, lo:RAUSCH.lo, hi:RAUSCH.hi })); } catch (e) {}
+    if (!RAUSCH.log || now - RAUSCH.log > 600000) { RAUSCH.log = now; hlog('Grundrauschen gemessen: Pegel ' + floorRms.toFixed(4) + ' · Spitzen ' + RAUSCH.pk.toFixed(4)); }
+  }
 }
 function snapFertig(c) {
   const B = c.win[1].length, win = new Float32Array(B * 4);
@@ -1528,7 +1562,7 @@ function snapFertig(c) {
   c.rms = Math.max(c.rms, Math.sqrt(s / B)); c.pk = Math.max(c.pk, f.pk); c.ratio = f.hell; c.kurz = f.kurz;
   const hellMin = 2 + (10 - sEmpf) * .5, kurzMax = .2 + .02 * sEmpf;
   c.snap = f.hell >= hellMin && f.kurz <= kurzMax;
-  c.ruhig = c.slow < c.rms * (.1 + .05 * sEmpf);
+  c.ruhig = ueber(c.slow) < ueber(c.rms) * (.1 + .05 * sEmpf);   // gleichmäßiges Lüfterrauschen zählt nicht als Geräusch
   const vorher = lautBl.filter(x => x[0] > c.t - 1000 && x[0] < c.t - 30 && x[1] > c.pk * .3).length;   // ein früherer Schnipser = 2 Blöcke
   const musikStreng = f.hell >= hellMin * 2 && f.kurz <= .2 && vorher <= 1;   // bei Musik nur ganz eindeutige Schnipser
   c.warum = musik && !musikStreng ? 'gerade läuft Musik' : vorher > 3 ? 'kurz davor war es nicht still (Sprache/Tippen?)'
@@ -1592,14 +1626,19 @@ function clapTick(tBlock) {
   if (snapPending && !ownSpeak && now > snapPending.t0 + 60) {
     let d = 0; for (let i = 1; i < clapBuf.length; i++) { const q = clapBuf[i] - clapBuf[i - 1]; d += q * q; }
     const hell = d / (s || 1) > 2 - 2 * Math.cos(2 * Math.PI * 5500 / ac.sampleRate);   // ein zweiter Schnipser bricht nicht ab
-    if (pk > Math.max(floorRms * 18, .02) && !hell) snapAbbruch('Knall');
+    if (pk > Math.max(knallSchwelle(18), .02) && !hell) snapAbbruch('Knall');
     else if (rms > Math.max(floorRms * 5, .002) && ++snapPending.laut >= 4) snapAbbruch('Geräusch/Sprache');
   }
   const mouse = now - lastMouse < 400;   // Klickgeräusch der Maus ist kein Klatschen
+  if (cand) {   // lautesten Block am Anfang merken und ~45 ms danach nachmessen: Klatscher/Schnipser sind dann fast weg, eine Silbe nicht
+    cand.n = (cand.n || 0) + 1;
+    if (cand.n <= 2) cand.top = Math.max(cand.top || cand.rms, rms); else if (cand.n === 4) cand.nach = rms;
+  }
   if (cand && !cand.fertig) { cand.win.push(clapBuf); if (cand.win.length >= 4) snapFertig(cand); }
   if (cand && cand.fertig) {
     if (now - cand.t >= 75) {
-      const knall = rms < cand.rms * (cand.snap ? .45 : .35);   // nach 75 ms muss der Knall abgeklungen sein (Schnipser: etwas Raumhall erlaubt)
+      // nach 75 ms muss der Knall abgeklungen sein – zurück auf das Grundrauschen (Schnipser: etwas Raumhall erlaubt)
+      const knall = rms < Math.max(cand.rms * (cand.snap ? .45 : .35), floorRms * 1.7) && !(cand.nach != null && ueber(cand.nach) > ueber(cand.top) * .5);
       const werte = ' · hell ' + cand.ratio.toFixed(1) + ' · Nachklang ' + cand.kurz.toFixed(2) + ' · Abklang ' + (rms / cand.rms).toFixed(2);
       if ((cand.snap || cand.ratio > 3) && !testet && !(verborgen && S.sleep)) {   // Diagnose nur, wenn Schnipsen überhaupt gilt
         if (!knall) slog('Schnipsen? nein: klang nicht schnell genug ab' + werte);
@@ -1645,23 +1684,30 @@ function clapTick(tBlock) {
   }
   else if (!cand && !mouse && now - lastClap > 140) {
     const mf = (musikAn() ? 2.5 : 1) * (ownSpeak ? 2 : 1);   // läuft Musik oder spricht ORB: nur deutliche Knalle zählen
-    const base = .0006 * (11 - (+cfg.empfindlichkeit || 6)) * mf, thr = Math.max(base, floorRms * 40), thrS = Math.max(base, floorRms * 12);   // Schnipser sind leiser als Klatscher
-    if (pk > thrS && rms > Math.max(floorRms * 3, base * .2)) {
-      // Klatschen ist breitbandig, ein Mausklick fast nur hohes Klicken: Anteil hoher Frequenzen prüfen
+    // Schwellen relativ zum gemessenen Grundrauschen (Lüfter): still wie bisher, im Rauschen sicherer Abstand über den Rausch-Spitzen
+    const base = .0006 * (11 - (+cfg.empfindlichkeit || 6)) * mf, thr = Math.max(base, knallSchwelle(40)), thrS = Math.max(base, knallSchwelle(12));   // Schnipser sind leiser als Klatscher
+    if (RAUSCH.kal >= 100 && pk > thrS && rms > Math.max(floorRms * 3, base * .2)) {
+      // Klatschen ist breitbandig, ein Mausklick fast nur hohes Klicken: Anteil hoher Frequenzen prüfen – OHNE den Rauschanteil
       let d = 0; for (let i = 1; i < clapBuf.length; i++) { const q = clapBuf[i] - clapBuf[i - 1]; d += q * q; }
-      const hf = d / (s || 1), hfMax = 2 - 2 * Math.cos(2 * Math.PI * 4800 / ac.sampleRate);
+      const rn = floorRms * floorRms * clapBuf.length, hf = Math.max(d - rn * RAUSCH.hf, 0) / Math.max(s - rn, s * .05), hfMax = 2 - 2 * Math.cos(2 * Math.PI * 4800 / ac.sampleRate);
       const snapHf = 2 - 2 * Math.cos(2 * Math.PI * 5500 / ac.sampleRate);   // Schwerpunkt über ~5,5 kHz
       if (window.ORB_DEBUG) console.log('Knall', 'pk', pk.toFixed(3), 'hf', hf.toFixed(2), 'crest', (pk / rms).toFixed(1));
-      const still = pre < rms * .3;   // davor (30–150 ms) war es deutlich leiser – bei Sprache fast nie
+      const still = ueber(pre / 1.1) < ueber(rms) * .3;   // davor (30–150 ms) war es deutlich leiser – bei Sprache fast nie (Lüfterrauschen zählt nicht)
       // Schnipsen nur, wenn es sich deutlich vom Raumgeräusch der letzten Sekunde abhebt (nicht bei Gesprächen/Werkzeug)
-      const ruhig = slow < rms * (.05 + .035 * sEmpf) && pre < rms * .4;
+      const ruhig = ueber(slow) < ueber(rms) * (.05 + .035 * sEmpf) && ueber(pre / 1.1) < ueber(rms) * .4;
       // Strenge Schnips-Prüfung (hell, kurz, davor still, keine Sprache/Musik) folgt in snapFertig – 2 Blöcke später
       const neu = () => ({ t:now, rms, pk, slow, ruhig, win:[clapPrev, clapBuf] });
-      if (hf > snapHf && pk > Math.max(floorRms * 18, (.02 - .0015 * sEmpf) * mf) && pk / rms < 16 && pre < rms * .4) cand = neu();
-      else if (hf < hfMax && pk / rms < 18 && still && pk > thr && rms > floorRms * 10) cand = neu();
+      if (hf > snapHf && pk > Math.max(knallSchwelle(18), (.02 - .0015 * sEmpf) * mf) && pk / rms < 16 && ueber(pre / 1.1) < ueber(rms) * .4) cand = neu();
+      else if (hf < hfMax && pk / rms < 18 && still && pk > thr && rms > pegelSchwelle(10)) cand = neu();
     }
   }
-  floorRms = rms < floorRms ? rms : floorRms * .995 + Math.min(rms, .2) * .005;   // Stille sofort übernehmen
+  // Grundrauschen: Stille schnell übernehmen, nach oben langsam und ohne Knall-Ausreißer; die erste Sekunde misst nur (Kalibrierung)
+  if (RAUSCH.kal < 100) { RAUSCH.kal++; floorRms = RAUSCH.kal < 20 ? Math.max(rms, 1e-5) : floorRms * .9 + Math.min(rms, floorRms * 2) * .1; }
+  else floorRms = rms < floorRms ? floorRms * .7 + rms * .3 : floorRms * .995 + Math.min(rms, floorRms * 2.5, .2) * .005;
+  if (rms < floorRms * 1.6 && !cand) {
+    let d = 0; for (let i = 1; i < clapBuf.length; i++) { const q = clapBuf[i] - clapBuf[i - 1]; d += q * q; }
+    rauschLernen(clapBuf, pk, s, d);
+  }
   clapPrev = clapBuf;
 }
 let lastMouse = -1e9;
@@ -2005,10 +2051,12 @@ function bargeListen() {
 }
 // Abgleich mit dem gerade gesprochenen Text: Wörter, die ORB selbst sagt, sind Echo
 const woerter = t => (t.toLowerCase().match(/[a-zäöüß0-9]+/g) || []);
+// Echo-Abgleich unscharf: der Erkenner hört ORBs eigene Wörter oft leicht verändert („Wetter“ → „Wette“, „heute“ → „heut“)
+function eigenesWort(w, eigen, stamm) { return eigen.has(w) || (w.length >= 4 && stamm.has(w.slice(0, 4))) || w.length <= 2; }
 function fremdeRede(t, fertig) {
-  const alle = woerter(t), eigen = new Set(woerter(curSay + ' ' + altSay));
-  const neu = alle.filter(w => !eigen.has(w) && !FUELLWORT.test(w));
-  if (neu.length < (fertig ? 1 : 2) || neu.join('').length < 5) return false;
+  const alle = woerter(t), ew = woerter(curSay + ' ' + altSay), eigen = new Set(ew), stamm = new Set(ew.filter(w => w.length >= 4).map(w => w.slice(0, 4)));
+  const neu = alle.filter(w => !eigenesWort(w, eigen, stamm) && !FUELLWORT.test(w));
+  if (fertig ? neu.join('').length < 6 : neu.length < 3 || neu.join('').length < 8) return false;   // Bruchstücke im Rauschen reichen nicht
   if (alle.length >= 3 && neu.length / alle.length < .5) return false;   // überwiegend ORBs eigene Worte
   return sprichtJemand();
 }
@@ -2319,9 +2367,11 @@ const KAM_MENUE = [['uhr','Uhr'], ['wetter','Wetter'], ['termine','Termine'], ['
   ['bild','Bild'], ['sphaere','Sphäre'], ['wuerfel','Würfel'], ['modell','Modell'], ['zeichnen','Zeichnen'], ['aufraeumen','Aufräumen']];
 const KAM_SPEICHER = 'orb_kam_layout', KAM_PROFIL_KEY = 'orb_kam_profil', KAM_TOUR_KEY = 'orb_kam_tour';
 /* Leistung: Stufe 0 = Profil „Scharf“, ab Stufe 1 = „Flüssig“ (Standard). Fällt die Bildrate unter 30, regelt ORB selbst eine Stufe runter.
-   b×h/fps = Kamera, erk = Breite des Bildes für die Handerkennung (0 = volles Bild), abst = min. ms zwischen zwei Erkennungen, dpr = Pixeldichte der Zeichenflächen */
-const KAM_STUFEN = [{ b:1920, h:1080, fps:60, erk:0, abst:0, dpr:0 }, { b:1280, h:720, fps:60, erk:640, abst:30, dpr:1 },
-  { b:1280, h:720, fps:30, erk:480, abst:30, dpr:1 }, { b:960, h:540, fps:30, erk:384, abst:45, dpr:1 }];
+   b×h/fps = Kamera, erk = Breite des Bildes für die Handerkennung (0 = volles Bild), abst = min. ms zwischen zwei Erkennungen, dpr = Pixeldichte der Zeichenflächen
+   „Flüssig“ zeigt jetzt das volle 1080p-Bild (die Anzeige kostet kaum etwas) und erkennt die Hände auf jedem neuen Kamerabild
+   auf einem 640er-Bild – schärfer und ohne Verzögerung; erst wenn es ruckelt, geht ORB schrittweise auf 720p/30 zurück. */
+const KAM_STUFEN = [{ b:1920, h:1080, fps:60, erk:0, abst:0, dpr:0 }, { b:1920, h:1080, fps:60, erk:640, abst:0, dpr:1 },
+  { b:1280, h:720, fps:60, erk:512, abst:16, dpr:1 }, { b:1280, h:720, fps:30, erk:480, abst:30, dpr:1 }, { b:960, h:540, fps:30, erk:384, abst:45, dpr:1 }];
 const KAM_GESTEN = {   // kleines Symbol für die gerade erkannte Geste
   greifen:['Greifen', '<path d="M5 7l5 4.5M19 7l-5 4.5"/><circle cx="12" cy="13" r="2.6"/>'],
   tippen:['Antippen', '<circle cx="12" cy="12" r="3"/><circle cx="12" cy="12" r="8" stroke-dasharray="3 3"/>'],
@@ -2405,14 +2455,14 @@ function kamLeistung(t) {   // alle 2 s: Bildrate messen; zweimal hintereinander
   if (t - KAM.fpsT < 2000) return;
   KAM.fps = Math.round(KAM.fpsN * 1000 / (t - KAM.fpsT)); KAM.fpsN = 0; KAM.fpsT = t; kamStatus();
   if (document.hidden || t < KAM.stufeSperre || KAM.stufe >= KAM_STUFEN.length - 1) { KAM.langsam = 0; return; }
-  KAM.langsam = KAM.fps < 30 ? KAM.langsam + 1 : 0;
+  KAM.langsam = KAM.fps < 30 || KAM.erkMs > 24 ? KAM.langsam + 1 : 0;   // ruckelt die Anzeige oder hinkt die Handerkennung hinterher
   if (KAM.langsam >= 2) { KAM.stufe++; kamStufeAnwenden(true); kamHinweis('Bild etwas reduziert, damit es flüssig bleibt', 2500); }
 }
 function kamErkBild(v, breite) {   // kleineres Bild für die Handerkennung (Landmarken sind relativ – Position bleibt exakt)
   if (!breite || v.videoWidth <= breite) return v;
   const c = kamErkBild._c || (kamErkBild._c = document.createElement('canvas')), hh = Math.round(breite * v.videoHeight / v.videoWidth);
   if (c.width !== breite || c.height !== hh) { c.width = breite; c.height = hh; }
-  c.getContext('2d').drawImage(v, 0, 0, breite, hh); return c;
+  c.getContext('2d', { alpha:false }).drawImage(v, 0, 0, breite, hh); return c;
 }
 function kamGeste(n, t = performance.now()) {
   const el = kamEl('.kges'); KAM.gesteBis = t + 1300;
@@ -2520,7 +2570,7 @@ async function kamHaendeLaden() {
     const fs = await mp.FilesetResolver.forVisionTasks(MP_URL + '/wasm');
     // beide Hände, strengere Erkennung (weniger Fehlgriffe), Verfolgung bleibt flott; Zittern glättet danach ein 1-Euro-Filter
     const opt = d => ({ baseOptions:{ modelAssetPath:'https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task', delegate:d },
-      runningMode:'VIDEO', numHands:2, minHandDetectionConfidence:.7, minHandPresenceConfidence:.6, minTrackingConfidence:.6 });
+      runningMode:'VIDEO', numHands:2, minHandDetectionConfidence:.6, minHandPresenceConfidence:.5, minTrackingConfidence:.5 });   // etwas toleranter: Hände bleiben auch bei schneller Bewegung erkannt (Halten/Spur-Zuordnung verhindert Fehlgriffe)
     try { KAM.haende = await mp.HandLandmarker.createFromOptions(fs, opt('GPU')); KAM.gpu = true; }   // Grafikkarte rechnet – CPU nur als Ersatz
     catch (e) { KAM.haende = await mp.HandLandmarker.createFromOptions(fs, opt('CPU')); KAM.gpu = false; }
     if (KAM.an) kamHinweis(HAND_TIPP, 10000);
@@ -2884,17 +2934,33 @@ function kamSchleife() {
   if (cv.width !== Math.round(w * z) || cv.height !== Math.round(h * z)) {
     cv.width = zc.width = Math.round(w * z); cv.height = zc.height = Math.round(h * z); KAM.stricheNeu = true; neu = true; }
   aiAlle().forEach(a => { if (a._gl) kam3DMalen(a, dt); });
-  // Handerkennung nur auf neuen Kamerabildern, im Profil „Flüssig“ höchstens ~30× pro Sekunde und auf einem kleineren Bild
+  // Handerkennung auf jedem neuen Kamerabild (bis 60×/s), im Profil „Flüssig“ auf einem kleineren Bild; erst niedrigere Stufen bremsen
   if (KAM.haende && v.readyState >= 2 && v.videoWidth && v.currentTime !== KAM.zeit && t - KAM.erkT >= st.abst - 4) {
     KAM.zeit = v.currentTime; KAM.erkT = t; neu = true; let erg = null;
     try { const q = kamErkBild(v, st.erk), t1 = performance.now(); erg = KAM.haende.detectForVideo(q, t); KAM.erkMs += (performance.now() - t1 - KAM.erkMs) * .1; } catch (e) {}
     // Kamerakoordinaten → Bühnen-Pixel (Bild füllt die Bühne und ist gespiegelt wie ein Spiegel), dann geglättet
-    const k = Math.max(w / v.videoWidth, h / v.videoHeight), dw = v.videoWidth * k, dh = v.videoHeight * k, ox = (w - dw) / 2, oy = (h - dh) / 2, ids = new Set();
-    KAM.letzte = ((erg && erg.landmarks) || []).map((lm, i) => {
-      let id = ((erg.handedness || erg.handednesses || [])[i] || [])[0]?.categoryName || 'h' + i; if (ids.has(id)) id += i; ids.add(id);
-      const F = KAM.filter[id] || (KAM.filter[id] = lm.map(() => [new KamFilter(), new KamFilter()]));
-      return { id, p:lm.map((q, j) => ({ x:F[j][0].f(ox + (1 - q.x) * dw, t), y:F[j][1].f(oy + q.y * dh, t) })) };
+    const k = Math.max(w / v.videoWidth, h / v.videoHeight), dw = v.videoWidth * k, dh = v.videoHeight * k, ox = (w - dw) / 2, oy = (h - dh) / 2;
+    // Stabile Hände: jede erkannte Hand wird der nächstgelegenen bisherigen Spur zugeordnet (statt nach „links/rechts“ –
+    // das kippt bei schneller Bewegung und ließ gegriffene Hologramme fallen). Verschwindet eine Hand nur kurz
+    // (Bewegungsunschärfe), bleibt sie ~180 ms stehen, statt sofort loszulassen.
+    const roh = ((erg && erg.landmarks) || []).map(lm => {
+      const px = lm.map(q => ({ x:ox + (1 - q.x) * dw, y:oy + q.y * dh })), c = { x:(px[0].x + px[9].x) / 2, y:(px[0].y + px[9].y) / 2 };
+      return { px, c };
     });
+    const alt = KAM.letzte.filter(hd => hd.c), paare = [], weit = Math.max(w, h) * .35;
+    roh.forEach((r, i) => alt.forEach((a, j) => { const d = Math.hypot(r.c.x - a.c.x - (a.vx || 0) * (t - a.seen), r.c.y - a.c.y - (a.vy || 0) * (t - a.seen)); if (d < weit) paare.push([d, i, j]); }));
+    paare.sort((a, b) => a[0] - b[0]);
+    const zu = new Map(), belegt = new Set();
+    for (const [, i, j] of paare) if (!zu.has(i) && !belegt.has(j)) { zu.set(i, alt[j]); belegt.add(j); }
+    const naechste = roh.map((r, i) => {
+      const a = zu.get(i), id = a ? a.id : 'h' + (KAM.spurN = (KAM.spurN || 0) + 1);
+      const F = KAM.filter[id] || (KAM.filter[id] = r.px.map(() => [new KamFilter(), new KamFilter()]));
+      const dtA = a ? Math.max(1, t - a.seen) : 1, vx = a ? (r.c.x - a.c.x) / dtA : 0, vy = a ? (r.c.y - a.c.y) / dtA : 0;
+      return { id, c:r.c, seen:t, vx:a ? a.vx * .5 + vx * .5 : 0, vy:a ? a.vy * .5 + vy * .5 : 0, p:r.px.map((q, j) => ({ x:F[j][0].f(q.x, t), y:F[j][1].f(q.y, t) })) };
+    });
+    alt.forEach((a, j) => { if (!belegt.has(j) && t - a.seen < 180 && naechste.length < 2) naechste.push(a); });   // kurz verdeckt: Hand halten
+    KAM.letzte = naechste;
+    const ids = new Set(naechste.map(hd => hd.id));
     for (const id in KAM.filter) if (!ids.has(id)) delete KAM.filter[id];
   }
   const haende = KAM.haende ? KAM.letzte : [];
