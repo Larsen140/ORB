@@ -338,6 +338,23 @@
   /* sanftes Einblenden: leicht wachsen + einblenden – Ausblenden umgekehrt */
   @keyframes glasAuf { 0% { opacity:0; scale:.94; translate:0 10px; } 100% { opacity:1; scale:1; translate:0 0; } }
   @keyframes glasAb { 0% { opacity:1; scale:1; translate:0 0; } 100% { opacity:0; scale:.95; translate:0 8px; } }
+  /* Grafikstufe „Kino“: Hologramme kippen mit Perspektive aus Licht herein, eine Lichtkante läuft einmal übers Glas, Ausblenden weich mit Unschärfe */
+  @keyframes kinoAuf { 0% { opacity:0; scale:.9; translate:0 26px; rotate:x 24deg; filter:blur(10px) brightness(1.9); }
+    50% { opacity:1; filter:blur(0) brightness(1.18); } 100% { opacity:1; scale:1; translate:0 0; rotate:x 0deg; filter:none; } }
+  @keyframes kinoAb { 0% { opacity:1; scale:1; translate:0 0; rotate:x 0deg; filter:none; } 100% { opacity:0; scale:.96; translate:0 -12px; rotate:x -16deg; filter:blur(9px) brightness(1.5); } }
+  @keyframes kinoKante { 0% { background-position:140% 0, 0 0, 0 0; } 100% { background-position:-70% 0, 0 0, 0 0; } }
+  @keyframes kinoRand { 0% { opacity:1; } 100% { opacity:.75; } }
+  body.kino :is(.karte, .th:not(.devmini), #bildh.on, #goldh.on, #kamh.on, #webh.on) { animation-name:kinoAuf; animation-duration:.9s; animation-timing-function:cubic-bezier(.16,1,.3,1); }
+  body.kino :is(.karte.weg, .th:not(.devmini).weg, #bildh.zu, #goldh.zu, #kamh.zu, #webh.zu) { animation-name:kinoAb; animation-duration:.5s; animation-timing-function:cubic-bezier(.4,0,.2,1); }
+  body.kino :is(.karte, .th:not(.devmini), #holo.on, #bildh.on, #goldh.on, #kamh.on, #webh.on)::before {
+    background:linear-gradient(105deg, transparent 38%, rgba(255,255,255,.07) 45%, rgba(255,255,255,.3) 50%, rgba(var(--c3),.16) 54%, transparent 62%),
+      radial-gradient(85% 55% at 18% -10%, rgba(255,255,255,.2), transparent 62%), radial-gradient(75% 60% at 100% 112%, var(--hgt, transparent), transparent 70%);
+    background-size:300% 100%, 100% 100%, 100% 100%; background-repeat:no-repeat; background-position:-70% 0, 0 0, 0 0;
+    animation:kinoKante 1.25s .18s cubic-bezier(.3,0,.2,1) both; }
+  body.kino :is(.karte, .th:not(.devmini), #holo.on, #bildh.on, #goldh.on, #kamh.on, #webh.on)::after { animation:rim 9s linear infinite, kinoRand 1.6s ease-out; }
+  body.kino #holo { transform:translate(-50%,-100%) perspective(800px) rotateX(28deg) scale(.9); filter:blur(8px) brightness(1.7);
+    transition:opacity .6s var(--ease), transform .95s cubic-bezier(.16,1,.3,1), filter .75s var(--ease); }
+  body.kino #holo.on { transform:translate(-50%,-100%) perspective(800px) rotateX(0deg) scale(1); filter:none; }
   /* kleiner runder Schließen-Knopf */
   .karte .kh button, .th:not(.devmini) .x, #bildh .x, #goldh .x, #kamh .x, #webh .wk .x { width:26px; height:26px; padding:0; border-radius:50%; display:grid; place-items:center;
     font-size:11px; line-height:1; color:rgba(255,255,255,.78); opacity:1; background:rgba(255,255,255,.08); box-shadow:inset 0 0 0 1px rgba(255,255,255,.1);
@@ -929,7 +946,7 @@
   <p class="note">Passwort erstellen unter account.apple.com → Anmeldung und Sicherheit → App-spezifische Passwörter. Es wird nur in der Windows-Anmeldeinformationsverwaltung gespeichert.</p></div>
   <div class="grp"><h4>Aussehen</h4><div class="card">
     <div class="row col">Farbe<div id="swatches"></div></div>
-    <div class="row col">Grafik<div class="seg" id="seg_fx"><button data-v="niedrig">Sparsam</button><button data-v="mittel">Flüssig</button><button data-v="hoch">Ultra</button></div></div>
+    <div class="row col">Grafik<div class="seg" id="seg_fx"><button data-v="niedrig">Sparsam</button><button data-v="mittel">Flüssig</button><button data-v="hoch">Ultra</button><button data-v="kino" title="Filmreife Kugel: Bloom, Tiefenschärfe, Lichtstrahlen, weiche Übergänge (braucht eine gute Grafikkarte)">Kino</button></div></div>
     <div class="row">Untertitel unter der Kugel<input type="checkbox" class="sw" id="s_unter"></div>
     <div class="row">Widgets per Drag &amp; Drop am Titel verschieben<button class="done" id="resetLayout">Zurücksetzen</button></div>
   </div></div>
@@ -978,14 +995,14 @@ const pcol = (i, a, k = 0) => `rgba(${rgb(mix(PAL()[i % 4], [255,255,255], k))},
 let cfg = { farbe:'rot', effekte:'mittel', untertitel:true, lautstaerke:160, sfx:true, sfxlaut:60, ambient:false,
   steuerung:'wort', schnipsen:true, wakeword:'Jarvis', stimme:'', tempo:'+15%', hoehe:'+0Hz', laenge:'kurz', rechte:'auto', tempo_claude:'low', ordner:'',
   schlaf_schliessen:true, bildschirm:false, klatschen:true, dauerzuhoeren:true, unterbrechen:true, sprechen_unterbrechen:true, nur_jarvis:true, musik_schutz:true, ducking:true, empfindlichkeit:6, schnips_empf:6, mikro:'TONOR', kalib:{}, begruessung:true, ort:'', name:'', schlafen:5, vollbild:true, autostart:true };
-const S = { mode:'idle', seq:-1, busy:false, energy:.12, holo:0, think:0, speakVis:0, listenVis:0, level:0, warn:0, boot:0, sleep:false, sleepVis:0, px:0, py:0 };
+const S = { mode:'idle', seq:-1, busy:false, energy:.12, holo:0, think:0, speakVis:0, listenVis:0, level:0, warn:0, boot:0, sleep:false, sleepVis:0, px:0, py:0, bands:[0, 0, 0, 0] };
 const mix = (a, b, t) => a.map((v, i) => Math.round(v + (b[i] - v) * t));
 const rgb = c => `${c[0]},${c[1]},${c[2]}`;
 const cur = () => mix(BASE, AMBER, S.warn);
 const col = a => `rgba(${rgb(cur())},${a})`;
 const col2 = a => `rgba(${rgb(mix(BASE2, AMBER, S.warn))},${a})`;
 const lite = (a, k = .55) => `rgba(${rgb(mix(cur(), [255,255,255], k))},${a})`;
-const Q = () => ({ hoch:2, mittel:1, niedrig:0 }[cfg.effekte] ?? 1);
+const Q = () => ({ kino:3, hoch:2, mittel:1, niedrig:0 }[cfg.effekte] ?? 1);
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;' }[c]));
 const hhmm = d => d.toLocaleTimeString('de-DE', { hour:'2-digit', minute:'2-digit' });
 let autoSleepCheck = false;
@@ -1001,6 +1018,7 @@ function applyCfg() {
     document.querySelectorAll('.' + cls).forEach(s => s.setAttribute('stop-color', `rgb(${rgb(c)})`));
   document.body.classList.toggle('lite', cfg.effekte === 'niedrig');
   document.body.classList.toggle('ultra', cfg.effekte === 'hoch');
+  document.body.classList.toggle('kino', cfg.effekte === 'kino');
   applyAudio(); syncSettingsUI();
   if (applyCfg._fx !== cfg.effekte) { applyCfg._fx = cfg.effekte; setupParticles(); glResize(); }   // nur bei Grafikstufe neu aufbauen
   if (cfg.steuerung === 'wort' && !S.sleep) startWake(); else if (cfg.steuerung !== 'wort') stopWake();
@@ -1031,6 +1049,7 @@ precision highp float;
 uniform vec2 uRes, uC, uPar; uniform float uT, uR;
 uniform vec3 uCol, uCol2, uCol3, uCol4;
 uniform float uLevel, uEnergy, uSpeak, uListen, uSleep, uThink;
+uniform vec4 uB;   // Stimme in vier Bändern (tief … hoch)
 vec3 pal(float x){ x = fract(x)*4.; return x < 1. ? mix(uCol, uCol2, x) : x < 2. ? mix(uCol2, uCol3, x - 1.) : x < 3. ? mix(uCol3, uCol4, x - 2.) : mix(uCol4, uCol, x - 3.); }
 uniform vec4 uD[6];
 float smin(float a, float b, float k){ float h = clamp(.5 + .5*(b - a)/k, 0., 1.); return mix(b, a, h) - k*h*(1. - h); }
@@ -1078,6 +1097,10 @@ vec3 bg(vec2 uv, vec2 p2, float rr){
 void main(){
   vec2 fc = gl_FragCoord.xy, uv = (fc - .5*uRes)/uRes.y;
   vec2 p2 = (fc - uC)/uR; float rr = length(p2);
+  // Stimme formt die Kugel: jedes Frequenzband wellt den Rand mit eigener Zahl von Bögen
+  float a0 = atan(p2.y, p2.x);
+  float def = (uB.x*sin(a0*3. + uT*1.7)*.026 + uB.y*sin(a0*5. - uT*2.3)*.019 + uB.z*sin(a0*8. + uT*3.1)*.013 + uB.w*sin(a0*12. - uT*3.7)*.009)*(1. - uSleep);
+  p2 /= 1. + def; rr = length(p2);
   vec3 col = bg(uv, p2, rr)*(1. - .8*uSleep);
   col *= 1. - .5*dot(uv, uv);
   // ===== Leuchtende Energiekugel: rund, Plasma innen, heißer Kern, glühender Rand, Korona pulsiert mit der Stimme =====
@@ -1105,30 +1128,149 @@ void main(){
     c += mix(uCol, vec3(1.), .6)*pow(z, 5.)*(.35 + 1.1*uLevel);                                         // heißer Kern
     c += mix(uCol2, uCol3, .5 + .5*sin(ang*2. + uT*.3))*fr*(1.2 + .6*uLevel);                           // glühender Rand
     c += vec3(1.)*pow(max(dot(n, normalize(vec3(-.45, .55, .7))), 0.), 40.)*.35;                        // Glanzpunkt
+#ifdef KINO
+    // Subsurface: Licht dringt ein und streut weich – leuchtender Terminator, Glühen aus der Tiefe am Rand
+    vec3 L = normalize(vec3(-.45, .55, .7)); float nl = dot(n, L);
+    c *= .5 + .32*clamp((nl + .6)/1.6, 0., 1.);
+    c += mix(uCol, uCol2, .35)*smoothstep(.55, 0., abs(nl + .05))*(.1 + .16*uLevel);
+    c += uCol*pow(1. - z, 1.3)*pl*(.3 + .45*uLevel + .2*uThink);
+    // weiche Reflexionen: Nebel der Umgebung (Fresnel) + eine weiche Lichtfläche
+    vec3 rd = reflect(vec3(0., 0., -1.), n); float fres = .04 + .96*pow(1. - z, 5.);
+    vec3 env = pal(rd.x*.18 + rd.y*.12 + uT*.01)*(.35 + .65*smoothstep(-.4, .9, rd.y));
+    float win = smoothstep(.14, 0., length(max(abs(rd.xy - vec2(-.5, .58)) - vec2(.16, .07), 0.)));
+    c += env*fres*.65 + vec3(1., .98, .95)*win*(.12 + fres*.8);
+    c += vec3(1., .97, .92)*pow(max(reflect(-L, n).z, 0.), 14.)*.16;                                    // breiter, weicher Glanz
+#endif
     col = mix(col, c*(1. - .55*uSleep), smoothstep(1., .985, rr));
   }
+#ifdef KINO
+  gl_FragColor = vec4(sqrt(col/(1. + col)), 1.);   // HDR verpackt – Tonemapping im Kino-Durchgang
+#else
   col = 1. - exp(-col*1.7);
   gl_FragColor = vec4(pow(col, vec3(.9)), 1.);
+#endif
 }`;
-let U = {}, glScale = 1, glOk = !!gl;
+let U = {}, glScale = 1, glOk = !!gl, MAIN = null;
+const glSh = (type, src) => { const s = gl.createShader(type); gl.shaderSource(s, src); gl.compileShader(s);
+  if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) { console.error(gl.getShaderInfoLog(s)); return null; } return s; };
+function glProg(vs, fs, names) {   // Programm übersetzen; Attribut „p“ immer an Stelle 0 (alle Durchgänge teilen das Bild-Dreieck)
+  const v = glSh(gl.VERTEX_SHADER, vs), f = glSh(gl.FRAGMENT_SHADER, fs); if (!v || !f) return null;
+  const p = gl.createProgram(); gl.attachShader(p, v); gl.attachShader(p, f); gl.bindAttribLocation(p, 0, 'p'); gl.linkProgram(p);
+  if (!gl.getProgramParameter(p, gl.LINK_STATUS)) return null;
+  const u = {}; for (const n of names) u[n] = gl.getUniformLocation(p, n); return { p, U:u };
+}
+const SCENE_VS = 'attribute vec2 p; void main(){ gl_Position = vec4(p, 0., 1.); }';
+const SCENE_U = ['uRes', 'uC', 'uPar', 'uT', 'uR', 'uCol', 'uCol2', 'uCol3', 'uCol4', 'uLevel', 'uEnergy', 'uSpeak', 'uListen', 'uSleep', 'uThink', 'uD', 'uB'];
 if (gl) {
-  const sh = (type, src) => { const s = gl.createShader(type); gl.shaderSource(s, src); gl.compileShader(s);
-    if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) { console.error(gl.getShaderInfoLog(s)); glOk = false; } return s; };
-  const prog = gl.createProgram();
-  gl.attachShader(prog, sh(gl.VERTEX_SHADER, 'attribute vec2 p; void main(){ gl_Position = vec4(p, 0., 1.); }'));
-  gl.attachShader(prog, sh(gl.FRAGMENT_SHADER, FRAG));
-  gl.linkProgram(prog); if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) glOk = false;
+  MAIN = glProg(SCENE_VS, FRAG, SCENE_U);
+  glOk = !!MAIN;
   if (glOk) {
-    gl.useProgram(prog);
+    U = MAIN.U; gl.useProgram(MAIN.p);
     gl.bindBuffer(gl.ARRAY_BUFFER, gl.createBuffer());
     gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW);
-    const loc = gl.getAttribLocation(prog, 'p'); gl.enableVertexAttribArray(loc); gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
-    for (const n of ['uRes', 'uC', 'uPar', 'uT', 'uR', 'uCol', 'uCol2', 'uCol3', 'uCol4', 'uLevel', 'uEnergy', 'uSpeak', 'uListen', 'uSleep', 'uThink', 'uD']) U[n] = gl.getUniformLocation(prog, n);
+    gl.enableVertexAttribArray(0); gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
   }
+}
+
+/* ===== Grafikstufe „Kino“: Szene in HDR → Tiefenschärfe, HDR-Bloom, Lichtstrahlen, filmische Farbkorrektur, Korn =====
+   Die Szene wird verpackt (sqrt(c/(1+c))) in eine Textur gerendert, auf 1/4 und 1/16 verkleinert und weichgezeichnet,
+   dann in einem Durchgang zusammengesetzt. Klappt etwas nicht, bleibt einfach der normale Weg. */
+const KINO = { ok:false, versucht:false, w:0, h:0 };
+const KINO_VS = 'attribute vec2 p; varying vec2 v; void main(){ v = p*.5 + .5; gl_Position = vec4(p, 0., 1.); }';
+const KINO_KOPF = `precision highp float; varying vec2 v;
+vec3 dec(vec4 t){ vec3 e = min(t.rgb*t.rgb, vec3(.985)); return e/(1. - e); }
+vec4 enc(vec3 c){ return vec4(sqrt(c/(1. + c)), 1.); }
+`;
+const KINO_DOWN = KINO_KOPF + `uniform sampler2D uTex; uniform vec2 uPx;
+void main(){ gl_FragColor = enc(.25*(dec(texture2D(uTex, v + uPx*vec2(-1., -1.))) + dec(texture2D(uTex, v + uPx*vec2(1., -1.)))
+  + dec(texture2D(uTex, v + uPx*vec2(-1., 1.))) + dec(texture2D(uTex, v + uPx*vec2(1., 1.))))); }`;
+const KINO_BLUR = KINO_KOPF + `uniform sampler2D uTex; uniform vec2 uDir;
+void main(){ vec3 c = dec(texture2D(uTex, v))*.227027;
+  c += (dec(texture2D(uTex, v + uDir*1.384615)) + dec(texture2D(uTex, v - uDir*1.384615)))*.316216;
+  c += (dec(texture2D(uTex, v + uDir*3.230769)) + dec(texture2D(uTex, v - uDir*3.230769)))*.070270;
+  gl_FragColor = enc(c); }`;
+const KINO_COMP = KINO_KOPF + `uniform sampler2D uS, uA, uW; uniform vec2 uRes, uC; uniform float uR, uT, uLevel, uSpeak, uThink, uSleep;
+uniform vec3 uCol, uCol2;
+vec3 aces(vec3 x){ return clamp((x*(2.51*x + .03))/(x*(2.43*x + .59) + .14), 0., 1.); }
+float h12(vec2 p){ return fract(sin(dot(p, vec2(12.9898, 78.233)))*43758.5453); }
+void main(){
+  vec2 fc = v*uRes; float rr = length(fc - uC)/uR, wach = 1. - .6*uSleep;
+  // feine Farbsäume nur zum Bildrand hin (Linse)
+  vec2 off = (v - .5)*.006*length(v - .5);
+  vec3 sh = vec3(dec(texture2D(uS, v + off)).r, dec(texture2D(uS, v)).g, dec(texture2D(uS, v - off)).b);
+  vec3 bq = dec(texture2D(uA, v)), bw = dec(texture2D(uW, v));
+  // Tiefenschärfe: Kugel und Nahbereich scharf, der Weltraum dahinter weich
+  vec3 col = mix(sh, bq, smoothstep(1.6, 3.8, rr)*.6);
+  // HDR-Bloom mit weichem Knie – die Stimme dreht das Licht auf
+  col += (max(bq - .7, 0.)*.35 + max(bw - .25, 0.)*.45)*(.6 + .55*uLevel*uSpeak + .3*uLevel + .2*uThink)*wach;
+  // Lichtstrahlen: helle Stellen werden zur Kugel hin verschmiert (volumetrisches Licht), Zufallsversatz gegen Streifen
+  vec2 cv = uC/uRes, st = (v - cv)*(.055 + .02*uLevel), sp = v - st*h12(fc + fract(uT*7.)*91.);
+  vec3 gr = vec3(0.); float w = 1.;
+  for (int i = 0; i < 14; i++){ sp -= st; gr += max(dec(texture2D(uA, sp)) - 1.2, 0.)*w; w *= .88; }
+  col += gr*(.012 + .05*uLevel + .012*uThink)*(1. - uSleep)*smoothstep(.85, 1.25, rr);
+  // filmische Abstimmung: ACES, Schatten leicht in Palette 2, Lichter warm in Palette 1, etwas satter
+  col = aces(col*1.15);
+  float l = dot(col, vec3(.2126, .7152, .0722));
+  col = mix(vec3(l), col, 1.1);
+  col += uCol2*.045*(1. - smoothstep(0., .45, l));
+  col = mix(col, col*(.82 + .36*uCol), smoothstep(.45, 1., l)*.3);
+  col *= 1. - .18*pow(length(v - .5)*1.3, 2.5);
+  col += (h12(fc + fract(uT)*173.) - .5)*(2.2/255.);   // Filmkorn, verhindert auch Farbstufen
+  gl_FragColor = vec4(clamp(col, 0., 1.), 1.);
+}`;
+function kinoZiel(w, h) {
+  const t = gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D, t);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, w, h, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+  const f = gl.createFramebuffer(); gl.bindFramebuffer(gl.FRAMEBUFFER, f);
+  gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, t, 0);
+  const ok = gl.checkFramebufferStatus(gl.FRAMEBUFFER) === gl.FRAMEBUFFER_COMPLETE;
+  gl.bindFramebuffer(gl.FRAMEBUFFER, null); return ok ? { t, f, w, h } : null;
+}
+function kinoBereit() {   // Programme einmal übersetzen, Ziele bei jeder Größenänderung neu anlegen
+  if (!glOk) return false;
+  if (!KINO.versucht) {
+    KINO.versucht = true;
+    KINO.scene = glProg(SCENE_VS, '#define KINO\n' + FRAG, SCENE_U);
+    KINO.down = glProg(KINO_VS, KINO_DOWN, ['uTex', 'uPx']);
+    KINO.blur = glProg(KINO_VS, KINO_BLUR, ['uTex', 'uDir']);
+    KINO.comp = glProg(KINO_VS, KINO_COMP, ['uS', 'uA', 'uW', 'uRes', 'uC', 'uR', 'uT', 'uLevel', 'uSpeak', 'uThink', 'uSleep', 'uCol', 'uCol2']);
+    KINO.ok = !!(KINO.scene && KINO.down && KINO.blur && KINO.comp);
+    if (KINO.ok) { gl.useProgram(KINO.comp.p); gl.uniform1i(KINO.comp.U.uS, 0); gl.uniform1i(KINO.comp.U.uA, 1); gl.uniform1i(KINO.comp.U.uW, 2); }
+  }
+  if (!KINO.ok) return false;
+  if (KINO.w !== glc.width || KINO.h !== glc.height) {
+    for (const z of [KINO.S, KINO.A, KINO.A2, KINO.B, KINO.B2]) if (z) { gl.deleteTexture(z.t); gl.deleteFramebuffer(z.f); }
+    const w = glc.width, h = glc.height, qw = Math.max(1, Math.ceil(w / 4)), qh = Math.max(1, Math.ceil(h / 4));
+    const bw = Math.max(1, Math.ceil(qw / 4)), bh = Math.max(1, Math.ceil(qh / 4));
+    Object.assign(KINO, { S:kinoZiel(w, h), A:kinoZiel(qw, qh), A2:kinoZiel(qw, qh), B:kinoZiel(bw, bh), B2:kinoZiel(bw, bh), w, h });
+    if (!(KINO.S && KINO.A && KINO.A2 && KINO.B && KINO.B2)) { KINO.ok = false; return false; }
+  }
+  return true;
+}
+function kinoPass(prog, ziel, tex, setU) {
+  gl.bindFramebuffer(gl.FRAMEBUFFER, ziel ? ziel.f : null);
+  gl.viewport(0, 0, ziel ? ziel.w : glc.width, ziel ? ziel.h : glc.height);
+  gl.useProgram(prog.p);
+  tex.forEach((z, i) => { gl.activeTexture(gl.TEXTURE0 + i); gl.bindTexture(gl.TEXTURE_2D, z.t); });
+  setU(prog.U); gl.drawArrays(gl.TRIANGLES, 0, 3);
+}
+function kinoPost(t, c1, c2) {
+  const K = KINO, down = (von, nach) => kinoPass(K.down, nach, [von], u => gl.uniform2f(u.uPx, 1 / von.w, 1 / von.h));
+  const blur = (a, b, s) => { kinoPass(K.blur, b, [a], u => gl.uniform2f(u.uDir, s / a.w, 0)); kinoPass(K.blur, a, [b], u => gl.uniform2f(u.uDir, 0, s / b.h)); };
+  down(K.S, K.A); blur(K.A, K.A2, 1.25);
+  down(K.A, K.B); blur(K.B, K.B2, 1.5); blur(K.B, K.B2, 2.5);
+  kinoPass(K.comp, null, [K.S, K.A, K.B], u => {
+    gl.uniform2f(u.uRes, glc.width, glc.height); gl.uniform2f(u.uC, K.cx, K.cy); gl.uniform1f(u.uR, K.r); gl.uniform1f(u.uT, t);
+    gl.uniform1f(u.uLevel, S.level); gl.uniform1f(u.uSpeak, S.speakVis); gl.uniform1f(u.uThink, S.think); gl.uniform1f(u.uSleep, S.sleepVis);
+    gl.uniform3f(u.uCol, c1[0], c1[1], c1[2]); gl.uniform3f(u.uCol2, c2[0], c2[1], c2[2]);
+  });
+  gl.activeTexture(gl.TEXTURE0);
 }
 function glResize() {
   W = innerWidth; H = innerHeight; if (W < 2 || H < 2) return;
-  glScale = [.45, .62, .9][Q()] * Math.min(devicePixelRatio || 1, 1.5);   // etwas niedriger = deutlich weniger Grafiklast
+  glScale = [.45, .62, .9, 1][Q()] * Math.min(devicePixelRatio || 1, 1.5);   // etwas niedriger = deutlich weniger Grafiklast
   glc.width = Math.round(W * glScale); glc.height = Math.round(H * glScale);
   fxc.width = W; fxc.height = H;
   if (gl) gl.viewport(0, 0, glc.width, glc.height);
@@ -1147,6 +1289,9 @@ function renderGL(t, cx, cy, R, speaking) {
     const a = d.ph + t * d.sp * (.45 + S.energy * 1.6 + S.think * 2) * (k % 2 ? -1 : 1);
     dropArr.set([Math.cos(a) * d.d, Math.sin(a) * d.d * Math.cos(d.tilt), Math.sin(a) * d.d * Math.sin(d.tilt), d.r], k * 4);
   });
+  const kino = Q() === 3 && kinoBereit(), P = kino ? KINO.scene : MAIN, U = P.U;
+  gl.useProgram(P.p);
+  gl.bindFramebuffer(gl.FRAMEBUFFER, kino ? KINO.S.f : null); gl.viewport(0, 0, glc.width, glc.height);
   const c1 = cur().map(v => v / 255), c2 = mix(BASE2, AMBER, S.warn).map(v => v / 255);
   gl.uniform2f(U.uRes, glc.width, glc.height);
   gl.uniform2f(U.uC, cx * glScale, (H - cy) * glScale);
@@ -1157,8 +1302,9 @@ function renderGL(t, cx, cy, R, speaking) {
   gl.uniform3f(U.uCol3, c3[0], c3[1], c3[2]); gl.uniform3f(U.uCol4, c4[0], c4[1], c4[2]);
   gl.uniform1f(U.uLevel, S.level); gl.uniform1f(U.uEnergy, S.energy); gl.uniform1f(U.uSpeak, S.speakVis);
   gl.uniform1f(U.uListen, S.listenVis); gl.uniform1f(U.uSleep, S.sleepVis); gl.uniform1f(U.uThink, S.think);
-  gl.uniform4fv(U.uD, dropArr);
+  gl.uniform4fv(U.uD, dropArr); gl.uniform4f(U.uB, S.bands[0], S.bands[1], S.bands[2], S.bands[3]);
   gl.drawArrays(gl.TRIANGLES, 0, 3);
+  if (kino) { KINO.cx = cx * glScale; KINO.cy = (H - cy) * glScale; KINO.r = R * glScale; kinoPost(t, c1, c2); }
 }
 
 /* ================= Audio ================= */
@@ -3812,13 +3958,13 @@ loadTermine(); setInterval(loadTermine, 30000); loadSpotify(); setInterval(loadS
 /* ================= Effekte ================= */
 let parts = [], bubbles = [], shooting = [];
 function setupParticles() {
-  const n = [30, 70, 120][Q()];
+  const n = [30, 70, 120, 140][Q()];
   if (parts.length !== n) parts = Array.from({ length:n }, () => ({ a:Math.random() * 6.283, r:1.3 + Math.random() * 1.9,
     sp:(.1 + Math.random() * .4) * (Math.random() < .5 ? -1 : 1), z:Math.random(), s:.5 + Math.random() * 1.4, wob:Math.random() * 6, ci:Math.random() * 4 | 0 }));
   setupBubbles();
 }
 function setupBubbles() {
-  const n = [8, 18, 28][Q()];
+  const n = [8, 18, 28, 28][Q()];
   bubbles = Array.from({ length:n }, () => newBubble(true));
 }
 function newBubble(any) {
@@ -3828,8 +3974,15 @@ function newBubble(any) {
 const waves = [], sparks = [];
 let bootT0 = performance.now(), nextPulse = 0, nextShoot = 4000, waveCi = 0;
 function ripple(k = 1) { if (waves.length < 12) waves.push({ r:0, a:.55 * Math.min(k, 1.4), w:1 + 2 * k, sp:1 + k * .4, ci:waveCi++ % 4 }); if (k >= 1) SFX.thump(); }
-function burst(n) { if (n >= 20) SFX.sparkle(); n = Math.round(n * [.3, .6, 1][Q()]); for (let i = 0; i < n; i++) sparks.push({ a:Math.random() * 6.283, d:1, v:90 + Math.random() * 280, life:1, s:1 + Math.random() * 1.8, ci:i % 4 }); }
-const ease = (k, v, f) => S[k] += (v - S[k]) * Math.min(1, f);
+function burst(n) { if (n >= 20) SFX.sparkle(); n = Math.round(n * [.3, .6, 1, 1][Q()]); for (let i = 0; i < n; i++) sparks.push({ a:Math.random() * 6.283, d:1, v:90 + Math.random() * 280, life:1, s:1 + Math.random() * 1.8, ci:i % 4 }); }
+let EASE_DT = 1 / 60;
+const EASE_V = {};
+const ease = (k, v, f) => {   // f = dt·Tempo. Feder (Smooth-Damp): startet sanft, kommt ohne Überschwingen an
+  const dt = EASE_DT, w = Math.max(1e-3, f / dt) * 1.6, x = w * dt, e = 1 / (1 + x + .48 * x * x + .235 * x * x * x);
+  const d = S[k] - v, tmp = ((EASE_V[k] || 0) + w * d) * dt;
+  EASE_V[k] = ((EASE_V[k] || 0) - w * tmp) * e; S[k] = v + (d + tmp) * e;
+  return S[k];
+};
 const waveBars = [...document.querySelectorAll('#wave i')];
 let mouse = { x:.5, y:.5 };
 addEventListener('mousemove', e => { mouse.x = e.clientX / W; mouse.y = e.clientY / H; });
@@ -3866,9 +4019,9 @@ function frame(now) {
   const speaking = speakingNow();
   const active = speaking || listening || convoRec || S.mode === 'denkt' || S.mode === 'auftrag' || S.mode === 'wartet' || S.boot < 1 || waves.length || sparks.length;
   const fps = Math.min(KAM.an ? (KAM.stufe ? 20 : 30) : 999,   // Kamera-Ansicht verdeckt die Kugel fast ganz → Kugel sparsam, damit die Kamera flüssig läuft
-    S.sleep && S.sleepVis > .95 && !active ? 24 : active ? [30, 60, 120][Q()] : [24, 40, 60][Q()]);   // im Leerlauf weniger Bilder = weniger CPU
+    S.sleep && S.sleepVis > .95 && !active ? 24 : active ? [30, 60, 120, 60][Q()] : [24, 40, 60, 60][Q()]);   // Kino: gleichmäßig 60 fps   // im Leerlauf weniger Bilder = weniger CPU
   if (now - lastT < 1000 / fps - 3) return;
-  const t = now / 1000, dt = Math.min(.08, (now - lastT) / 1000); lastT = now;
+  const t = now / 1000, dt = Math.min(.08, (now - lastT) / 1000); lastT = now; EASE_DT = Math.max(.001, dt);
   if (innerWidth < 2 || innerHeight < 2) return;
   if (innerWidth !== W || innerHeight !== H) { glResize(); LAY = layout(); }
 
@@ -3910,6 +4063,15 @@ function frame(now) {
     lv = Math.min(1, Math.sqrt(s / micTime.length) * 6); micAn.getByteFrequencyData(micData);
   }
   S.level += (lv - S.level) * (lv > S.level ? .45 : .1);
+  {
+    const src = speaking && audioOk() && ac.currentTime < endTime ? freq : (listening || convoRec) && micAn ? micData : null;
+    [[1, 4], [4, 9], [9, 20], [20, 44]].forEach(([a, b], k) => {
+      let v = 0;
+      if (src) { for (let i = a; i < b; i++) v += src[i]; v = Math.min(1, v / (b - a) / 255 * 1.25); }
+      else if (speaking) v = lv * (.55 + .45 * Math.sin(t * (6 + k * 3.3) + k));
+      S.bands[k] += (v - S.bands[k]) * Math.min(1, dt * (v > S.bands[k] ? 22 : 7));
+    });
+  }
   S.boot = Math.min(1, (now - bootT0) / 2000);
   ease('energy', { idle:.12, hoert:.35, denkt:.55, auftrag:.65, spricht:.3, wartet:.4, schlaf:.02 }[vm] ?? .12, dt * 2.5);
   ease('holo', vm === 'auftrag' || vm === 'wartet' ? 1 : 0, dt * 3);
@@ -4048,9 +4210,13 @@ function drawFx(t, dt, now, cx, cy, R, speaking) {
     }
     fx.shadowBlur = 0;
     // Lichtstrahlen beim Sprechen
-    if (!CALM && S.speakVis > .1 && freq) for (let i = 0; i < 28; i++) {
+    if ((!CALM || q === 3) && S.speakVis > .1 && freq) for (let i = 0; i < 28; i++) {
       const a = i / 28 * 6.283 + t * .2, v = freq[2 + (i * 3) % 50] / 255;
       if (v < .25) continue;
+      if (q === 3) { const r0 = R * 1.45, r1 = R * (1.7 + v * 1.6), g = fx.createLinearGradient(cx + Math.cos(a) * r0, cy + Math.sin(a) * r0, cx + Math.cos(a) * r1, cy + Math.sin(a) * r1);
+        g.addColorStop(0, pcol(i, 0)); g.addColorStop(.3, lite(.22 * v * S.speakVis, .5)); g.addColorStop(1, pcol(i, 0));
+        fx.strokeStyle = g; fx.lineWidth = 1.6; fx.lineCap = 'round';
+        fx.beginPath(); fx.moveTo(cx + Math.cos(a) * r0, cy + Math.sin(a) * r0); fx.lineTo(cx + Math.cos(a) * r1, cy + Math.sin(a) * r1); fx.stroke(); continue; }
       fx.strokeStyle = lite(.18 * v * S.speakVis, .5); fx.lineWidth = 1;
       fx.beginPath(); fx.moveTo(cx + Math.cos(a) * R * 1.5, cy + Math.sin(a) * R * 1.5); fx.lineTo(cx + Math.cos(a) * R * (1.7 + v * 1.4), cy + Math.sin(a) * R * (1.7 + v * 1.4)); fx.stroke();
     }
@@ -4071,14 +4237,26 @@ function drawFx(t, dt, now, cx, cy, R, speaking) {
   for (const p of parts) {
     p.a += p.sp * dt * (.1 + S.energy * .6 + S.level * .5);
     if (S.listenVis > .3) { p.r -= dt * .45 * S.listenVis; if (p.r < 1.15) p.r = 3; }
-    const rr = R * (p.r + Math.sin(t * .7 + p.wob) * .08);
-    fx.fillStyle = pcol(p.ci, (.14 + p.z * .42) * (.45 + S.energy) * fade, .35);
-    fx.beginPath(); fx.arc(cx + Math.cos(p.a) * rr, cy + Math.sin(p.a) * rr * (.8 + p.z * .35), p.s * .7, 0, 7); fx.fill();
+    const rr = R * (p.r + Math.sin(t * .7 + p.wob) * .08), px = cx + Math.cos(p.a) * rr, py = cy + Math.sin(p.a) * rr * (.8 + p.z * .35);
+    const pc = pcol(p.ci, (.14 + p.z * .42) * (.45 + S.energy) * fade, .35);
+    if (q === 3 && p.lx !== undefined && Math.hypot(px - p.lx, py - p.ly) > .8 && Math.hypot(px - p.lx, py - p.ly) < 60) {
+      // Bewegungsunschärfe: Spur über ~1/30 s statt Punkt
+      const k2 = Math.min(2.2, 1 / 30 / Math.max(dt, .004));
+      fx.strokeStyle = pc; fx.lineWidth = p.s * 1.4; fx.lineCap = 'round';
+      fx.beginPath(); fx.moveTo(px - (px - p.lx) * k2, py - (py - p.ly) * k2); fx.lineTo(px, py); fx.stroke();
+    } else { fx.fillStyle = pc; fx.beginPath(); fx.arc(px, py, p.s * .7, 0, 7); fx.fill(); }
+    p.lx = px; p.ly = py;
   }
   for (let i = sparks.length - 1; i >= 0; i--) {
     const s = sparks[i]; s.life -= dt * 1.3; s.d += s.v * dt / R; s.v *= Math.pow(.15, dt);
     if (s.life <= 0) { sparks.splice(i, 1); continue; }
-    fx.fillStyle = pcol(s.ci || 0, s.life, .45); fx.beginPath(); fx.arc(cx + Math.cos(s.a) * R * s.d, cy + Math.sin(s.a) * R * s.d, s.s * s.life, 0, 7); fx.fill();
+    const sx = cx + Math.cos(s.a) * R * s.d, sy = cy + Math.sin(s.a) * R * s.d;
+    if (q === 3) {   // Funken als Lichtspur mit Bewegungsunschärfe
+      const L = Math.min(R * .6, s.v / 30 + 2), g = fx.createLinearGradient(sx, sy, sx - Math.cos(s.a) * L, sy - Math.sin(s.a) * L);
+      g.addColorStop(0, pcol(s.ci || 0, s.life, .55)); g.addColorStop(1, pcol(s.ci || 0, 0));
+      fx.strokeStyle = g; fx.lineWidth = s.s * s.life * 1.6; fx.lineCap = 'round';
+      fx.beginPath(); fx.moveTo(sx, sy); fx.lineTo(sx - Math.cos(s.a) * L, sy - Math.sin(s.a) * L); fx.stroke();
+    } else { fx.fillStyle = pcol(s.ci || 0, s.life, .45); fx.beginPath(); fx.arc(sx, sy, s.s * s.life, 0, 7); fx.fill(); }
   }
   for (let i = waves.length - 1; i >= 0; i--) {
     const w = waves[i]; w.r += dt * w.sp * 1.5; const al = w.a * (1 - w.r / 3);
