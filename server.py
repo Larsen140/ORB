@@ -37,6 +37,7 @@ def _lade_icloud():
 
 icloud = _lade_icloud()  # iCloud-Kalender (CalDAV)
 TTS_PS = os.path.join(RES, "tts.ps1")
+MIKRO_PS = os.path.join(RES, "mikro.ps1")
 PORT = int(os.environ.get("ORB_PORT", "8766"))  # ORB_PORT nur für Tests (update.ps1 prüft auf 8799)
 NO_WINDOW = 0x08000000
 # Schutz gegen fremde Webseiten: nur Anfragen mit diesem Token (steht nur in ORBs eigener Seite und in einer
@@ -61,14 +62,14 @@ DEFAULT_CFG = {
     "sfx": True, "sfxlaut": 60, "ambient": False,
     "steuerung": "wort", "wakeword": "Jarvis", "schnipsen": True, "unterbrechen": True, "sprechen_unterbrechen": True, "nur_jarvis": True, "musik_schutz": True, "ducking": True,
     "tts_anbieter": "edge",
-    "klatschen": True, "dauerzuhoeren": True, "empfindlichkeit": 6, "schnips_empf": 6, "satzpause": 2.0, "begruessung": True, "ort": "", "name": "",
+    "klatschen": True, "dauerzuhoeren": True, "empfindlichkeit": 6, "schnips_empf": 6, "mikro": "TONOR", "kalib": {}, "satzpause": 2.0, "begruessung": True, "ort": "", "name": "",
     "schlafen": 5, "vollbild": True, "autostart": True, "schlaf_schliessen": True, "bildschirm": False,
     "modell": "claude-opus-5-5", "laenge": "kurz", "rechte": "auto", "tempo_claude": "low",
     "ordner": os.path.join(os.path.expanduser("~"), "Documents", "Jarvis"), "sitzung": "",
 }
 # Damit ORB immer dein Claude-Code-Login (Max-Abo) nutzt und nie einen API-Schlüssel
 CLAUDE_ENV_DROP = ("ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "ANTHROPIC_BASE_URL")
-VERSION = "88"
+VERSION = "89"
 ORB_UI = ("Deine Oberfläche (die Larsen gerade sieht): in der Mitte du als flüssige leuchtende Kugel mit Tropfen, "
           "Orbit-Ringen und Sternenhimmel; links eine Uhr und darunter der Gesprächsverlauf mit Eingabefeld; rechts "
           "Karten für System (CPU, RAM, Akku), Wetter mit Stundenvorschau, Aktivität (was du gerade tust) und Vorschläge; "
@@ -679,7 +680,27 @@ def save_cfg(patch):
     # Claude mit neuen Einstellungen neu starten (passiert beim nächsten Auftrag)
     if any(old.get(k) != cfg.get(k) for k in ("modell", "rechte", "laenge", "ordner", "tempo_claude")):
         BRAIN.kill()
+    if "mikro" in patch and old.get("mikro") != cfg.get("mikro"):
+        threading.Thread(target=mikro_standard, daemon=True).start()
     return cfg
+
+
+def mikro_passt(wahl, name):
+    """Passt ein Gerätename zur Mikrofon-Wahl? („TONOR“ passt zu „Mikrofon (TONOR TD510 …)“; MME kürzt Namen auf 31 Zeichen)."""
+    w, n = str(wahl or "").strip().lower(), str(name or "").strip().lower()
+    return bool(w and n) and (w in n or (len(n) >= 20 and n in w))
+
+
+def mikro_standard():
+    """Gewähltes Mikrofon zum Windows-Standard machen – die Spracherkennung im Fenster hört immer auf den Standard."""
+    wahl = str(load_cfg().get("mikro") or "").strip()
+    if not wahl:
+        return
+    try:
+        subprocess.run(["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", MIKRO_PS, "-Name", wahl],
+                       capture_output=True, timeout=20, creationflags=NO_WINDOW)
+    except Exception as e:
+        print("Mikrofon-Wahl:", e)
 
 
 STARTUP_LNK = os.path.join(os.environ.get("APPDATA", ""), r"Microsoft\Windows\Start Menu\Programs\Startup\ORB.lnk")

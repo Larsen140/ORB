@@ -227,6 +227,7 @@ class KlatschErkenner:
         self.kal = []
         self.cand, self.last, self.claps, self.pks, self.hist = None, 0.0, [], [], []
         self.thr_base, self.prof_n = .0024, 0
+        self.kalib = None   # Messwerte aus „Mikro kalibrieren“ (nur für das kalibrierte Mikrofon)
 
     def rausch(self):
         return {"floor": self.floor, "npk": self.npk, "nhf": self.nhf, "nprof": self.nprof}
@@ -234,6 +235,9 @@ class KlatschErkenner:
     def schwellen(self):
         """(Spitze, Pegel) für einen Klatscher – nie unter den alten Werten im stillen Raum, im Rauschen relativ."""
         f, tb = self.floor, self.thr_base
+        kp = float((self.kalib or {}).get("klatschPk") or 0)
+        if kp > 0:   # kalibriert: ~30 % der gemessenen Klatsch-Spitze (Empfindlichkeit/Musik skalieren), sicher über den Rausch-Spitzen
+            return max(self.npk * 3, f * 8, kp * .3 * tb / .003), max(f * 4, min(f * 10, .003))
         pk = max(tb, min(f * 40, max(self.npk * 6, .012)))
         rms = max(tb * .2, f * 4, min(f * 10, .003))
         return pk, rms
@@ -312,6 +316,17 @@ class KlatschErkenner:
 _RAUSCH = None   # gemessenes Grundrauschen (bleibt beim erneuten Lauschen erhalten – keine neue Kalibrierung nötig)
 
 
+def mikro_geraet(sd, wahl):
+    """Index des gewählten Mikrofons (z. B. „TONOR“) – None = Windows-Standard."""
+    try:
+        for i, d in enumerate(sd.query_devices()):
+            if d["max_input_channels"] > 0 and d["hostapi"] == 0 and server.mikro_passt(wahl, d["name"]):
+                return i
+    except Exception:
+        pass
+    return None
+
+
 def clap_loop():
     """Lauscht nur, solange das Fenster zu ist – erkennt zwei kurze, laute Knalle kurz hintereinander.
     Ohne numpy (spart Speicher): rohe 16-Bit-Werte. Schwellen relativ zum gemessenen Grundrauschen (Lüfter)."""
@@ -323,13 +338,17 @@ def clap_loop():
         print("Klatsch-Erkennung im Hintergrund nicht verfügbar:", e)
         return
     sr, block = 16000, 400  # 25 ms
+    mikro = None
     while True:
         if window_open():   # Klatschen ist nie abschaltbar
             time.sleep(1)
             continue
+        wahl = str(server.load_cfg().get("mikro") or "")
+        if wahl != mikro:
+            mikro, _RAUSCH = wahl, None   # anderes Mikro: Grundrauschen neu messen
         k, cfg_t = KlatschErkenner(sr, _RAUSCH), 0.0
         try:
-            with sd.RawInputStream(samplerate=sr, channels=1, dtype="int16", blocksize=block) as st:
+            with sd.RawInputStream(samplerate=sr, channels=1, dtype="int16", blocksize=block, device=mikro_geraet(sd, wahl)) as st:
                 while not window_open():
                     raw, _ = st.read(block)
                     x = array.array("h", bytes(raw))
@@ -338,6 +357,11 @@ def clap_loop():
                         cfg_t = now
                         if k.n >= k.KAL:
                             _RAUSCH = k.rausch()
+                        c = server.load_cfg()
+                        if str(c.get("mikro") or "") != mikro:
+                            break   # Mikro gewechselt → mit dem neuen weiterlauschen
+                        kal = c.get("kalib") or {}
+                        k.kalib = kal if kal.get("klatschPk") and server.mikro_passt(mikro, kal.get("mikro")) else None
                         # Empfindlichkeit 1..10 -> Grundschwelle (leise Laptop-Mikros: Klatscher kommen nur mit ~0,003–0,01 an)
                         k.thr_base = .0006 * (11 - float(server.load_cfg().get("empfindlichkeit", 6)))
                         try:   # läuft Musik, zählen nur deutliche Knalle (Beats sind kein Klatschen)
@@ -352,6 +376,11 @@ def clap_loop():
                         break
         except Exception as e:
             print("Mikrofon:", e)
+            try:   # Mikro ab-/angesteckt: Geräteliste neu einlesen
+                sd._terminate()
+                sd._initialize()
+            except Exception:
+                pass
             time.sleep(5)
 
 
@@ -550,6 +579,7 @@ def main():
     threading.Thread(target=srv.serve_forever, daemon=True).start()
     cfg = server.load_cfg()
     server.set_autostart(bool(cfg.get("autostart", True)))
+    threading.Thread(target=server.mikro_standard, daemon=True).start()   # gewähltes Mikro (TONOR) = Windows-Standard
     threading.Thread(target=clap_loop, daemon=True).start()
     threading.Thread(target=update_loop, daemon=True).start()
     threading.Thread(target=announce_update, daemon=True).start()

@@ -886,6 +886,8 @@
   <div class="grp"><h4>Wecken &amp; Gespräch</h4><div class="card">
     <div class="row">2× klatschen weckt ORB · 2× schnipsen schickt ihn weg<span class="v">immer an</span></div>
     <div class="row">„Jarvis“ rufen – ORB hört jederzeit zu<input type="checkbox" class="sw" id="s_jarvis"></div>
+    <div class="row col"><div class="lbl">Mikrofon</div><select id="s_mikro"></select></div>
+    <div class="row col"><button class="btn" id="mikrokal">Mikro kalibrieren</button><p class="note" id="mikro_kal" style="margin:6px 0 0">5 s Ruhe, dann 2× klatschen und 2× schnipsen – nach jedem Mikrowechsel einmal machen.</p></div>
     <div class="row col"><div class="lbl">Klatsch-Empfindlichkeit<span class="v" id="v_empf"></span></div><input type="range" id="s_empf" min="1" max="10" step="1"></div>
     <div class="row col"><div class="lbl">Schnips-Empfindlichkeit<span class="v" id="v_sempf"></span></div><input type="range" id="s_sempf" min="1" max="10" step="1"></div>
     <div class="row col"><button class="btn" id="snaptest">Schnipsen testen</button><p class="note" id="snap_test" style="margin:6px 0 0">Startet einen 15-Sekunden-Test – ORB verschwindet dabei nicht.</p></div>
@@ -975,7 +977,7 @@ const PAL = () => [BASE, BASE2, BASE3, BASE4];
 const pcol = (i, a, k = 0) => `rgba(${rgb(mix(PAL()[i % 4], [255,255,255], k))},${a})`;
 let cfg = { farbe:'rot', effekte:'mittel', untertitel:true, lautstaerke:160, sfx:true, sfxlaut:60, ambient:false,
   steuerung:'wort', schnipsen:true, wakeword:'Jarvis', stimme:'', tempo:'+15%', hoehe:'+0Hz', laenge:'kurz', rechte:'auto', tempo_claude:'low', ordner:'',
-  schlaf_schliessen:true, bildschirm:false, klatschen:true, dauerzuhoeren:true, unterbrechen:true, sprechen_unterbrechen:true, nur_jarvis:true, musik_schutz:true, ducking:true, empfindlichkeit:6, schnips_empf:6, begruessung:true, ort:'', name:'', schlafen:5, vollbild:true, autostart:true };
+  schlaf_schliessen:true, bildschirm:false, klatschen:true, dauerzuhoeren:true, unterbrechen:true, sprechen_unterbrechen:true, nur_jarvis:true, musik_schutz:true, ducking:true, empfindlichkeit:6, schnips_empf:6, mikro:'TONOR', kalib:{}, begruessung:true, ort:'', name:'', schlafen:5, vollbild:true, autostart:true };
 const S = { mode:'idle', seq:-1, busy:false, energy:.12, holo:0, think:0, speakVis:0, listenVis:0, level:0, warn:0, boot:0, sleep:false, sleepVis:0, px:0, py:0 };
 const mix = (a, b, t) => a.map((v, i) => Math.round(v + (b[i] - v) * t));
 const rgb = c => `${c[0]},${c[1]},${c[2]}`;
@@ -1398,11 +1400,39 @@ function scheduleReady() {
   }
 }
 
+/* ---------- Mikrofon-Wahl (Standard: USB-Mikro „TONOR“) ---------- */
+// passt ein Gerätename zur Wahl? „TONOR“ passt zu „Mikrofon (TONOR TD510 Air S Mic) (…)“ – gleiche Regel wie im Server
+const mikroPasst = (wahl, name) => { const w = String(wahl || '').trim().toLowerCase(), n = String(name || '').trim().toLowerCase();
+  return !!(w && n) && (n.includes(w) || (n.length >= 20 && w.includes(n))); };
+let mikroLabel = '', micStreams = [];
+async function micAudio(o) {   // Mikrofon-Zugang auf dem gewählten Gerät (fehlt es, nimmt der Browser den Windows-Standard)
+  let id = '';
+  try { const d = (await navigator.mediaDevices.enumerateDevices()).find(d => d.kind === 'audioinput' && !/^(default|communications)$/.test(d.deviceId) && mikroPasst(cfg.mikro, d.label));
+        if (d) id = d.deviceId; } catch (e) {}
+  const st = await navigator.mediaDevices.getUserMedia({ audio:Object.assign({}, o, id ? { deviceId:{ ideal:id } } : {}) });
+  const t = st.getAudioTracks()[0]; if (t) mikroLabel = t.label;
+  micStreams.push(st); return st;
+}
+function mikroNeu() {   // anderes Mikro gewählt: alle Zugänge schließen und neu öffnen, Grundrauschen neu messen
+  micStreams.forEach(st => st.getTracks().forEach(t => t.stop())); micStreams = [];
+  try { micSrc && micSrc.disconnect(); clapSrc && clapTimer && clapSrc.disconnect(clapTimer); clapTimer && clapTimer.disconnect(); } catch (e) {}
+  clearInterval(sprechIv); micAn = micSrc = clapTimer = clapSrc = sprechAn = null; RAUSCH.kal = 0;
+  ensureMic().then(startClap).catch(() => {});
+}
+async function mikroListe() {   // Auswahl in den Einstellungen füllen
+  const sel = $('s_mikro'); let l = [];
+  try { l = (await navigator.mediaDevices.enumerateDevices()).filter(d => d.kind === 'audioinput' && d.label && !/^(default|communications)$/.test(d.deviceId)).map(d => d.label); } catch (e) {}
+  let wahl = l.find(n => mikroPasst(cfg.mikro, n)), fehlt = false;
+  if (!wahl && cfg.mikro) { l.unshift(wahl = cfg.mikro); fehlt = true; }   // gewähltes Mikro gerade nicht angesteckt
+  sel.innerHTML = l.map(n => `<option value="${esc(n)}">${esc(n)}${fehlt && n === wahl ? ' – nicht angeschlossen' : ''}</option>`).join('');
+  if (wahl) sel.value = wahl;
+}
+
 /* ---------- Mikrofon & Doppelklatschen ---------- */
 async function ensureMic() {
   if (micAn || !ac) return;
   try {
-    const st = await navigator.mediaDevices.getUserMedia({ audio:{ echoCancellation:true, noiseSuppression:false, autoGainControl:false } });
+    const st = await micAudio({ echoCancellation:true, noiseSuppression:false, autoGainControl:false });
     micAn = ac.createAnalyser(); micAn.fftSize = 256; micAn.smoothingTimeConstant = .5;
     micData = new Uint8Array(micAn.frequencyBinCount); micTime = new Uint8Array(micAn.fftSize);
     micSrc = ac.createMediaStreamSource(st); micSrc.connect(micAn);
@@ -1411,14 +1441,16 @@ async function ensureMic() {
 }
 /* Eigener Mikrofon-Zugang MIT Echo- und Rauschunterdrückung: misst, ob Larsen spricht, während ORB redet
    (ORBs eigene Stimme aus den Lautsprechern wird dabei weitgehend herausgerechnet) */
-let sprechAn = null, sprechBuf = null, sprechPegel = [], echoBoden = .004, ruheBoden = .002;   // ruheBoden: Rest-Rauschen (Lüfter), wenn ORB schweigt
+let sprechAn = null, sprechIv = 0, sprechBuf = null, sprechPegel = [], echoBoden = .004, ruheBoden = .002;   // ruheBoden: Rest-Rauschen (Lüfter), wenn ORB schweigt
 async function startSprechMic() {
   if (sprechAn || !ac) return;
   try {
-    const st = await navigator.mediaDevices.getUserMedia({ audio:{ echoCancellation:true, noiseSuppression:true, autoGainControl:false } });
-    sprechAn = ac.createAnalyser(); sprechAn.fftSize = 1024; sprechBuf = new Float32Array(sprechAn.fftSize);
+    const st = await micAudio({ echoCancellation:true, noiseSuppression:true, autoGainControl:false });
+    const an = sprechAn = ac.createAnalyser(); sprechAn.fftSize = 1024; sprechBuf = new Float32Array(sprechAn.fftSize);
     ac.createMediaStreamSource(st).connect(sprechAn);
-    setInterval(() => {
+    clearInterval(sprechIv);
+    sprechIv = setInterval(() => {
+      if (sprechAn !== an) return;
       sprechAn.getFloatTimeDomainData(sprechBuf); let s = 0;
       for (const v of sprechBuf) s += v * v;
       const v = Math.sqrt(s / sprechBuf.length), now = performance.now();
@@ -1458,7 +1490,7 @@ let clapAn = null, clapBuf = null, clapTimer = null, claps = [], floorRms = .000
    werden laufend in ruhigen Blöcken gemessen, abgezogen und gemerkt. Alle Knall-Schwellen gelten RELATIV dazu –
    im stillen Raum bleibt alles wie bisher, bei lautem Rauschen gilt ein sicherer Abstand über den Rausch-Spitzen. */
 const RAUSCH = { pk:.001, hf:1, lo:0, hi:0, n:0, kal:0, t:0 };
-try { const r = JSON.parse(localStorage.getItem('orbRausch') || 'null'); if (r && r.floor > 0) { floorRms = r.floor; Object.assign(RAUSCH, { pk:r.pk, hf:r.hf, lo:r.lo || 0, hi:r.hi || 0, kal:100 }); } } catch (e) {}
+try { const r = JSON.parse(localStorage.getItem('orbRausch') || 'null'); if (r && r.floor > 0) { floorRms = r.floor; Object.assign(RAUSCH, { pk:r.pk, hf:r.hf, lo:r.lo || 0, hi:r.hi || 0, kal:100, mikro:r.mikro || '' }); } } catch (e) {}
 const knallSchwelle = k => Math.min(floorRms * k, Math.max(RAUSCH.pk * k / 6.5, .0003 * k));   // Spitze: still = floor·k, laut = ~k/6,5 × Rausch-Spitze
 const pegelSchwelle = k => Math.max(floorRms * Math.min(k, 4), Math.min(floorRms * k, .0003 * k));   // Pegel: mind. 4× (12 dB) über dem Rauschen
 const ueber = v => Math.max(v - floorRms, 0);   // Anteil über dem Grundrauschen
@@ -1485,8 +1517,13 @@ async function startClap() {
   // eigener, UNGEFILTERTER Mikrofon-Zugang: Echo-/Rauschunterdrückung schneidet genau die hellen Anteile weg,
   // an denen man Schnipsen erkennt (sonst klang ein Schnipser „dumpf wie Klatschen“)
   let src = micSrc;
-  try { const roh = await navigator.mediaDevices.getUserMedia({ audio:{ echoCancellation:false, noiseSuppression:false, autoGainControl:false } });
+  try { const roh = await micAudio({ echoCancellation:false, noiseSuppression:false, autoGainControl:false });
         src = ac.createMediaStreamSource(roh); } catch (e) {}
+  if (RAUSCH.mikro !== mikroLabel && RAUSCH.kal >= 100) {   // gemerktes Rauschprofil stammt von einem anderen Mikro → neu messen
+    hlog('Mikrofon: ' + (mikroLabel || 'Windows-Standard') + ' – Grundrauschen wird neu gemessen');
+    Object.assign(RAUSCH, { pk:.001, hf:1, lo:0, hi:0, kal:0 }); floorRms = .0003;
+  }
+  RAUSCH.mikro = mikroLabel;
   src.connect(clapTimer); clapTimer.connect(mute);
   clapStarting = false; knallT = performance.now(); clapSrc = src;
   hlog('Knall-Erkenner gestartet (Mikrofon ' + (src === micSrc ? 'gefiltert' : 'roh') + ', Audio ' + ac.state + ')');
@@ -1550,7 +1587,7 @@ function rauschLernen(buf, pk, s, d) {
   }
   const now = performance.now();
   if (now - RAUSCH.t > 10000) { RAUSCH.t = now;
-    try { localStorage.setItem('orbRausch', JSON.stringify({ floor:floorRms, pk:RAUSCH.pk, hf:RAUSCH.hf, lo:RAUSCH.lo, hi:RAUSCH.hi })); } catch (e) {}
+    try { localStorage.setItem('orbRausch', JSON.stringify({ floor:floorRms, pk:RAUSCH.pk, hf:RAUSCH.hf, lo:RAUSCH.lo, hi:RAUSCH.hi, mikro:RAUSCH.mikro || '' })); } catch (e) {}
     if (!RAUSCH.log || now - RAUSCH.log > 600000) { RAUSCH.log = now; hlog('Grundrauschen gemessen: Pegel ' + floorRms.toFixed(4) + ' · Spitzen ' + RAUSCH.pk.toFixed(4)); }
   }
 }
@@ -1560,7 +1597,12 @@ function snapFertig(c) {
   const f = snapMerkmale(win, B), sEmpf = +cfg.schnips_empf || 6;
   let s = 0; for (const v of c.win[2]) s += v * v;
   c.rms = Math.max(c.rms, Math.sqrt(s / B)); c.pk = Math.max(c.pk, f.pk); c.ratio = f.hell; c.kurz = f.kurz;
-  const hellMin = 2 + (10 - sEmpf) * .5, kurzMax = .2 + .02 * sEmpf;
+  let hellMin = 2 + (10 - sEmpf) * .5, kurzMax = .2 + .02 * sEmpf;
+  const K = kalOk();
+  if (K && K.schnipsHell > K.klatschHell * 1.5) {   // kalibriert: Grenze zwischen Larsens Klatschen und Schnipsen auf diesem Mikro
+    hellMin = Math.max(K.klatschHell * 1.2, Math.min(Math.sqrt(K.schnipsHell * K.klatschHell) * (1 + (6 - sEmpf) * .08), K.schnipsHell * .7));
+  }
+  if (K && K.schnipsKurz > 0) kurzMax = Math.max(kurzMax, Math.min(K.schnipsKurz * 1.5, .6));
   c.snap = f.hell >= hellMin && f.kurz <= kurzMax;
   c.ruhig = ueber(c.slow) < ueber(c.rms) * (.1 + .05 * sEmpf);   // gleichmäßiges Lüfterrauschen zählt nicht als Geräusch
   const vorher = lautBl.filter(x => x[0] > c.t - 1000 && x[0] < c.t - 30 && x[1] > c.pk * .3).length;   // ein früherer Schnipser = 2 Blöcke
@@ -1576,8 +1618,10 @@ let snapErster = null;   // { t, pk } des ersten klaren Schnipsers
 const snapFaktor = () => 4 + (10 - (+cfg.schnips_empf || 6)) * .5;   // Empfindlichkeit 6 → 6× (≈16 dB) über den Rausch-Spitzen
 const snapAbstand = c => (c.pk / Math.max(RAUSCH.pk, 1e-6)).toFixed(1) + '×/' + (c.rms / Math.max(floorRms, 1e-6)).toFixed(1) + '×';
 function snapKlar(c) {
-  const f = snapFaktor();
-  return c.pk > Math.max(RAUSCH.pk * f, knallSchwelle(12)) && c.rms > floorRms * f * .8;
+  const f = snapFaktor(), K = kalOk();
+  let pkMin = Math.max(RAUSCH.pk * f, knallSchwelle(12));
+  if (K && K.schnipsPk > 0) pkMin = Math.max(RAUSCH.pk * 4, Math.min(pkMin, K.schnipsPk * .35 * (11 - (+cfg.schnips_empf || 6)) / 5));
+  return c.pk > pkMin && c.rms > floorRms * (K ? 4 : f * .8);
 }
 function snapDoppel(c) {
   const e = snapErster;
@@ -1629,6 +1673,7 @@ function clapTick(tBlock) {
   let pk = 0, s = 0;
   for (const v of clapBuf) { const a = Math.abs(v); if (a > pk) pk = a; s += v * v; }
   const rms = Math.sqrt(s / clapBuf.length), now = tBlock ?? performance.now();
+  if (KAL) { kalTick(now, pk, rms, s); clapPrev = clapBuf; return; }   // „Mikro kalibrieren“ läuft: nur messen, nichts auslösen
   const hist = clapTick.h || (clapTick.h = []); const pre = hist.length >= 14 ? hist.slice(-14, -2).reduce((a, b) => a + b, 0) / 12 : 1;   // ~30–150 ms vorher
   hist.push(rms); if (hist.length > 16) hist.shift();
   const slow = slowRms; slowRms = slowRms * .97 + rms * .03;   // ~0,3 s Gedächtnis (vorher ~1 s: nach einem Klatscher war Schnipsen lange blockiert)
@@ -1716,20 +1761,29 @@ function clapTick(tBlock) {
   else if (!cand && !mouse && now - lastClap > 140) {
     const mf = (musikAn() ? 2.5 : 1) * (ownSpeak ? 2 : 1);   // läuft Musik oder spricht ORB: nur deutliche Knalle zählen
     // Schwellen relativ zum gemessenen Grundrauschen (Lüfter): still wie bisher, im Rauschen sicherer Abstand über den Rausch-Spitzen
-    const base = .0006 * (11 - (+cfg.empfindlichkeit || 6)) * mf, thr = Math.max(base, knallSchwelle(40)), thrS = Math.max(base, knallSchwelle(12));   // Schnipser sind leiser als Klatscher
-    if (RAUSCH.kal >= 100 && pk > thrS && rms > Math.max(floorRms * 3, base * .2)) {
+    const base = .0006 * (11 - (+cfg.empfindlichkeit || 6)) * mf;
+    let thr = Math.max(base, knallSchwelle(40)), thrS = Math.max(base, knallSchwelle(12)), snapPkMin = Math.max(knallSchwelle(18), (.02 - .0015 * sEmpf) * mf), clapRms = pegelSchwelle(10);   // Schnipser sind leiser als Klatscher
+    const K = kalOk();
+    if (K) {   // kalibriert (Mikro kalibrieren): Schwellen aus Larsens eigenen Klatschern/Schnipsern auf diesem Mikro, sicher über den Rausch-Spitzen
+      const kS = (11 - (+cfg.empfindlichkeit || 6)) / 5 * mf, sS = (11 - sEmpf) / 5 * mf;
+      thr = Math.max(RAUSCH.pk * 3, floorRms * 8, K.klatschPk * .3 * kS); clapRms = Math.max(floorRms * 4, K.klatschRms * .2 * kS);
+      thrS = snapPkMin = Math.max(RAUSCH.pk * 3, floorRms * 6, K.schnipsPk * .3 * sS);
+    }
+    if (RAUSCH.kal >= 100 && pk > Math.min(thr, thrS) && rms > (K ? floorRms * 3 : Math.max(floorRms * 3, base * .2))) {
       // Klatschen ist breitbandig, ein Mausklick fast nur hohes Klicken: Anteil hoher Frequenzen prüfen – OHNE den Rauschanteil
       let d = 0; for (let i = 1; i < clapBuf.length; i++) { const q = clapBuf[i] - clapBuf[i - 1]; d += q * q; }
       const rn = floorRms * floorRms * clapBuf.length, hf = Math.max(d - rn * RAUSCH.hf, 0) / Math.max(s - rn, s * .05), hfMax = 2 - 2 * Math.cos(2 * Math.PI * 4800 / ac.sampleRate);
-      const snapHf = 2 - 2 * Math.cos(2 * Math.PI * 5500 / ac.sampleRate);   // Schwerpunkt über ~5,5 kHz
+      // Schwerpunkt über ~5,5 kHz – kalibriert: Grenze zwischen gemessenem Klatschen und Schnipsen
+      const hfK = K && K.schnipsHf > K.klatschHf * 1.3 ? Math.sqrt(K.schnipsHf * K.klatschHf) : 0;
+      const snapHf = hfK ? Math.min(2 - 2 * Math.cos(2 * Math.PI * 5500 / ac.sampleRate), hfK) : 2 - 2 * Math.cos(2 * Math.PI * 5500 / ac.sampleRate);
       if (window.ORB_DEBUG) console.log('Knall', 'pk', pk.toFixed(3), 'hf', hf.toFixed(2), 'crest', (pk / rms).toFixed(1));
       const still = ueber(pre / 1.1) < ueber(rms) * .3;   // davor (30–150 ms) war es deutlich leiser – bei Sprache fast nie (Lüfterrauschen zählt nicht)
       // Schnipsen nur, wenn es sich deutlich vom Raumgeräusch der letzten Sekunde abhebt (nicht bei Gesprächen/Werkzeug)
       const ruhig = ueber(slow) < ueber(rms) * (.05 + .035 * sEmpf) && ueber(pre / 1.1) < ueber(rms) * .4;
       // Strenge Schnips-Prüfung (hell, kurz, davor still, keine Sprache/Musik) folgt in snapFertig – 2 Blöcke später
       const neu = () => ({ t:now, rms, pk, slow, ruhig, win:[clapPrev, clapBuf] });
-      if (hf > snapHf && pk > Math.max(knallSchwelle(18), (.02 - .0015 * sEmpf) * mf) && pk / rms < 16 && ueber(pre / 1.1) < ueber(rms) * .4) cand = neu();
-      else if (hf < hfMax && pk / rms < 18 && still && pk > thr && rms > pegelSchwelle(10)) cand = neu();
+      if (hf > snapHf && pk > snapPkMin && pk / rms < 16 && ueber(pre / 1.1) < ueber(rms) * .4) cand = neu();
+      else if (hf < (hfK ? Math.max(hfMax, hfK) : hfMax) && pk / rms < 18 && still && pk > thr && rms > clapRms) cand = neu();
     }
   }
   // Grundrauschen: Stille schnell übernehmen, nach oben langsam und ohne Knall-Ausreißer; die erste Sekunde misst nur (Kalibrierung)
@@ -1740,6 +1794,70 @@ function clapTick(tBlock) {
     rauschLernen(clapBuf, pk, s, d);
   }
   clapPrev = clapBuf;
+}
+/* ---------- Mikro kalibrieren: 5 s Ruhe (Lüfter dürfen laufen), dann 2× klatschen, 2× schnipsen ----------
+   Misst Grundrauschen und Larsens eigene Knalle auf diesem Mikro; alle Klatsch-/Schnips-Schwellen richten sich danach
+   (gilt nur für das kalibrierte Mikro – Doppel-Schnipsen und alle Schutzregeln bleiben). */
+let KAL = null;
+const kalOk = () => { const k = cfg.kalib; return k && k.klatschPk > 0 && k.schnipsPk > 0 && mikroPasst(cfg.mikro, k.mikro) ? k : null; };
+function kalInfo(t, cls = '') { const el = $('mikro_kal'); el.textContent = t; el.className = 'note ' + cls; }
+const kalMed = a => { a = a.slice().sort((x, y) => x - y); return a[a.length >> 1] || 0; };
+async function mikroKalibrieren() {
+  if (KAL) return;
+  try { await ensureMic(); await startClap(); } catch (e) {}
+  if (!clapTimer) return kalInfo('Kein Mikrofon-Zugriff – Mikro angesteckt?', 'nein');
+  KAL = { phase:'ruhe', t0:performance.now(), bl:[], ev:[], cur:null, last:0 };
+  kalInfo('1/3 · Bitte 5 Sekunden still sein … (Lüfter dürfen laufen)'); SFX.on();
+}
+function kalAbbruch(t) { KAL = null; kalInfo(t, 'nein'); hlog('Mikro kalibrieren abgebrochen: ' + t); }
+function kalTick(now, pk, rms, s) {
+  const K = KAL, dt = now - K.t0, buf = clapBuf;
+  let d = 0; for (let i = 1; i < buf.length; i++) { const q = buf[i] - buf[i - 1]; d += q * q; }
+  if (K.phase === 'ruhe') {
+    K.bl.push({ rms, pk, hf:d / (s || 1e-12), b:buf.length >= 512 && K.bl.length % 10 === 0 ? baender512(buf, 0) : null });
+    if (dt < 5000) return;
+    const ru = K.bl.slice().sort((a, b) => a.rms - b.rms).slice(0, Math.max(1, Math.round(K.bl.length * .8)));   // lauteste 20 % (Husten, Klick) zählen nicht
+    floorRms = Math.max(kalMed(ru.map(x => x.rms)), 1e-5);
+    RAUSCH.pk = Math.max(kalMed(ru.map(x => x.pk)), floorRms * 2); RAUSCH.hf = kalMed(ru.map(x => x.hf)) || 1;
+    const bs = ru.filter(x => x.b); if (bs.length) { RAUSCH.lo = kalMed(bs.map(x => x.b.lo)); RAUSCH.hi = kalMed(bs.map(x => x.b.hi)); }
+    RAUSCH.kal = 100; RAUSCH.t = 0; RAUSCH.mikro = mikroLabel;
+    K.spitze = Math.max(...ru.map(x => x.pk));   // lauteste Rausch-Spitze (Lüfter-Knacker)
+    K.phase = 'klatschen'; K.t0 = now; kalInfo('2/3 · Ruhe gemessen ✓ – jetzt 2× klatschen'); SFX.on();
+    return;
+  }
+  if (K.cur) {   // Knall läuft: 4 Blöcke sammeln (davor, Auslöser, 2 danach) – wie die echte Schnips-Analyse
+    K.cur.win.push(buf); K.cur.rms = Math.max(K.cur.rms, rms);
+    if (K.cur.win.length < 4) return;
+    const c = K.cur, B = c.win[1].length, win = new Float32Array(B * 4);
+    c.win.forEach((b, i) => b && win.set(b.subarray(0, B), i * B));
+    const f = snapMerkmale(win, B);
+    K.ev.push({ pk:Math.max(c.pk, f.pk), rms:c.rms, hell:f.hell, kurz:f.kurz, hf:c.hf }); K.cur = null; ripple(.4);
+    if (K.ev.length < 2) return kalInfo((K.phase === 'klatschen' ? '2/3 · 1× geklatscht' : '3/3 · 1× geschnipst') + ' – noch einmal');
+    const e = K.ev, m = { pk:Math.min(e[0].pk, e[1].pk), rms:Math.min(e[0].rms, e[1].rms), hell:(e[0].hell + e[1].hell) / 2, kurz:Math.max(e[0].kurz, e[1].kurz), hf:(e[0].hf + e[1].hf) / 2 };
+    K[K.phase] = m; K.ev = [];
+    if (K.phase === 'klatschen') { K.phase = 'schnipsen'; K.t0 = now; kalInfo('3/3 · Klatschen gemessen ✓ – jetzt 2× schnipsen'); SFX.on(); return; }
+    return kalFertig(K);
+  }
+  if (dt > 12000) return kalAbbruch(K.phase === 'klatschen' ? 'Kein Klatschen gehört – bitte noch einmal starten' : 'Kein Schnipsen gehört – bitte noch einmal starten');
+  // neuer Knall: klar über Grundrauschen und lautester Rausch-Spitze, nicht direkt nach dem letzten
+  if (pk > Math.max(RAUSCH.pk * 5, K.spitze * 2, floorRms * 15) && now - K.last > 200) {
+    const rn = floorRms * floorRms * buf.length;
+    K.cur = { win:[clapPrev, buf], pk, rms, hf:Math.max(d - rn * RAUSCH.hf, 0) / Math.max(s - rn, s * .05) }; K.last = now;
+  }
+}
+function kalFertig(K) {
+  KAL = null;
+  const k = K.klatschen, n = K.schnipsen, r = v => +(+v).toPrecision(3);
+  const kal = { mikro:mikroLabel || cfg.mikro, zeit:new Date().toISOString().slice(0, 16), floor:r(floorRms), npk:r(RAUSCH.pk),
+    klatschPk:r(k.pk), klatschRms:r(k.rms), klatschHell:r(k.hell), klatschHf:r(k.hf),
+    schnipsPk:r(n.pk), schnipsRms:r(n.rms), schnipsHell:r(n.hell), schnipsKurz:r(n.kurz), schnipsHf:r(n.hf) };
+  saveCfg({ kalib:kal }); SFX.done(); ripple(.8);
+  const ab = x => Math.round(20 * Math.log10(x / Math.max(RAUSCH.pk, 1e-6))) + ' dB';
+  const unklar = n.hell < k.hell * 1.5 && n.hf < k.hf * 1.3;
+  kalInfo('Fertig ✓ · Klatschen ' + ab(k.pk) + ', Schnipsen ' + ab(n.pk) + ' über dem Rauschen' +
+    (unklar ? ' · Schnipsen klang kaum heller als Klatschen – ggf. näher am Mikro wiederholen' : ''), unklar ? 'nein' : 'ok');
+  hlog('Mikro kalibriert (' + kal.mikro + '): Rauschen ' + kal.floor + '/' + kal.npk + ' · Klatschen ' + kal.klatschPk + ' hell ' + kal.klatschHell +
+    ' · Schnipsen ' + kal.schnipsPk + ' hell ' + kal.schnipsHell + ' kurz ' + kal.schnipsKurz);
 }
 let lastMouse = -1e9;
 addEventListener('keydown', () => { lastMouse = performance.now(); }, true);   // Tastenklicks sind kein Knall
@@ -4007,7 +4125,8 @@ $('kb').onclick = () => { SFX.click(); $('txt').focus(); };
 $('gear').onclick = () => toggleSettings();
 $('stopb').onclick = stoppKnopf;
 $('setx').onclick = () => toggleSettings(false);
-function toggleSettings(on) { const el = $('set'); on = on ?? !el.classList.contains('on'); el.classList.toggle('on', on); on ? SFX.open() : SFX.close(); }
+function toggleSettings(on) { const el = $('set'); on = on ?? !el.classList.contains('on'); el.classList.toggle('on', on); on ? SFX.open() : SFX.close();
+  if (on) { mikroListe(); if (!KAL) { const k = kalOk(); kalInfo(k ? 'Kalibriert am ' + k.zeit.replace('T', ' um ') + ' · bei Mikrowechsel neu machen' : '5 s Ruhe, dann 2× klatschen und 2× schnipsen – nach jedem Mikrowechsel einmal machen.'); } } }
 // leiser Tick beim Überfahren von Knöpfen (höchstens alle 80 ms)
 let lastHover = 0;
 document.addEventListener('mouseover', e => { if (e.target.closest('.ic, .chip, .btn, .seg button, .swc, .done') && performance.now() - lastHover > 80) { lastHover = performance.now(); SFX.hover(); } });
@@ -4068,6 +4187,8 @@ $('s_voice').onchange = e => setVoice(e.target.checked);
 $('s_jarvis').onchange = e => { saveCfg({ steuerung:e.target.checked ? 'wort' : 'taste' }); e.target.checked ? SFX.on() : SFX.off(); };
 $('s_empf').oninput = e => saveCfg({ empfindlichkeit:+e.target.value });
 $('s_sempf').oninput = e => saveCfg({ schnips_empf:+e.target.value });
+$('mikrokal').onclick = () => mikroKalibrieren();
+$('s_mikro').onchange = e => { saveCfg({ mikro:e.target.value }); mikroNeu(); kalInfo(kalOk() ? 'Dieses Mikro ist schon kalibriert.' : 'Neues Mikro – bitte einmal „Mikro kalibrieren“.'); };
 $('snaptest').onclick = () => {
   snapTest = performance.now() + 15000; ensureMic().then(startClap).catch(() => {});
   const el = $('snap_test'); el.className = 'note'; el.textContent = 'Jetzt zweimal kurz hintereinander schnipsen … (15 Sekunden)';
