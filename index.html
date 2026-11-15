@@ -927,6 +927,7 @@
     <div class="row">Stimmungs-Licht (Nacht, Trading, Musik)<input type="checkbox" class="sw" id="s_stimmung"></div>
     <div class="row">Gaming-Modus (bei Spielen Platz machen)<input type="checkbox" class="sw" id="s_gaming"></div>
     <div class="row">Razer-Licht (Tastatur/Maus in ORBs Farbe)<input type="checkbox" class="sw" id="s_razer"></div>
+    <div class="row">Lokale Spracherkennung (Whisper + „Hey Jarvis“, offline)<input type="checkbox" class="sw" id="s_ohr"></div>
     <div class="row">Gesten per Webcam (✋ zuhören · ✊ Stopp · 👎 weg · 👍 ja)<input type="checkbox" class="sw" id="s_gesten"></div>
     <div class="row">Einschlafen nach<select id="s_schlaf"><option value="0">nie</option><option value="2">2 Min.</option><option value="5">5 Min.</option><option value="10">10 Min.</option><option value="30">30 Min.</option></select></div>
     <div class="row">Dein Name<input type="text" id="s_name" placeholder="optional"></div>
@@ -2160,6 +2161,27 @@ function geste(n) {
     else { hint('👍', 1000); SFX.done(); }
   }
 }
+/* ---------- Lokales Ohr (Whisper + „Hey Jarvis“) ersetzt die Online-Spracherkennung, sobald es läuft ---------- */
+let ohrLast = -1;
+function ohrStand(o) {
+  const an = !!(o && o.an) && cfg.ohr !== false;
+  if (an && !S.ohr) { S.ohr = true; stopWake(); killConvoRec(); killBarge(); hlog && hlog('Lokale Spracherkennung aktiv'); }
+  else if (!an && S.ohr) { S.ohr = false; hlog && hlog('Lokale Spracherkennung aus – Online-Erkennung übernimmt'); }
+  const ev = (o && o.ev) || [];
+  if (ohrLast < 0) { ohrLast = ev.reduce((m, e) => Math.max(m, e.id), 0); return; }   // beim Laden nichts Altes nachspielen
+  for (const e of ev) if (e.id > ohrLast) { ohrLast = e.id; try { ohrEreignis(e); } catch (err) {} }
+}
+function ohrEreignis(e) {
+  if (e.typ === 'wake') return onWake('Jarvis');
+  const t = (e.text || '').trim(); if (!t) return;
+  if (speakingNow()) {   // ORB spricht: nur „Stopp“ oder „Jarvis“ zählt (Rest ist meist Echo)
+    if (STOP_RE.test(t.replace(/[.!?,]+$/g, ''))) { stopAudio(); caption(''); if (S.busy) fetch('/stop', { method:'POST' }).catch(() => {}); return convo ? stopConvo() : hint('Okay', 1200); }
+    if (NAME_RE().test(t)) return interrupt();
+    return;
+  }
+  if (convo) { liveMsg(t); return handleConvo(t); }
+  onWake(t);
+}
 let waechterT = 0;
 function zuhoerWaechter() {
   const now = performance.now();
@@ -2305,7 +2327,7 @@ function convoCanListen() {
   return !S.call && convo && !S.sleep && !listening && !speakingNow() && performance.now() >= askGap && S.mode !== 'wartet';   // auch während er arbeitet – Neues läuft parallel
 }
 function convoListen() {
-  if (convoRec || !convoCanListen() || performance.now() - convoLastStart < 500) return;
+  if (S.ohr || convoRec || !convoCanListen() || performance.now() - convoLastStart < 500) return;
   convoLastStart = performance.now(); stopWake(); killBarge();
   const r = mkSR(); r.lang = 'de-DE'; r.continuous = true; r.interimResults = true; r.maxAlternatives = 3;
   adoptRec(r);
@@ -2417,7 +2439,7 @@ let bargeRec = null, bargeLast = 0;
 function killBarge() { if (bargeRec) { const r = bargeRec; bargeRec = null; try { r.abort(); } catch (e) {} } }
 function bargeWanted() { return !S.call && SR && !S.sleep && !listening && !convoRec && (speakingNow() || S.busy); }   // hört auf „Jarvis“ (falls an) und „Stopp“
 function bargeListen() {
-  if (bargeRec || !bargeWanted() || performance.now() - bargeLast < 600) return;
+  if (S.ohr || bargeRec || !bargeWanted() || performance.now() - bargeLast < 600) return;
   bargeLast = performance.now(); stopWake();
   const r = mkSR(); r.lang = 'de-DE'; r.continuous = true; r.interimResults = true;
   r.onresult = e => {
@@ -2468,7 +2490,7 @@ function hlog(t) {
 }
 let wakeErr = 0, wakeFehler = 0;
 function startWake(warum) {
-  if (S.call || !SR || cfg.steuerung !== 'wort' || wakeRec || listening || convoRec || bargeRec) return;
+  if (S.ohr || S.call || !SR || cfg.steuerung !== 'wort' || wakeRec || listening || convoRec || bargeRec) return;
   if (typeof warum === 'string') hlog('Jarvis-Erkennung fehlte im Zustand ' + (S.sleep ? 'Schlaf' : convo ? 'Gespräch' : 'Bereit') + ' → neu gestartet (' + warum + ')');
   wakeRec = mkSR(); wakeRec.lang = 'de-DE'; wakeRec.continuous = true; wakeRec.interimResults = true; wakeRec.maxAlternatives = 3;
   wakeRec.onresult = e => {
@@ -2587,11 +2609,12 @@ async function poll() {
   const ctl = new AbortController(), abbruch = setTimeout(() => ctl.abort(), 5000);
   try {
     const aktiv = speakingNow() || listening || !!convoRec ? '1' : '0';
-    const resp = await fetch('/state?aktiv=' + aktiv + '&wach=' + (!S.sleep && !document.hidden && !verborgen ? 1 : 0), { cache:'no-store', signal:ctl.signal });
+    const resp = await fetch('/state?aktiv=' + aktiv + '&spricht=' + (speakingNow() ? 1 : 0) + '&wach=' + (!S.sleep && !document.hidden && !verborgen ? 1 : 0), { cache:'no-store', signal:ctl.signal });
     if (resp.status === 403 && !poll._reload) { poll._reload = true; setTimeout(() => location.reload(), 300); }   // ORB neu gestartet → neues Token
     const st = await resp.json(); lastOk = performance.now(); S.busy = !!st.busy; renderTasks(st.aufgaben);
     if (st.karten_v !== undefined && st.karten_v !== kartenV) { kartenV = st.karten_v; ladeKarten(); } if (st.bild) bildHolo(st.bild); if (st.gold !== undefined) goldHolo(st.gold); if (st.kamera_foto !== undefined) kamFoto(st.kamera_foto); if (st.kam_n !== undefined) kamInhalt(st.kam_n); if (st.web) webHolo(st.web);
-    S.spiel = st.spiel || '';   // im Spiel: Klatschen/Schnipsen aus (Schüsse, Explosionen, Blöcke)
+    S.spiel = st.spiel || '';
+    ohrStand(st.ohr);   // im Spiel: Klatschen/Schnipsen aus (Schüsse, Explosionen, Blöcke)
     if (!!st.anruf !== !!S.call) { S.call = !!st.anruf; if (S.call) { stopWake(); killConvoRec(); killBarge(); hint('Meeting oder Spiel erkannt – ich höre nicht zu', 3500); } else if (cfg.steuerung === 'wort') startWake(); }
     // neue ORB-Version läuft → Seite neu laden (sonst sieht man Änderungen erst nach Fenster-Neustart)
     if (st.version) { if (!poll._v) poll._v = st.version; else if (st.version !== poll._v) { location.replace(S.sleep ? '/#schlaf' : '/#wake'); location.reload(); return; } }
@@ -4456,7 +4479,7 @@ document.querySelectorAll('.swc').forEach(el => el.onclick = () => { saveCfg({ f
 const segs = { seg_eff:'tempo_claude', seg_len:'laenge', seg_rechte:'rechte', seg_fx:'effekte' };
 for (const [id, key] of Object.entries(segs)) $(id).querySelectorAll('button').forEach(b => b.onclick = () => { saveCfg({ [key]:b.dataset.v }); SFX.click(); });
 function fillRange(el) { el.style.setProperty('--p', (el.value - el.min) / (el.max - el.min) * 100 + '%'); }
-const CHK = { s_gesten:'gesten', s_razer:'razer', s_stimmung:'stimmung', s_gaming:'gaming_modus', s_tstart:'trading_start', s_dauer:'dauerzuhoeren', s_unterbrechen:'unterbrechen', s_sprechunter:'sprechen_unterbrechen', s_nurjarvis:'nur_jarvis', s_musik:'musik_schutz', s_duck:'ducking', s_gruss:'begruessung', s_voll:'vollbild', s_auto:'autostart', s_schliessen:'schlaf_schliessen', s_screen:'bildschirm', s_unter:'untertitel', s_sfx:'sfx', s_amb:'ambient' };
+const CHK = { s_ohr:'ohr', s_gesten:'gesten', s_razer:'razer', s_stimmung:'stimmung', s_gaming:'gaming_modus', s_tstart:'trading_start', s_dauer:'dauerzuhoeren', s_unterbrechen:'unterbrechen', s_sprechunter:'sprechen_unterbrechen', s_nurjarvis:'nur_jarvis', s_musik:'musik_schutz', s_duck:'ducking', s_gruss:'begruessung', s_voll:'vollbild', s_auto:'autostart', s_schliessen:'schlaf_schliessen', s_screen:'bildschirm', s_unter:'untertitel', s_sfx:'sfx', s_amb:'ambient' };
 function syncSettingsUI() {
   const set = (id, v) => { const el = $(id); if (el && document.activeElement !== el) el.value = v; };
   set('s_stimme', cfg.stimme); set('s_tempo', parseInt(cfg.tempo) || 0); set('s_hoehe', parseInt(cfg.hoehe) || 0);

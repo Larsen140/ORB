@@ -109,6 +109,27 @@ def mini(an=True):
                 u.keybd_event(0x7A, 0, 0, 0); u.keybd_event(0x7A, 0, 2, 0)   # F11: wieder Vollbild
 
 
+OHR_PY = os.path.join(os.environ.get("LOCALAPPDATA", ""), "ORB", "ohr", "venv", "Scripts", "pythonw.exe")
+
+
+def ohr_wache():
+    """Startet ORBs lokales Ohr (ohr.py im eigenen venv), sobald es installiert ist, und hält es am Laufen."""
+    p = None
+    while True:
+        try:
+            an = server.load_cfg().get("ohr", True) and os.path.exists(OHR_PY)
+            skript = os.path.join(os.path.dirname(os.path.abspath(server.__file__)), "ohr.py")
+            if an and (p is None or p.poll() is not None) and os.path.exists(skript):
+                p = subprocess.Popen([OHR_PY, skript], creationflags=0x08000000, env=dict(os.environ, ORB_PORT=str(server.PORT)))
+                server.OHR["pid"] = p.pid
+            elif not an and p is not None and p.poll() is None:
+                p.kill()
+                p = None
+        except Exception as e:
+            print("Ohr:", e)
+        time.sleep(10)
+
+
 def hide_hidden_soon():
     """Gerade gestartetes Fenster sofort ausblenden (Start im Hintergrund, damit „Jarvis“ trotzdem zuhört)."""
     end = time.time() + 20
@@ -633,6 +654,7 @@ def main():
     threading.Thread(target=server.chroma_loop, daemon=True).start()   # Razer-Licht
     threading.Thread(target=server.pc_wache, daemon=True).start()      # warnt bei vollem RAM/Platte, heißer GPU
     threading.Thread(target=server.musik_logger, daemon=True).start()  # Musikgeschmack für den Spotify-DJ
+    threading.Thread(target=ohr_wache, daemon=True).start()            # lokales Ohr: „Hey Jarvis“ + Whisper
     threading.Thread(target=update_loop, daemon=True).start()
     threading.Thread(target=announce_update, daemon=True).start()
     threading.Thread(target=backup_jarvis, daemon=True).start()

@@ -60,7 +60,7 @@ DEFAULT_CFG = {
     "stimme": "de-DE-FlorianMultilingualNeural", "tempo": "+12%", "hoehe": "+0Hz", "lautstaerke": 160, "laut_v": 2,
     "farbe": "rot", "effekte": "mittel", "untertitel": True,
     "sfx": True, "sfxlaut": 60, "ambient": False,
-    "steuerung": "wort", "wakeword": "Jarvis", "schnipsen": True, "trading_start": True, "gaming_modus": True, "stimmung": True, "razer": True, "gesten": True, "unterbrechen": True, "sprechen_unterbrechen": True, "nur_jarvis": True, "musik_schutz": True, "ducking": True,
+    "steuerung": "wort", "wakeword": "Jarvis", "schnipsen": True, "trading_start": True, "gaming_modus": True, "stimmung": True, "razer": True, "gesten": True, "ohr": True, "unterbrechen": True, "sprechen_unterbrechen": True, "nur_jarvis": True, "musik_schutz": True, "ducking": True,
     "tts_anbieter": "edge",
     "klatschen": True, "dauerzuhoeren": True, "empfindlichkeit": 6, "schnips_empf": 6, "mikro": "TONOR", "kalib": {}, "satzpause": 2.0, "begruessung": True, "ort": "", "name": "",
     "schlafen": 5, "vollbild": True, "autostart": True, "schlaf_schliessen": True, "bildschirm": False,
@@ -69,7 +69,7 @@ DEFAULT_CFG = {
 }
 # Damit ORB immer dein Claude-Code-Login (Max-Abo) nutzt und nie einen API-Schlüssel
 CLAUDE_ENV_DROP = ("ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "ANTHROPIC_BASE_URL")
-VERSION = "96"
+VERSION = "97"
 ORB_UI = ("Deine Oberfläche (die Larsen gerade sieht): in der Mitte du als flüssige leuchtende Kugel mit Tropfen, "
           "Orbit-Ringen und Sternenhimmel; links eine Uhr und darunter der Gesprächsverlauf mit Eingabefeld; rechts "
           "Karten für System (CPU, RAM, Akku), Wetter mit Stundenvorschau, Aktivität (was du gerade tust) und Vorschläge; "
@@ -450,7 +450,9 @@ KURZ_PROMPT = ("Du sprichst gerade über ORB, eine Sprachoberfläche; deine Antw
 
 _cache, _lock, _cfg_lock = {}, threading.Lock(), threading.Lock()
 LAST_POLL = [0.0]
-LAST_WACH = [0.0]   # wann die Oberfläche zuletzt sichtbar und wach war (Razer-Licht)
+LAST_WACH = [0.0]
+LAST_SPRICHT = [0.0]   # wann ORB zuletzt hörbar gesprochen hat (Echo-Schutz fürs lokale Ohr)
+OHR = {"t": 0.0, "n": 0, "ev": []}   # lokales Ohr (ohr.py): letzter Kontakt, Ereignisse für die Oberfläche   # wann die Oberfläche zuletzt sichtbar und wach war (Razer-Licht)
 LAST_ACTIVE = [0.0]   # wann das Fenster zuletzt gesprochen/zugehört hat  # wann das Fenster zuletzt nachgefragt hat
 ON_SHOW = [None]    # wird von orb_app gesetzt: öffnet/zeigt das Fenster
 ON_HIDE = [None]
@@ -2133,7 +2135,7 @@ class Chroma:
             return True
         try:
             r = self._req("POST", "http://localhost:54235/razer/chromasdk", {
-                "title": "ORB", "description": "ORB Sprachassistent", "author": {"name": "ORB", "contact": "lokal"},
+                "title": "ORB Licht", "description": "ORB Sprachassistent – Licht",   # eigener Name: Razer startet dafür einen Hilfsprozess mit diesem Namen "author": {"name": "ORB", "contact": "lokal"},
                 "device_supported": list(CHROMA_GERAETE), "category": "application"})
             self.uri = r.get("uri")
             time.sleep(0.6)   # Chroma braucht kurz, bis die Sitzung bereit ist
@@ -2549,6 +2551,8 @@ class Handler(BaseHTTPRequestHandler):
             LAST_POLL[0] = time.time()
             if q.get("wach") == "1":
                 LAST_WACH[0] = time.time()
+            if q.get("spricht") == "1":
+                LAST_SPRICHT[0] = time.time()
             if q.get("aktiv") == "1":
                 LAST_ACTIVE[0] = time.time()
             st = read_state()
@@ -2559,6 +2563,8 @@ class Handler(BaseHTTPRequestHandler):
                 st = read_state()
             st["busy"] = BRAIN.busy
             st["aufgaben"] = tasks_list()
+            OHR["ev"] = [e for e in OHR["ev"] if time.time() - e["t"] < 20]
+            st["ohr"] = {"an": time.time() - OHR["t"] < 5 and load_cfg().get("ohr", True), "ev": OHR["ev"]}
             karten_liste()   # abgelaufene Hologramme wegräumen
             st["karten_v"] = KARTEN_V[0]   # Hintergrund-Aufgaben + Entwickler (je ein Hologramm)
             st["bild"] = {"n": BILD["n"], "name": BILD["name"], "rein": BILD["rein"]}   # Bild-Hologramm
@@ -2577,6 +2583,11 @@ class Handler(BaseHTTPRequestHandler):
         elif u.path == "/karten":
             self.send(200, {"karten": [dict(c, inhalt=[{k: v for k, v in blk.items() if k != "pfad"} for blk in c["inhalt"]])
                                        for c in karten_liste()]})
+        elif u.path == "/ohr/modus":   # ohr.py fragt: lauschen? mitschreiben?
+            OHR["t"] = time.time()
+            spiel = spiel_laeuft()
+            an = load_cfg().get("ohr", True) and not in_call() and not (spiel and spiel != "Minecraft")
+            self.send(200, {"an": an, "mitschreiben": an and time.time() - LAST_WACH[0] < 3})
         elif u.path == "/stimmung":
             self.send(200, stimmung())
         elif u.path == "/karte/datei":   # Bild aus einem Hologramm (nur Bilddateien, die beim Anlegen geprüft wurden)
@@ -2820,6 +2831,18 @@ class Handler(BaseHTTPRequestHandler):
             web_schliessen_fenster()   # Webansicht verschwindet mit ORB
             if ON_HIDE[0]:
                 threading.Thread(target=ON_HIDE[0], kwargs={"keep": keep}, daemon=True).start()
+        elif u.path == "/ohr":   # ohr.py: „Hey Jarvis“ erkannt oder Satz mitgeschrieben
+            OHR["t"] = time.time()
+            typ, text = str(b.get("typ", "")), str(b.get("text", "")).strip()
+            echo = time.time() - LAST_SPRICHT[0] < 1.2
+            name_stopp = re.search(r"(?i)\b(jarvis|orb|stopp?|hör auf|aufhören|sei still|ruhe)\b", text)
+            if typ == "text" and echo and not name_stopp:
+                return self.send(200, {"ok": False, "grund": "Echo – ORB sprach gerade"})
+            if typ == "wake" and time.time() - LAST_WACH[0] > 3 and ON_SHOW[0]:
+                threading.Thread(target=ON_SHOW[0], kwargs={"wake": True}, daemon=True).start()   # Fenster zu/versteckt: aufwecken
+            OHR["n"] += 1
+            OHR["ev"].append({"id": OHR["n"], "typ": typ, "text": text, "t": time.time()})
+            self.send(200, {"ok": True})
         elif u.path == "/mini":   # Mini-ORB: kleine Kugel in der Ecke, immer obenauf
             self.send(200, {"ok": bool(ON_MINI[0])})
             if ON_MINI[0]:
