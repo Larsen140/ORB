@@ -916,6 +916,8 @@
     <div class="row">Musik leiser, während ich antworte<input type="checkbox" class="sw" id="s_duck"></div>
     <div class="row">Mit Wetter begrüßen<input type="checkbox" class="sw" id="s_gruss"></div>
     <div class="row">Trading-Start (News, Gold, Chart – 1× am Tag)<input type="checkbox" class="sw" id="s_tstart"></div>
+    <div class="row">Stimmungs-Licht (Nacht, Trading, Musik)<input type="checkbox" class="sw" id="s_stimmung"></div>
+    <div class="row">Gaming-Modus (bei Spielen Platz machen)<input type="checkbox" class="sw" id="s_gaming"></div>
     <div class="row">Einschlafen nach<select id="s_schlaf"><option value="0">nie</option><option value="2">2 Min.</option><option value="5">5 Min.</option><option value="10">10 Min.</option><option value="30">30 Min.</option></select></div>
     <div class="row">Dein Name<input type="text" id="s_name" placeholder="optional"></div>
     <div class="row">Ort fürs Wetter<input type="text" id="s_ort" placeholder="automatisch"></div>
@@ -989,6 +991,31 @@ const THEMES = {
   weiss: [[210,225,255],[150,190,255], [160,255,230], [255,170,220]],  // Eis
 };
 const AMBER = [255,165,30];
+// Stimmungs-Licht: Farbe gleitet sanft nach Lage (Nacht blau, Trading-Plus grün, -Minus gold, Musik lila)
+let stimmungFarbe = '', stimmungAnim = null;
+function farbeGleiten(ziel) {
+  const von = [BASE, BASE2, BASE3, BASE4].map(c => c.slice()), nach = THEMES[ziel] || THEMES.rot, t0 = performance.now();
+  clearInterval(stimmungAnim);
+  stimmungAnim = setInterval(() => {
+    const u = Math.min(1, (performance.now() - t0) / 2500), e = u * u * (3 - 2 * u);
+    const mix = (a, b) => a.map((v, i) => Math.round(v + (b[i] - v) * e));
+    [BASE, BASE2, BASE3, BASE4] = von.map((c, i) => mix(c, nach[i]));
+    if (u >= 1) clearInterval(stimmungAnim);
+  }, 40);
+}
+async function stimmungPruefen() {
+  if (S.sleep || document.hidden) return;
+  let ziel = cfg.farbe;
+  try {
+    if (cfg.stimmung !== false) {
+      const st = await (await fetch('/stimmung')).json(); ziel = st.farbe || cfg.farbe;
+      if (typeof musik !== 'undefined' && musik && st.grund === 'normal') ziel = 'lila';
+    }
+  } catch (e) {}
+  const neu = ziel === cfg.farbe ? '' : ziel;
+  if (neu !== stimmungFarbe) { stimmungFarbe = neu; farbeGleiten(ziel); }
+}
+setInterval(stimmungPruefen, 60000); setTimeout(stimmungPruefen, 4000);
 let BASE = THEMES.rot[0], BASE2 = THEMES.rot[1], BASE3 = THEMES.rot[2], BASE4 = THEMES.rot[3];
 const CALM = true;   // ruhiges Design: weniger Effekte, mehr Platz für die Kugel
 const PAL = () => [BASE, BASE2, BASE3, BASE4];
@@ -1011,7 +1038,7 @@ let autoSleepCheck = false;
 let lastAct = performance.now(), listenAfterSpeech = false, wasSpeaking = false;
 
 function applyCfg() {
-  [BASE, BASE2, BASE3, BASE4] = THEMES[cfg.farbe] || THEMES.rot;
+  [BASE, BASE2, BASE3, BASE4] = THEMES[stimmungFarbe || cfg.farbe] || THEMES.rot;
   const root = document.documentElement.style;
   root.setProperty('--c', rgb(BASE)); root.setProperty('--c2', rgb(BASE2)); root.setProperty('--c3', rgb(BASE3)); root.setProperty('--c4', rgb(BASE4));
   $('gg1').setAttribute('stop-color', `rgb(${rgb(BASE)})`); $('gg2').setAttribute('stop-color', `rgb(${rgb(BASE2)})`);
@@ -2500,7 +2527,7 @@ async function poll() {
     if (resp.status === 403 && !poll._reload) { poll._reload = true; setTimeout(() => location.reload(), 300); }   // ORB neu gestartet → neues Token
     const st = await resp.json(); lastOk = performance.now(); S.busy = !!st.busy; renderTasks(st.aufgaben);
     if (st.karten_v !== undefined && st.karten_v !== kartenV) { kartenV = st.karten_v; ladeKarten(); } if (st.bild) bildHolo(st.bild); if (st.gold !== undefined) goldHolo(st.gold); if (st.kamera_foto !== undefined) kamFoto(st.kamera_foto); if (st.kam_n !== undefined) kamInhalt(st.kam_n); if (st.web) webHolo(st.web);
-    if (!!st.anruf !== !!S.call) { S.call = !!st.anruf; if (S.call) { stopWake(); killConvoRec(); killBarge(); hint('Meeting erkannt – ich höre nicht zu', 3500); } else if (cfg.steuerung === 'wort') startWake(); }
+    if (!!st.anruf !== !!S.call) { S.call = !!st.anruf; if (S.call) { stopWake(); killConvoRec(); killBarge(); hint('Meeting oder Spiel erkannt – ich höre nicht zu', 3500); } else if (cfg.steuerung === 'wort') startWake(); }
     // neue ORB-Version läuft → Seite neu laden (sonst sieht man Änderungen erst nach Fenster-Neustart)
     if (st.version) { if (!poll._v) poll._v = st.version; else if (st.version !== poll._v) { location.replace(S.sleep ? '/#schlaf' : '/#wake'); location.reload(); return; } }
     if (st.seq !== S.seq && (S.seq === -1 || st.seq > S.seq || st.seq < S.seq - 1000)) { const first = S.seq === -1; S.seq = st.seq; onState(st, first); }
@@ -4361,7 +4388,7 @@ document.querySelectorAll('.swc').forEach(el => el.onclick = () => { saveCfg({ f
 const segs = { seg_eff:'tempo_claude', seg_len:'laenge', seg_rechte:'rechte', seg_fx:'effekte' };
 for (const [id, key] of Object.entries(segs)) $(id).querySelectorAll('button').forEach(b => b.onclick = () => { saveCfg({ [key]:b.dataset.v }); SFX.click(); });
 function fillRange(el) { el.style.setProperty('--p', (el.value - el.min) / (el.max - el.min) * 100 + '%'); }
-const CHK = { s_tstart:'trading_start', s_dauer:'dauerzuhoeren', s_unterbrechen:'unterbrechen', s_sprechunter:'sprechen_unterbrechen', s_nurjarvis:'nur_jarvis', s_musik:'musik_schutz', s_duck:'ducking', s_gruss:'begruessung', s_voll:'vollbild', s_auto:'autostart', s_schliessen:'schlaf_schliessen', s_screen:'bildschirm', s_unter:'untertitel', s_sfx:'sfx', s_amb:'ambient' };
+const CHK = { s_stimmung:'stimmung', s_gaming:'gaming_modus', s_tstart:'trading_start', s_dauer:'dauerzuhoeren', s_unterbrechen:'unterbrechen', s_sprechunter:'sprechen_unterbrechen', s_nurjarvis:'nur_jarvis', s_musik:'musik_schutz', s_duck:'ducking', s_gruss:'begruessung', s_voll:'vollbild', s_auto:'autostart', s_schliessen:'schlaf_schliessen', s_screen:'bildschirm', s_unter:'untertitel', s_sfx:'sfx', s_amb:'ambient' };
 function syncSettingsUI() {
   const set = (id, v) => { const el = $(id); if (el && document.activeElement !== el) el.value = v; };
   set('s_stimme', cfg.stimme); set('s_tempo', parseInt(cfg.tempo) || 0); set('s_hoehe', parseInt(cfg.hoehe) || 0);

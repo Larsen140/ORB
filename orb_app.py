@@ -133,6 +133,22 @@ def show(wake=False, hidden=False):
         threading.Thread(target=hide_hidden_soon, daemon=True).start()
 
 
+def spiel_wache():
+    """Startet ein Spiel, schließt ORB sein Fenster (gibt GPU/RAM frei) – außer Larsen redet gerade mit ihm."""
+    vorher = ""
+    while True:
+        time.sleep(8)
+        try:
+            spiel = server.spiel_laeuft()
+            if spiel and not vorher and window_open() and time.time() - server.LAST_ACTIVE[0] > 20:
+                server.log_close("Gaming-Modus: %s gestartet" % spiel)
+                server.BRAIN.kill() if not server.BRAIN.busy else None
+                hide_window()
+            vorher = spiel
+        except Exception as e:
+            print("Spiel-Wache:", e)
+
+
 def hide_window(keep=False):
     """ORB-Fenster schließen (spart ~800 MB) – im Hintergrund wird weiter auf Klatschen gelauscht.
     keep=True: nur ausblenden – die Seite läuft weiter und hört auf „Jarvis“, Klatschen und Schnipsen."""
@@ -351,6 +367,8 @@ def clap_loop():
             with sd.RawInputStream(samplerate=sr, channels=1, dtype="int16", blocksize=block, device=mikro_geraet(sd, wahl)) as st:
                 while not window_open():
                     raw, _ = st.read(block)
+                    if server.spiel_laeuft():
+                        continue   # Gaming-Modus: Schüsse/Explosionen sind keine Klatscher
                     x = array.array("h", bytes(raw))
                     now = time.time()
                     if now - cfg_t > 3:
@@ -581,6 +599,7 @@ def main():
     server.set_autostart(bool(cfg.get("autostart", True)))
     threading.Thread(target=server.mikro_standard, daemon=True).start()   # gewähltes Mikro (TONOR) = Windows-Standard
     threading.Thread(target=clap_loop, daemon=True).start()
+    threading.Thread(target=spiel_wache, daemon=True).start()
     threading.Thread(target=update_loop, daemon=True).start()
     threading.Thread(target=announce_update, daemon=True).start()
     threading.Thread(target=backup_jarvis, daemon=True).start()

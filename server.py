@@ -60,7 +60,7 @@ DEFAULT_CFG = {
     "stimme": "de-DE-FlorianMultilingualNeural", "tempo": "+12%", "hoehe": "+0Hz", "lautstaerke": 160, "laut_v": 2,
     "farbe": "rot", "effekte": "mittel", "untertitel": True,
     "sfx": True, "sfxlaut": 60, "ambient": False,
-    "steuerung": "wort", "wakeword": "Jarvis", "schnipsen": True, "trading_start": True, "unterbrechen": True, "sprechen_unterbrechen": True, "nur_jarvis": True, "musik_schutz": True, "ducking": True,
+    "steuerung": "wort", "wakeword": "Jarvis", "schnipsen": True, "trading_start": True, "gaming_modus": True, "stimmung": True, "unterbrechen": True, "sprechen_unterbrechen": True, "nur_jarvis": True, "musik_schutz": True, "ducking": True,
     "tts_anbieter": "edge",
     "klatschen": True, "dauerzuhoeren": True, "empfindlichkeit": 6, "schnips_empf": 6, "mikro": "TONOR", "kalib": {}, "satzpause": 2.0, "begruessung": True, "ort": "", "name": "",
     "schlafen": 5, "vollbild": True, "autostart": True, "schlaf_schliessen": True, "bildschirm": False,
@@ -69,7 +69,7 @@ DEFAULT_CFG = {
 }
 # Damit ORB immer dein Claude-Code-Login (Max-Abo) nutzt und nie einen API-Schlüssel
 CLAUDE_ENV_DROP = ("ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "ANTHROPIC_BASE_URL")
-VERSION = "92"
+VERSION = "93"
 ORB_UI = ("Deine Oberfläche (die Larsen gerade sieht): in der Mitte du als flüssige leuchtende Kugel mit Tropfen, "
           "Orbit-Ringen und Sternenhimmel; links eine Uhr und darunter der Gesprächsverlauf mit Eingabefeld; rechts "
           "Karten für System (CPU, RAM, Akku), Wetter mit Stundenvorschau, Aktivität (was du gerade tust) und Vorschläge; "
@@ -2044,6 +2044,62 @@ def tagesstart(zwingen=False):
     return True
 
 
+# ---------- Gaming-Modus: läuft ein Spiel, gibt ORB Grafikkarte/Speicher frei und reagiert nicht auf Knalle ----------
+SPIEL_ORDNER = ("\\steamapps\\common\\", "\\epic games\\", "\\riot games\\", "\\roblox\\versions\\", "\\ea games\\",
+                "\\ubisoft game launcher\\games\\", "\\battle.net\\", "\\xboxgames\\", "\\gog galaxy\\games\\")
+KEIN_SPIEL = ("steam.exe", "steamwebhelper.exe", "epicgameslauncher.exe", "robloxplayerlauncher.exe", "riotclientservices.exe",
+              "riotclientux.exe", "battle.net.exe", "eadesktop.exe", "crashreport", "unitycrashhandler", "easyanticheat")
+_spiel = {"t": 0.0, "name": ""}
+
+
+def spiel_laeuft():
+    """Name des laufenden Spiels (Steam, Epic, Riot, Roblox, EA, Ubisoft, Battle.net, Xbox) oder ''. 5 s zwischengespeichert."""
+    if time.time() - _spiel["t"] < 5:
+        return _spiel["name"]
+    name = ""
+    if load_cfg().get("gaming_modus", True):
+        try:
+            import psutil
+            for p in psutil.process_iter(["exe", "name"]):
+                exe = (p.info.get("exe") or "").lower()
+                n = (p.info.get("name") or "").lower()
+                if exe and any(o in exe for o in SPIEL_ORDNER) and not any(k in n for k in KEIN_SPIEL):
+                    name = p.info.get("name") or "Spiel"
+                    break
+        except Exception:
+            pass
+    _spiel.update(t=time.time(), name=name)
+    return name
+
+
+def stimmung():
+    """Farbe für ORB nach Lage: Spiel/Nacht/Trading-Ergebnis des Tages – sonst die eingestellte Farbe."""
+    cfg = load_cfg()
+    if not cfg.get("stimmung", True):
+        return {"farbe": cfg.get("farbe", "rot"), "grund": "aus"}
+    h = datetime.datetime.now().hour
+    r = 0.0
+    try:
+        heute = datetime.date.today()
+        varianten = (heute.isoformat(), heute.strftime("%d.%m.%Y"), heute.strftime("%d.%m."))
+        with open(os.path.join(cfg["ordner"], "trading", "journal.md"), encoding="utf-8") as f:
+            for zeile in f:
+                teile = [t.strip() for t in zeile.strip().strip("|").split("|")]
+                if len(teile) >= 10 and any(teile[0].startswith(v) for v in varianten):
+                    m = re.search(r"[-+]?\d+(?:[.,]\d+)?", teile[9])
+                    if m:
+                        r += float(m.group().replace(",", "."))
+    except Exception:
+        pass
+    if r > 0:
+        return {"farbe": "gruen", "grund": "Trading heute im Plus (%+.1f R)" % r}
+    if r < 0:
+        return {"farbe": "gold", "grund": "Trading heute im Minus (%+.1f R) – ruhig bleiben" % r}
+    if h >= 22 or h < 6:
+        return {"farbe": "blau", "grund": "Nacht"}
+    return {"farbe": cfg.get("farbe", "rot"), "grund": "normal"}
+
+
 def say_when_free(text):
     """Ansage, sobald ORB nicht gerade selbst antwortet (max. 2 Min. warten)."""
     def run():
@@ -2320,7 +2376,7 @@ class Handler(BaseHTTPRequestHandler):
             st["kamera_foto"] = KAMERA["foto"] if time.time() - KAMERA["foto_zeit"] < 15 else 0   # kamera.ps1 wartet auf ein Standbild
             st["web"] = {"n": WEB["n"], "url": WEB["url"], "titel": WEB["titel"], "modus": WEB["modus"],
                          "lebt": web_lebt(), "rein": WEB["rein"]}   # Web-Hologramm
-            st["anruf"] = in_call()   # während Meet/Teams/Zoom nicht zuhören
+            st["anruf"] = in_call() or bool(spiel_laeuft())   # Meeting oder Spiel: nicht zuhören   # während Meet/Teams/Zoom nicht zuhören
             st["version"] = VERSION   # Fenster lädt sich neu, wenn eine neue Version läuft
             for i, p in enumerate(st.get("parts") or []):   # Stimme für alle Stücke vorbereiten
                 ensure((st.get("aid"), i), p)
@@ -2328,6 +2384,8 @@ class Handler(BaseHTTPRequestHandler):
         elif u.path == "/karten":
             self.send(200, {"karten": [dict(c, inhalt=[{k: v for k, v in blk.items() if k != "pfad"} for blk in c["inhalt"]])
                                        for c in karten_liste()]})
+        elif u.path == "/stimmung":
+            self.send(200, stimmung())
         elif u.path == "/karte/datei":   # Bild aus einem Hologramm (nur Bilddateien, die beim Anlegen geprüft wurden)
             c = KARTEN.get(q.get("id", ""))
             try:
