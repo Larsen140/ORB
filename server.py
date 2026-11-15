@@ -69,7 +69,7 @@ DEFAULT_CFG = {
 }
 # Damit ORB immer dein Claude-Code-Login (Max-Abo) nutzt und nie einen API-Schlüssel
 CLAUDE_ENV_DROP = ("ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "ANTHROPIC_BASE_URL")
-VERSION = "107"
+VERSION = "108"
 ORB_UI = ("Deine Oberfläche (die Larsen gerade sieht): in der Mitte du als flüssige leuchtende Kugel mit Tropfen, "
           "Orbit-Ringen und Sternenhimmel; links eine Uhr und darunter der Gesprächsverlauf mit Eingabefeld; rechts "
           "Karten für System (CPU, RAM, Akku), Wetter mit Stundenvorschau, Aktivität (was du gerade tust) und Vorschläge; "
@@ -2695,7 +2695,7 @@ class Handler(BaseHTTPRequestHandler):
             c = load_cfg()
             self.send(200, {"config": c, "stimmen": STIMMEN})
         elif u.path == "/skin3d":   # drehbare 3D-Vorschau eines Minecraft-Skins (skinview3d)
-            n = re.sub(r"[^a-z0-9_-]", "", q.get("n", ""))[:40]
+            n = re.sub(r"[^A-Za-z0-9_-]", "", q.get("n", ""))[:60]   # Großbuchstaben erlaubt (z. B. „Larscraft17-aktuell“)
             seite = ("<!doctype html><meta charset=utf-8><style>html,body{margin:0;height:100%;background:#0b0f1c;overflow:hidden}"
                      "canvas{display:block}</style><canvas id=c></canvas>"
                      "<script src='https://cdn.jsdelivr.net/npm/skinview3d@3.1.0/bundles/skinview3d.bundle.js'></script><script>"
@@ -2705,7 +2705,7 @@ class Handler(BaseHTTPRequestHandler):
                      "v.background=0x0b0f1c;onresize=()=>v.setSize(innerWidth,innerHeight)</script>").replace("{N}", n)   # kein %-Format: CSS enthält „100%“
             self.send(200, seite.encode(), "text/html; charset=utf-8")
         elif u.path.startswith("/skinbild/"):   # nur PNGs aus dem Skin-Ordner
-            n = re.sub(r"[^a-z0-9_-]", "", u.path[len("/skinbild/"):].rsplit(".", 1)[0])[:40]
+            n = re.sub(r"[^A-Za-z0-9_-]", "", urllib.parse.unquote(u.path[len("/skinbild/"):]).rsplit(".", 1)[0])[:60]
             pfad = os.path.join(os.path.expanduser("~"), "Pictures", "Minecraft-Skins", n + ".png")
             try:
                 with open(pfad, "rb") as f:

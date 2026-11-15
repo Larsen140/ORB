@@ -3,6 +3,7 @@
   py -3 skin.py bauen  <rezept.json>        ein Rezept oder eine Liste (z. B. 3 Varianten) → Skins + 3D-Hologramm
   py -3 skin.py launcher <name>             Skin in die Skin-Bibliothek des Minecraft-Launchers legen
   py -3 skin.py launcher alle               alle PNGs aus Bilder/Minecraft-Skins (auch selbst abgelegte) in den Launcher
+  py -3 skin.py zeigen [name …]             vorhandene Skins (auch eigene PNGs) als drehbares 3D-Hologramm
   py -3 skin.py liste                       vorhandene Skins
 
 Rezept (alles optional außer name):
@@ -269,7 +270,7 @@ def vorschau(img, slim=False):
 
 
 def name_ok(n):
-    return re.sub(r"[^a-z0-9_-]", "", str(n).lower().replace(" ", "_"))[:40] or "skin"
+    return re.sub(r"[^A-Za-z0-9_-]", "", str(n).replace(" ", "_"))[:60] or "skin"
 
 
 def holo(namen):
@@ -343,6 +344,10 @@ def main():
             print(json.dumps({"ok": True, "hinzugefuegt": neu, "hinweis": erg[-1]["hinweis"] if erg else "nichts Neues"}, ensure_ascii=False))
         else:
             print(json.dumps(launcher(sys.argv[2]), ensure_ascii=False))
+    elif cmd == "zeigen":   # vorhandene Skins (auch selbst abgelegte) als 3D-Hologramm
+        namen = [os.path.splitext(n)[0] for n in sys.argv[2:]] or sorted(f[:-4] for f in os.listdir(ORDNER) if f.lower().endswith(".png") and "_vorschau" not in f)[:3]
+        holo(namen)
+        print(json.dumps({"ok": True, "skins": namen}, ensure_ascii=False))
     elif cmd == "liste":
         print(json.dumps(sorted(f[:-4] for f in os.listdir(ORDNER) if f.endswith(".png") and "_vorschau" not in f), ensure_ascii=False))
 
