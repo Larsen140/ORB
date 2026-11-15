@@ -69,7 +69,7 @@ DEFAULT_CFG = {
 }
 # Damit ORB immer dein Claude-Code-Login (Max-Abo) nutzt und nie einen API-Schlüssel
 CLAUDE_ENV_DROP = ("ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "ANTHROPIC_BASE_URL")
-VERSION = "90"
+VERSION = "91"
 ORB_UI = ("Deine Oberfläche (die Larsen gerade sieht): in der Mitte du als flüssige leuchtende Kugel mit Tropfen, "
           "Orbit-Ringen und Sternenhimmel; links eine Uhr und darunter der Gesprächsverlauf mit Eingabefeld; rechts "
           "Karten für System (CPU, RAM, Akku), Wetter mit Stundenvorschau, Aktivität (was du gerade tust) und Vorschläge; "
@@ -1960,7 +1960,8 @@ def task_cancel(tid):
 # ---------- Freie Hologramme („Karten“): beliebig viele, je mit mehreren Inhalten ----------
 KARTEN, KARTEN_V, _karten_lock = {}, [0], threading.Lock()
 BILD_ENDUNGEN = (".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp")
-BLOCK_TYPEN = ("text", "titel", "liste", "zahl", "fortschritt", "bild", "web", "tabelle", "trenner")
+BLOCK_TYPEN = ("text", "titel", "liste", "zahl", "fortschritt", "bild", "video", "web", "tabelle", "trenner")
+VIDEO_ENDUNGEN = (".mp4", ".webm", ".mov", ".m4v")
 
 
 def karte_setzen(b):
@@ -1979,9 +1980,10 @@ def karte_setzen(b):
             for blk in (b.get("inhalt") or [])[:60]:
                 if not isinstance(blk, dict) or blk.get("typ") not in BLOCK_TYPEN:
                     continue
-                if blk["typ"] == "bild":
+                if blk["typ"] in ("bild", "video"):
                     pfad = os.path.abspath(os.path.expandvars(str(blk.get("pfad", ""))))
-                    if not (pfad.lower().endswith(BILD_ENDUNGEN) and os.path.isfile(pfad)):
+                    endungen = BILD_ENDUNGEN if blk["typ"] == "bild" else VIDEO_ENDUNGEN
+                    if not (pfad.lower().endswith(endungen) and os.path.isfile(pfad)):
                         continue
                     blk = dict(blk, pfad=pfad)
                 inhalt.append(blk)
@@ -2170,7 +2172,9 @@ class Handler(BaseHTTPRequestHandler):
             except Exception:
                 return self.send(404, b"", "text/plain")
             ext = os.path.splitext(pfad)[1].lower().lstrip(".")
-            self.send(200, data, "image/" + {"jpg": "jpeg"}.get(ext, ext))
+            typ = ({"mp4": "video/mp4", "m4v": "video/mp4", "webm": "video/webm", "mov": "video/quicktime"}.get(ext)
+                   or "image/" + {"jpg": "jpeg"}.get(ext, ext))
+            self.send(200, data, typ)
         elif u.path == "/kamera/inhalt":   # Oberfläche holt neue Kamera-Inhalte (ohne Dateipfade)
             try:
                 seit = int(q.get("seit", "0") or 0)

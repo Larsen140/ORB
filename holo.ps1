@@ -7,7 +7,7 @@
 #        {"typ":"zahl","wert":"21","einheit":"°C","label":"Außen","reihe":true}, {"typ":"fortschritt","prozent":40,"label":"…"},
 #        {"typ":"bild","pfad":"C:\…\bild.png"}, {"typ":"web","url":"https://…"}, {"typ":"tabelle","kopf":["A","B"],"zeilen":[["1","2"]]},
 #        {"typ":"trenner"} ]}     ("reihe":true stellt Blöcke nebeneinander)
-param([string]$Json, [string]$Id, [string]$Titel, [string]$Text, [string]$Punkte, [string]$Bild, [string]$Web,
+param([string]$Json, [string]$Id, [string]$Titel, [string]$Text, [string]$Punkte, [string]$Bild, [string]$Video, [string]$Web,
       [string]$Groesse = 'mittel', [string]$Farbe, [int]$Dauer = 0, [switch]$Anhaengen, [switch]$Zu, [switch]$AlleZu)
 [Console]::OutputEncoding = [Text.Encoding]::UTF8
 $port = if ($env:ORB_PORT) { $env:ORB_PORT } else { 8766 }
@@ -22,6 +22,7 @@ if ($Json) {
     if ($Text)   { $inhalt += @{ typ = 'text'; text = $Text } }
     if ($Punkte) { $inhalt += @{ typ = 'liste'; punkte = @($Punkte -split '\|') } }
     if ($Bild)   { $inhalt += @{ typ = 'bild'; pfad = $Bild } }
+    if ($Video)  { $inhalt += @{ typ = 'video'; pfad = $Video } }
     if ($Web)    { $inhalt += @{ typ = 'web'; url = $Web } }
     $daten = @{ titel = $Titel; groesse = $Groesse; inhalt = $inhalt; dauer = $Dauer }
     if ($Farbe) { $daten.farbe = $Farbe }

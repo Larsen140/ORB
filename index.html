@@ -3557,6 +3557,7 @@ function blockHtml(b, kid, i) {
     case 'fortschritt': { const p = Math.max(0, Math.min(100, +b.prozent || 0));
       return `<div class="b-fort"><div class="fk"><span>${t(b.label)}</span><b>${p} %</b></div><div class="bar"><i style="width:${p}%"></i></div></div>`; }
     case 'bild': return `<div class="b-bild"><img data-k="${t(kid)}" data-i="${i}" alt=""></div>`;
+    case 'video': return `<div class="b-bild"><video data-k="${t(kid)}" data-i="${i}" controls playsinline ${b.loop ? 'loop' : ''} style="width:100%;max-height:70vh;border-radius:10px;background:#000"></video></div>`;
     case 'web': return /^https?:\/\//i.test(b.url || '') ? `<iframe class="b-web" src="${t(b.url)}" sandbox="allow-scripts allow-same-origin allow-forms allow-popups"></iframe>` : '';
     case 'tabelle': { const zl = (b.zeilen || []).slice(0, 80), zahl = c => /^[\s+−\-–]*[\d.,]+\s*[%€$°a-zA-Z/]{0,4}$/.test(String(c ?? '').trim());
       const n = j => zl.length && zl.every(z => !String((z || [])[j] ?? '').trim() || zahl((z || [])[j])) ? ' class="n"' : '';   // Zahlenspalten rechtsbündig
@@ -3608,6 +3609,8 @@ function renderKarten(list) {
     c.inhalt.forEach((b, i) => { const h = blockHtml(b, c.id, i); if (b.reihe) reihe.push(h); else { flush(); html += h; } });
     flush();
     el.querySelector('.kb').innerHTML = html;
+    el.querySelectorAll('video[data-k]').forEach(v => fetch(`/karte/datei?id=${encodeURIComponent(v.dataset.k)}&i=${v.dataset.i}`)
+      .then(r => r.ok ? r.blob() : null).then(bl => { if (bl) { v.src = URL.createObjectURL(bl); v.play().catch(() => {}); } }).catch(() => {}));
     el.querySelectorAll('img[data-k]').forEach(img => fetch(`/karte/datei?id=${encodeURIComponent(img.dataset.k)}&i=${img.dataset.i}`)
       .then(r => r.ok ? r.blob() : null).then(bl => { if (bl) img.src = URL.createObjectURL(bl); }).catch(() => {}));
   }
@@ -4062,7 +4065,7 @@ function frame(now) {
     for (const v of micTime) { const d = (v - 128) / 128; s += d * d; }
     lv = Math.min(1, Math.sqrt(s / micTime.length) * 6); micAn.getByteFrequencyData(micData);
   }
-  S.level += (lv - S.level) * (lv > S.level ? .45 : .1);
+  S.level += (lv - S.level) * (1 - Math.exp(-dt * (lv > S.level ? 36 : 6.3)));   // bildratenunabhängig: schneller Anstieg, weiches Abklingen
   {
     const src = speaking && audioOk() && ac.currentTime < endTime ? freq : (listening || convoRec) && micAn ? micData : null;
     [[1, 4], [4, 9], [9, 20], [20, 44]].forEach(([a, b], k) => {
