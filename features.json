@@ -365,7 +365,7 @@
     },
     {
      "name": "Skin-Designer",
-     "text": "Eigene Skins nach Beschreibung mit drehbarer 3D-Vorschau, gespeichert in Bilder\\Minecraft-Skins.",
+     "text": "Echte Skin-KI (auf Minecraft-Skins trainiert, lokal): jede Figur in ~20 s pro Skin, drehbare 3D-Vorschau.",
      "beispiel": "Jarvis, mach mir einen Skin: Ritter in roter Rüstung"
     },
     {
