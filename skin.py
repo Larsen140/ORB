@@ -2,6 +2,7 @@
 
   py -3 skin.py bauen  <rezept.json>        ein Rezept oder eine Liste (z. B. 3 Varianten) → Skins + 3D-Hologramm
   py -3 skin.py launcher <name>             Skin in die Skin-Bibliothek des Minecraft-Launchers legen
+  py -3 skin.py launcher alle               alle PNGs aus Bilder\Minecraft-Skins (auch selbst abgelegte) in den Launcher
   py -3 skin.py liste                       vorhandene Skins
 
 Rezept (alles optional außer name):
@@ -287,6 +288,9 @@ def holo(namen):
 
 def launcher(n):
     pfad = os.path.join(ORDNER, n + ".png")
+    if not os.path.exists(pfad):
+        n = name_ok(n)
+        pfad = os.path.join(ORDNER, n + ".png")
     meta = json.load(open(os.path.join(ORDNER, n + ".json"), encoding="utf-8")) if os.path.exists(os.path.join(ORDNER, n + ".json")) else {}
     img = Image.open(pfad)
     b64 = lambda im: "data:image/png;base64," + base64.b64encode((lambda b: (im.save(b, "PNG"), b.getvalue())[1])(io.BytesIO())).decode()
@@ -331,7 +335,14 @@ def main():
         holo(namen)
         print(json.dumps({"ok": True, "skins": namen, "ordner": ORDNER}, ensure_ascii=False))
     elif cmd == "launcher":
-        print(json.dumps(launcher(name_ok(sys.argv[2])), ensure_ascii=False))
+        if sys.argv[2] == "alle":   # alle Skins aus Bilder\Minecraft-Skins in den Launcher (auch selbst abgelegte PNGs)
+            vorhanden = json.load(open(LAUNCHER, encoding="utf-8")).get("customSkins", {}) if os.path.exists(LAUNCHER) else {}
+            namen_da = {v.get("name") for v in vorhanden.values()}
+            neu = [f[:-4] for f in os.listdir(ORDNER) if f.lower().endswith(".png") and "_vorschau" not in f and f[:-4] not in namen_da]
+            erg = [launcher(n) for n in neu]
+            print(json.dumps({"ok": True, "hinzugefuegt": neu, "hinweis": erg[-1]["hinweis"] if erg else "nichts Neues"}, ensure_ascii=False))
+        else:
+            print(json.dumps(launcher(sys.argv[2]), ensure_ascii=False))
     elif cmd == "liste":
         print(json.dumps(sorted(f[:-4] for f in os.listdir(ORDNER) if f.endswith(".png") and "_vorschau" not in f), ensure_ascii=False))
 
