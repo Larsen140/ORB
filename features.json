@@ -1,0 +1,133 @@
+{
+  "_hinweis": "Zentrale Liste aller ORB-Funktionen für das Widget „Was Jarvis kann“. Bei JEDEM Update mit neuer Funktion ergänzen: Bereich wählen (oder neu anlegen), Eintrag mit name, text, beispiel.",
+  "bereiche": [
+    {
+      "name": "Sprache & Steuerung", "icon": "🎙",
+      "features": [
+        {"name": "Wecken mit Doppelklatschen", "text": "ORB erscheint, auch direkt nach dem PC-Start.", "beispiel": "2× klatschen"},
+        {"name": "Wegschicken mit Doppelschnipsen", "text": "ORB schläft im Hintergrund weiter.", "beispiel": "2× schnipsen"},
+        {"name": "Wort „Jarvis“", "text": "Hört zu, auch aus dem Schlaf; unterbricht laufende Antworten.", "beispiel": "Jarvis, wie spät ist es?"},
+        {"name": "Gespräch", "text": "Hört dauerhaft zu, bis man „Stopp“ sagt.", "beispiel": "Stopp"},
+        {"name": "Antwortet laut", "text": "Neural-Stimme auf Deutsch, Satz für Satz, Lautstärke bis 300 %.", "beispiel": "Erzähl mir einen Witz"},
+        {"name": "Apps & Webseiten öffnen", "text": "Startet Programme und Seiten sofort, ohne Token.", "beispiel": "Öffne YouTube"},
+        {"name": "Wetter", "text": "Aktuelles Wetter und Stundenvorschau.", "beispiel": "Wie wird das Wetter?"},
+        {"name": "Hintergrund-Aufgaben", "text": "Längere Aufträge laufen in eigenem Hologramm, ORB sagt das Ergebnis an.", "beispiel": "Recherchier die besten Grafikkarten unter 400 Euro"},
+        {"name": "PC bedienen", "text": "Screenshot ansehen, klicken und tippen – nur auf ausdrücklichen Wunsch.", "beispiel": "Schau auf meinen Bildschirm und klick auf Speichern"},
+        {"name": "Lokale Spracherkennung", "text": "Whisper und „Hey Jarvis“ offline (Einstellungen).", "beispiel": "Hey Jarvis"},
+        {"name": "Mikro kalibrieren", "text": "Misst Ruhe, Klatschen und Schnipsen und stellt alle Schwellen ein.", "beispiel": "Einstellungen → Mikro kalibrieren"},
+        {"name": "Mini-ORB", "text": "Kleine Kugel in der Ecke, immer obenauf.", "beispiel": "Jarvis, mach dich klein"},
+        {"name": "Wissensbasis", "text": "Merkt sich alles dauerhaft in deinem Jarvis-Ordner.", "beispiel": "Merk dir, dass ich Sushi mag"}
+      ]
+    },
+    {
+      "name": "Hologramme & Kamera", "icon": "◈",
+      "features": [
+        {"name": "Bild-Hologramme", "text": "Neue Bilder erscheinen sofort als Holo-Karte.", "beispiel": "Zeig mir das letzte Bild"},
+        {"name": "Web-Hologramme", "text": "Echte Webseiten zum Klicken, Scrollen und Tippen im Hologramm.", "beispiel": "Zeig mir Wikipedia als Hologramm"},
+        {"name": "Echte Farben", "text": "Schalter im Hologramm zeigt Inhalte ohne Effekte.", "beispiel": "Knopf „Echte Farben“"},
+        {"name": "Kamera-Ansicht", "text": "Live-Webcam als Hologramm-Fenster mit Widgets und 3D-Objekten darin.", "beispiel": "Jarvis, Kamera an"},
+        {"name": "Kamera-Standbild", "text": "Claude schaut auf Wunsch einmal durch die laufende Kamera.", "beispiel": "Was halte ich gerade in der Hand?"},
+        {"name": "Sphäre in der Hand", "text": "Eine Sphäre schwebt über deiner Handfläche.", "beispiel": "Jarvis, Sphäre in meine Hand"},
+        {"name": "Grafikstufe „Kino“", "text": "Bloom, Lichtstrahlen, Tiefenschärfe und filmische Farben.", "beispiel": "Einstellungen → Grafik → Kino"},
+        {"name": "Was ist neu?", "text": "Nach jedem Update ein kleines Hologramm mit den Neuerungen.", "beispiel": "kommt von selbst"}
+      ]
+    },
+    {
+      "name": "Gesten", "icon": "✋",
+      "features": [
+        {"name": "Greifen & Verschieben", "text": "Hologramme per Hand greifen, drehen, skalieren, anheften und wegwischen.", "beispiel": "Faust schließen und ziehen"},
+        {"name": "Radiales Menü", "text": "Handfläche zeigen öffnet das Menü.", "beispiel": "Handfläche zur Kamera"},
+        {"name": "Zeigefinger-Cursor", "text": "Zeigen und tippen wie mit der Maus.", "beispiel": "Zeigefinger ausstrecken"},
+        {"name": "Zeichnen in der Luft", "text": "Mit dem Finger Linien in den Raum malen.", "beispiel": "In der Kamera-Ansicht zeichnen"},
+        {"name": "Spotify per Geste", "text": "Musik ohne Tastatur steuern.", "beispiel": "Wischen für nächsten Song"},
+        {"name": "Gesten-Hilfe", "text": "Zeigt alle Gesten auf einen Blick.", "beispiel": "Jarvis, Kamera-Hilfe"}
+      ]
+    },
+    {
+      "name": "Kalender, Erinnerungen, Kontakte & Health", "icon": "📅",
+      "features": [
+        {"name": "iCloud-Kalender", "text": "Termine eintragen, lesen und löschen.", "beispiel": "Termin am 20.11. um 15 Uhr Zahnarzt"},
+        {"name": "Erinnerungen", "text": "Anlegen, lesen, abhaken und löschen.", "beispiel": "Erinnere mich morgen um 18 Uhr an Milch"},
+        {"name": "Kontakte", "text": "Suchen, anlegen und ändern; Löschen nur nach Bestätigung.", "beispiel": "Wie ist die Nummer von Anna?"},
+        {"name": "Apple Health", "text": "Schritte, Schlaf, Ruhepuls und Kalorien vom iPhone zusammengefasst.", "beispiel": "Wie viele Schritte hatte ich heute?"}
+      ]
+    },
+    {
+      "name": "WhatsApp & Mail", "icon": "✉",
+      "features": [
+        {"name": "WhatsApp", "text": "Text oder Bild in Sekunden vorbereiten, Abschicken erst nach Bestätigung.", "beispiel": "Schreib Mama auf WhatsApp, dass ich später komme"},
+        {"name": "Gmail lesen", "text": "Mails suchen und zusammenfassen.", "beispiel": "Hab ich neue wichtige Mails?"},
+        {"name": "Mail schreiben", "text": "Entwurf vorlesen, Senden erst nach deinem Okay.", "beispiel": "Antworte Tim, dass Freitag passt"}
+      ]
+    },
+    {
+      "name": "Bilder & KI-Bilder", "icon": "🖼",
+      "features": [
+        {"name": "Bild-Werkzeug", "text": "Logos, Wallpaper, Banner und Profilbilder mit Stil-Paketen und Effekten.", "beispiel": "Mach mir ein Neon-Wallpaper mit meinem Namen"},
+        {"name": "KI-Bilder", "text": "Lokale KI auf der Grafikkarte erzeugt Bilder aus Text.", "beispiel": "Mal mir ein Auto im Synthwave-Stil"},
+        {"name": "Bild-Werkstatt", "text": "Bilder anpassen und als Hologramm ansehen.", "beispiel": "Mach das Logo goldener"}
+      ]
+    },
+    {
+      "name": "TikTok-Videofabrik", "icon": "🎬",
+      "features": [
+        {"name": "Fertiges TikTok-Video", "text": "Aus einem Thema ein 60–90-s-Video mit Stimme, Untertiteln, Musik und Titelbild.", "beispiel": "Mach ein TikTok über Gold"},
+        {"name": "Vorlagen", "text": "Jarvis, Gold, Autos oder KI-Bilder.", "beispiel": "Mach ein Jarvis-Video über die Kamera-Gesten"}
+      ]
+    },
+    {
+      "name": "Trading", "icon": "📈",
+      "features": [
+        {"name": "Gold live", "text": "XAU/USD jede Sekunde mit Farbblitz und Kurve.", "beispiel": "Jarvis, Gold"},
+        {"name": "Trading-Tagesstart", "text": "Beim ersten Öffnen am Tag: News, Gold und Live-Chart.", "beispiel": "kommt morgens von selbst"},
+        {"name": "Journal & Stimmung", "text": "Tagesergebnis färbt ORB grün oder gold.", "beispiel": "Trag meinen Trade ein: plus 2 R"}
+      ]
+    },
+    {
+      "name": "Minecraft", "icon": "⛏",
+      "features": [
+        {"name": "Befehle im Spiel", "text": "ORB tippt Befehle in den Chat, auch während du spielst.", "beispiel": "Jarvis, mach Tag und klares Wetter"},
+        {"name": "Bauen", "text": "Ganze Bauten per Befehlsfolge.", "beispiel": "Bau mir ein kleines Haus vor mir"}
+      ]
+    },
+    {
+      "name": "PC-Doktor", "icon": "🩺",
+      "features": [
+        {"name": "Diagnose", "text": "Was frisst Speicher, CPU, GPU, wie voll ist die Platte, wie warm die Grafikkarte.", "beispiel": "PC-Doktor"},
+        {"name": "Aufräumen", "text": "Alte Temp-Dateien löschen.", "beispiel": "Räum meinen PC auf"},
+        {"name": "Warnungen", "text": "Meldet sich, wenn der Speicher fast voll ist.", "beispiel": "kommt von selbst"}
+      ]
+    },
+    {
+      "name": "Spotify-DJ", "icon": "🎧",
+      "features": [
+        {"name": "Spotify steuern", "text": "Abspielen, Pause, Weiter – ohne Token.", "beispiel": "Nächster Song"},
+        {"name": "DJ", "text": "Merkt sich, was du hörst und überspringst, und wählt passend.", "beispiel": "Jarvis, sei mein DJ"},
+        {"name": "Musik-Schutz", "text": "Musik wird leiser, solange ORB spricht.", "beispiel": "Einstellungen → Ducking"}
+      ]
+    },
+    {
+      "name": "Licht & Stimmung", "icon": "💡",
+      "features": [
+        {"name": "Razer-Licht", "text": "Tastatur und Maus leuchten in ORBs Farbe und pulsieren beim Sprechen.", "beispiel": "Einstellungen → Razer-Licht"},
+        {"name": "Stimmungs-Licht", "text": "Farbe gleitet nach Nacht, Trading und Musik.", "beispiel": "Einstellungen → Stimmungs-Licht"},
+        {"name": "Farbe ändern", "text": "ORB in einer anderen Palette.", "beispiel": "Jarvis, werd blau"}
+      ]
+    },
+    {
+      "name": "Larsens World & Casino", "icon": "🎰",
+      "features": [
+        {"name": "Guthaben & Statistik", "text": "Stand und Casino-Statistik abfragen.", "beispiel": "Wie viel Geld hab ich in Larsens World?"},
+        {"name": "Guthaben ändern", "text": "Geld hinzufügen oder genau setzen; App übernimmt es in Sekunden.", "beispiel": "Gib mir 10.000 in Larsens World"},
+        {"name": "Einstellungen ändern", "text": "Werte der Casino-Spiele anpassen.", "beispiel": "Stell das Glücksrad auf mehr Gewinne"}
+      ]
+    },
+    {
+      "name": "Gaming-Modus", "icon": "🎮",
+      "features": [
+        {"name": "Platz machen", "text": "Läuft ein Spiel, gibt ORB Grafikkarte und Speicher frei.", "beispiel": "startet von selbst"},
+        {"name": "Keine Fehlalarme", "text": "Reagiert im Spiel nicht auf Knalle; in Minecraft hört er weiter auf „Jarvis“.", "beispiel": "Jarvis, …"}
+      ]
+    }
+  ]
+}

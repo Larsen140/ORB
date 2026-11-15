@@ -69,7 +69,7 @@ DEFAULT_CFG = {
 }
 # Damit ORB immer dein Claude-Code-Login (Max-Abo) nutzt und nie einen API-Schlüssel
 CLAUDE_ENV_DROP = ("ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "ANTHROPIC_BASE_URL")
-VERSION = "99"
+VERSION = "100"
 ORB_UI = ("Deine Oberfläche (die Larsen gerade sieht): in der Mitte du als flüssige leuchtende Kugel mit Tropfen, "
           "Orbit-Ringen und Sternenhimmel; links eine Uhr und darunter der Gesprächsverlauf mit Eingabefeld; rechts "
           "Karten für System (CPU, RAM, Akku), Wetter mit Stundenvorschau, Aktivität (was du gerade tust) und Vorschläge; "
@@ -2693,6 +2693,12 @@ class Handler(BaseHTTPRequestHandler):
             self.send(200, {"config": c, "stimmen": STIMMEN})
         elif u.path == "/version":
             self.send(200, {"version": VERSION})
+        elif u.path == "/features":   # Widget „Was Jarvis kann“: zentrale Liste features.json neben server.py
+            try:
+                with open(os.path.join(RES, "features.json"), encoding="utf-8-sig") as f:
+                    self.send(200, {"bereiche": json.load(f).get("bereiche", [])})
+            except Exception:
+                self.send(200, {"bereiche": []})
         elif u.path == "/mouse":
             self.send(200, {"ago": round(mouse_ago(), 3), "eingabe": round(input_ago(), 3)})
         elif u.path == "/sys":

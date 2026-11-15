@@ -807,6 +807,34 @@
   #holo .sub:empty { display:none; }
   /* gleicher Innenabstand für alle Karten – egal in welcher Spalte sie liegen */
   .col > [data-w] { padding:16px 18px; flex:none; }
+  /* Widget „Was Jarvis kann“: speist sich aus features.json */
+  #featc { flex:none; display:flex; flex-direction:column; max-height:46vh; min-height:0; }
+  #ft_such { display:flex; align-items:center; gap:8px; padding:7px 14px; border-radius:999px; background:rgba(0,0,0,.25);
+    box-shadow:inset 0 1px 2px rgba(0,0,0,.4), inset 0 0 0 1px rgba(255,255,255,.06); transition:box-shadow .3s; }
+  #ft_such:focus-within { box-shadow:inset 0 1px 2px rgba(0,0,0,.4), 0 0 0 2px rgba(var(--ac),.5), 0 0 18px rgba(var(--ac),.22); }
+  #ft_such span { color:var(--sub); font-size:13px; }
+  #ft_q { flex:1; min-width:0; border:0; outline:none; background:transparent; color:var(--txt); font:inherit; font-size:13px; user-select:text; }
+  #ft_n { margin-left:auto; font-size:10.5px; letter-spacing:.06em; color:var(--sub); font-weight:600; }
+  #ft_list { margin-top:8px; overflow-y:auto; min-height:0; flex:1; scrollbar-width:thin; scrollbar-color:rgba(var(--ac),.35) transparent; padding-right:2px; }
+  .ftg { border-top:1px solid rgba(255,255,255,.06); }
+  .ftg:first-child { border-top:0; }
+  .ftg > button { width:100%; display:flex; align-items:center; gap:9px; padding:8px 2px; font-size:13px; font-weight:620; text-align:left;
+    transition:color .3s; }
+  .ftg > button:hover { color:rgb(var(--ac)); }
+  .ftg > button em { font-style:normal; width:18px; text-align:center; }
+  .ftg > button b { margin-left:auto; font-size:10.5px; font-weight:600; color:var(--sub); padding:2px 8px; border-radius:999px; background:rgba(255,255,255,.07); }
+  .ftg > button i { font-style:normal; color:var(--sub); transition:transform .45s var(--spring); }
+  .ftg.auf > button i { transform:rotate(90deg); }
+  .ftg ul { list-style:none; margin:0; padding:0 0 6px 27px; display:none; }
+  .ftg.auf ul { display:block; }
+  .ftg li { padding:5px 0; animation:cardIn .5s var(--spring) both; }
+  .ftg li .n { font-size:12.5px; font-weight:600; }
+  .ftg li .t { font-size:11.5px; color:var(--sub); margin-top:1px; line-height:1.35; }
+  .ftg li .b { display:inline-block; margin-top:4px; padding:3px 10px; border-radius:999px; font-size:11.5px; font-weight:550; cursor:pointer;
+    background:rgba(var(--ac),.14); box-shadow:inset 0 1px 0 rgba(255,255,255,.12); transition:transform .45s var(--spring), background .3s; }
+  .ftg li .b:hover { transform:scale(1.05); background:rgba(var(--ac),.3); }
+  #ft_list mark { background:rgba(var(--ac),.35); color:inherit; border-radius:3px; }
+  #ft_list .leer { color:var(--sub); font-size:12px; padding:6px 0; }
   /* Drag & Drop der Widgets */
   .col > [data-w] h5, .col > [data-w] > header, #clockc { cursor:grab; }
   .dragging, .dropping { position:fixed !important; z-index:50; margin:0 !important; pointer-events:none; animation:none !important; }
@@ -877,6 +905,11 @@
     <h5><i class="dot"></i>Aktivität</h5>
     <div id="task">Bereit</div><div id="detail">Warte auf deinen Auftrag</div>
     <div id="bar"><i></i></div><ul id="log"></ul>
+  </div>
+  <div id="featc" data-w="faehigkeiten" class="glass acc enter" style="animation-delay:.22s;--ac:var(--c3);--ac2:var(--c2)">
+    <h5><i class="dot"></i>Was Jarvis kann<span id="ft_n"></span></h5>
+    <label id="ft_such"><span>⌕</span><input id="ft_q" placeholder="Funktion suchen …" autocomplete="off"></label>
+    <div id="ft_list"><div class="leer">lädt …</div></div>
   </div>
   <div id="chipsc" data-w="vorschlaege" class="glass acc enter" style="animation-delay:.26s;--ac:var(--c4);--ac2:var(--c3)">
     <h5><i class="dot"></i>Vorschläge</h5><div id="chips"></div>
@@ -4013,6 +4046,7 @@ function loadLayout() {
   let l = null; try { l = JSON.parse(localStorage.getItem('orbLayout') || 'null'); } catch (e) {}
   if (!l) return;
   for (const id of ['left', 'right']) (l[id] || []).forEach(w => { const el = document.querySelector(`[data-w="${w}"]`); if (el) $(id).appendChild(el); });
+  if (![...(l.left || []), ...(l.right || [])].includes('faehigkeiten')) $('chipsc').parentNode.insertBefore($('featc'), $('chipsc'));   // neues Widget: über den Vorschlägen
 }
 function flip(change) {   // Nachbarkarten gleiten weich an ihren neuen Platz
   const els = [...document.querySelectorAll('.col > [data-w]:not(.dragging)')], before = new Map(els.map(e => [e, e.getBoundingClientRect()]));
@@ -4066,8 +4100,48 @@ addEventListener('mousemove', e => {
 }, { passive:true });
 loadLayout();
 
+/* ================= Widget „Was Jarvis kann“ (aus features.json) ================= */
+let FEAT = [], featAuf = [];
+try { featAuf = JSON.parse(localStorage.getItem('orbFeatAuf') || '[]') || []; } catch (e) {}
+function featZeigen() {
+  const q = $('ft_q').value.trim().toLowerCase(), hl = t => {
+    t = esc(t); if (!q) return t;
+    const i = t.toLowerCase().indexOf(esc(q)); return i < 0 ? t : t.slice(0, i) + '<mark>' + t.slice(i, i + esc(q).length) + '</mark>' + t.slice(i + esc(q).length);
+  };
+  let gesamt = 0, treffer = 0;
+  const html = FEAT.map((g, gi) => {
+    const fs = (g.features || []).filter(f => { gesamt++; return !q || [g.name, f.name, f.text, f.beispiel].join(' ').toLowerCase().includes(q); });
+    treffer += fs.length;
+    if (!fs.length) return '';
+    const auf = q || featAuf.includes(g.name);
+    return `<div class="ftg${auf ? ' auf' : ''}" data-g="${esc(g.name)}"><button><em>${esc(g.icon || '•')}</em>${hl(g.name)}<b>${fs.length}</b><i>›</i></button><ul>` +
+      fs.map(f => `<li><div class="n">${hl(f.name)}</div>${f.text ? `<div class="t">${hl(f.text)}</div>` : ''}` +
+        (f.beispiel ? `<span class="b" title="In das Eingabefeld übernehmen">„${hl(f.beispiel)}“</span>` : '') + '</li>').join('') + '</ul></div>';
+  }).join('');
+  $('ft_list').innerHTML = html || `<div class="leer">${FEAT.length ? 'Nichts gefunden' : 'Liste nicht erreichbar'}</div>`;
+  $('ft_n').textContent = gesamt ? (q ? treffer + ' / ' + gesamt : gesamt) : '';
+}
+$('ft_list').addEventListener('click', e => {
+  const b = e.target.closest('.ftg > button'), bsp = e.target.closest('.b');
+  if (b) {
+    const g = b.parentNode, n = g.dataset.g; g.classList.toggle('auf');
+    featAuf = featAuf.filter(x => x !== n); if (g.classList.contains('auf')) featAuf.push(n);
+    try { localStorage.setItem('orbFeatAuf', JSON.stringify(featAuf)); } catch (e) {}
+    SFX.click();
+  } else if (bsp) {
+    const t = bsp.textContent.replace(/^„|“$/g, '');
+    $('txt').value = /^\d|→|^(kommt|startet)/.test(t) ? '' : t; $('txt').focus(); SFX.click();
+  }
+});
+$('ft_q').addEventListener('input', featZeigen);
+async function featLaden() {
+  try { FEAT = (await (await fetch('/features')).json()).bereiche || []; } catch (e) { FEAT = []; }
+  featZeigen();
+}
+featLaden(); setInterval(featLaden, 10 * 60000);
+
 /* ================= Widgets ein-/ausblenden ================= */
-const WNAMES = { uhr:'Uhr', termine:'Termine', gespraech:'Gespräch', wetter:'Wetter', spotify:'Spotify', system:'System', vorschlaege:'Vorschläge' };
+const WNAMES = { uhr:'Uhr', termine:'Termine', gespraech:'Gespräch', wetter:'Wetter', spotify:'Spotify', faehigkeiten:'Was Jarvis kann', system:'System', vorschlaege:'Vorschläge' };
 let hiddenW = ['system', 'vorschlaege'];
 try { const h = JSON.parse(localStorage.getItem('orbHiddenW') || 'null'); if (Array.isArray(h)) hiddenW = h; } catch (e) {}
 function applyWidgets() {

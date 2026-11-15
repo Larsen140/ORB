@@ -17,6 +17,14 @@ for f in ("server.py", "orb_app.py", "hook.py", "icloud.py"):
             ast.parse(fh.read(), f)
     except SyntaxError as e:
         fehler.append("Python-Fehler in %s Zeile %s: %s" % (f, e.lineno, e.msg))
+try:   # Feature-Liste für das Widget „Was Jarvis kann“
+    import json
+    with open(os.path.join(HERE, "features.json"), encoding="utf-8-sig") as fh:
+        for b in json.load(fh)["bereiche"]:
+            if not b.get("name") or not all(f.get("name") for f in b["features"]):
+                fehler.append("features.json: Bereich oder Funktion ohne Namen")
+except Exception as e:
+    fehler.append("features.json fehlerhaft: %s" % e)
 if fehler:
     print("\n".join(fehler))
     sys.exit(1)

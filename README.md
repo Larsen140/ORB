@@ -26,6 +26,7 @@ Voraussetzung für Antworten: [Claude Code](https://claude.com/claude-code) inst
 - **Gold live** („Jarvis, Gold“): XAU/USD jede Sekunde, mit Farbblitz pro Tick und mitlaufender Kurve.
 - **Kamera-Ansicht** („Jarvis, Kamera an“ / „Kamera aus“): Live-Webcam (bis 1080p, Autofokus/-belichtung, Aufhellen bei wenig Licht) als Hologramm-Fenster. Alle Hologramme, Widgets (Uhr, Wetter, Termine, Spotify, Gold, System), Bilder, Text-Karten und 3D-Objekte (Sphäre, Würfel, Modell, WebGL) erscheinen darin und lassen sich per Hand greifen, verschieben, drehen, skalieren, anheften, in eine Ecke parken und wegwischen; Handfläche zeigen = radiales Menü, Zeigefinger = Cursor, Spotify per Geste, Zeichnen in der Luft; „Jarvis, Sphäre in meine Hand“ lässt eine Sphäre über der Handfläche schweben. Positionen werden gemerkt (MediaPipe auf der GPU, beide Hände, geglättet, rechnet lokal). Profil „Flüssig“ (Standard: 1080p, Hände auf jedem Bild bis 60 fps erkannt, stabile Zuordnung beider Hände auch bei schneller Bewegung, kurz verdeckte Hand wird gehalten; regelt bei unter 30 fps selbst runter) oder „Scharf“; beim ersten Start eine geführte Einführung, „Jarvis, Kamera-Hilfe“ zeigt alle Gesten, die erkannte Geste erscheint als kleines Symbol. `kamera_zeigen.ps1` schickt Inhalte hinein. Nur auf Befehl, rotes Kamera-Symbol solange an, nichts wird aufgenommen; `kamera.ps1` holt auf Larsens Frage ein einzelnes Standbild für Claude.
 - **Was ist neu?**: nach jedem Update (ORB oder Projekt) erscheint kurz ein kleines Hologramm mit den Neuerungen und wie man sie benutzt.
+- **Widget „Was Jarvis kann“**: alle Funktionen nach Bereichen, einklappbar, mit Suchfeld und Beispiel-Befehl (antippen = ins Eingabefeld), per Drag & Drop verschiebbar; speist sich aus `features.json`.
 - **Wissensbasis**: arbeitet im Ordner `Documents\Jarvis` und merkt sich dort alles.
 
 ## Aufbau
@@ -43,6 +44,7 @@ Voraussetzung für Antworten: [Claude Code](https://claude.com/claude-code) inst
 | `kamera.ps1` | ein Standbild aus der laufenden Kamera-Ansicht nach `%LOCALAPPDATA%\ORB\screen\kamera.png` (schaltet die Kamera nie ein) |
 | `kamera_zeigen.ps1` | schickt Widgets, Bilder, Texte oder 3D-Objekte in die laufende Kamera-Ansicht (schaltet die Kamera nie ein) |
 | `whatsapp.ps1` | WhatsApp-Nachricht (Text/Bild) in Sekunden vorbereiten, Abschicken erst nach Bestätigung |
+| `features.json` | zentrale Liste aller Funktionen (Bereich → Name, Text, Beispiel-Befehl) für das Widget „Was Jarvis kann“ – bei jeder neuen Funktion ergänzen |
 | `check.py` | prüft Code und Oberfläche vor jedem Update |
 | `update.ps1` | prüfen → hochladen → ORB aktualisiert sich → Kontrolle (bei Fehler automatisch zurück) |
 | `release.ps1` | stellt die ORB.exe als Download bereit |

@@ -53,6 +53,8 @@ Regeln:
   Richtwerte: 10 "Verstehen" (nach dem Einlesen), 30–70 "Bauen" (beim Fortschreiten erhöhen), 80 "Testen", 90 "Veröffentlichen", 100 "Fertig".
 - Hinterlege vor dem Abschluss eine kleine Einführung (2–4 kurze Punkte in einfachen Worten, dazu wie man es startet/benutzt):
   powershell -NoProfile -ExecutionPolicy Bypass -File C:\Users\larse\Orb\neu.ps1 -Punkte "Punkt 1|Punkt 2" -Nutzen "So startest du es"
+- Neue Funktion für Larsen? Trage sie in features.json ein (passender Bereich oder neuer, je name/text/beispiel = Sprachbefehl) –
+  daraus speist sich das Widget „Was Jarvis kann“.
 - Deine letzte Antwort wird Larsen laut vorgelesen: EIN kurzer deutscher Satz, was fertig ist und wo er es findet.
 "@
 } else {
