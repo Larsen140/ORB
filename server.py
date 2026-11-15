@@ -69,7 +69,7 @@ DEFAULT_CFG = {
 }
 # Damit ORB immer dein Claude-Code-Login (Max-Abo) nutzt und nie einen API-Schlüssel
 CLAUDE_ENV_DROP = ("ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "ANTHROPIC_BASE_URL")
-VERSION = "103"
+VERSION = "104"
 ORB_UI = ("Deine Oberfläche (die Larsen gerade sieht): in der Mitte du als flüssige leuchtende Kugel mit Tropfen, "
           "Orbit-Ringen und Sternenhimmel; links eine Uhr und darunter der Gesprächsverlauf mit Eingabefeld; rechts "
           "Karten für System (CPU, RAM, Akku), Wetter mit Stundenvorschau, Aktivität (was du gerade tust) und Vorschläge; "
@@ -2580,7 +2580,8 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_GET(self):
         u = urlparse(self.path)
-        if not self.erlaubt(braucht_token=u.path not in ("/", "/index.html", "/version")):
+        if not self.erlaubt(braucht_token=u.path not in ("/", "/index.html", "/version", "/skin3d")
+                            and not u.path.startswith("/skinbild/")):
             return
         q = {k: v[0] for k, v in parse_qs(u.query).items()}
         if u.path in ("/", "/index.html"):
@@ -2691,6 +2692,24 @@ class Handler(BaseHTTPRequestHandler):
         elif u.path == "/config":
             c = load_cfg()
             self.send(200, {"config": c, "stimmen": STIMMEN})
+        elif u.path == "/skin3d":   # drehbare 3D-Vorschau eines Minecraft-Skins (skinview3d)
+            n = re.sub(r"[^a-z0-9_-]", "", q.get("n", ""))[:40]
+            seite = ("<!doctype html><meta charset=utf-8><style>html,body{margin:0;height:100%;background:#0b0f1c;overflow:hidden}"
+                     "canvas{display:block}</style><canvas id=c></canvas>"
+                     "<script src='https://cdn.jsdelivr.net/npm/skinview3d@3.1.0/bundles/skinview3d.bundle.js'></script><script>"
+                     "const v=new skinview3d.SkinViewer({canvas:document.getElementById('c'),width:innerWidth,height:innerHeight,"
+                     "skin:'/skinbild/{N}.png?t='+Date.now()});v.autoRotate=true;v.autoRotateSpeed=.8;"
+                     "v.animation=new skinview3d.WalkingAnimation();v.animation.speed=.6;v.zoom=.85;"
+                     "v.background=0x0b0f1c;onresize=()=>v.setSize(innerWidth,innerHeight)</script>").replace("{N}", n)   # kein %-Format: CSS enthält „100%“
+            self.send(200, seite.encode(), "text/html; charset=utf-8")
+        elif u.path.startswith("/skinbild/"):   # nur PNGs aus dem Skin-Ordner
+            n = re.sub(r"[^a-z0-9_-]", "", u.path[len("/skinbild/"):].rsplit(".", 1)[0])[:40]
+            pfad = os.path.join(os.path.expanduser("~"), "Pictures", "Minecraft-Skins", n + ".png")
+            try:
+                with open(pfad, "rb") as f:
+                    self.send(200, f.read(), "image/png")
+            except OSError:
+                self.send(404, b"", "text/plain")
         elif u.path == "/version":
             self.send(200, {"version": VERSION})
         elif u.path == "/features":   # Widget „Was Jarvis kann“: zentrale Liste features.json neben server.py

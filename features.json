@@ -362,6 +362,26 @@
      "name": "Jede Version & Mods",
      "text": "Funktioniert mit 1.8.9 bis 26.x, Fabric, Forge und LabyMod.",
      "beispiel": "einfach spielen"
+    },
+    {
+     "name": "Skin-Designer",
+     "text": "Eigene Skins nach Beschreibung mit drehbarer 3D-Vorschau, gespeichert in Bilder\\Minecraft-Skins.",
+     "beispiel": "Jarvis, mach mir einen Skin: Ritter in roter Rüstung"
+    },
+    {
+     "name": "Skin-Varianten",
+     "text": "3 Skins zur Auswahl nebeneinander in 3D.",
+     "beispiel": "Jarvis, 3 Skin-Ideen für einen Hacker"
+    },
+    {
+     "name": "Skins in den Launcher",
+     "text": "Legt den gewählten Skin direkt in die Skin-Bibliothek des Launchers.",
+     "beispiel": "Jarvis, Nummer 2 in den Launcher"
+    },
+    {
+     "name": "Pixel-Art-Bauer",
+     "text": "Baut Bilder und Logos aus Blöcken in deine Welt – mit Vorschau.",
+     "beispiel": "Jarvis, bau mein Logo als Pixel-Art"
     }
    ]
   },
