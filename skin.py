@@ -2,7 +2,7 @@
 
   py -3 skin.py bauen  <rezept.json>        ein Rezept oder eine Liste (z. B. 3 Varianten) → Skins + 3D-Hologramm
   py -3 skin.py launcher <name>             Skin in die Skin-Bibliothek des Minecraft-Launchers legen
-  py -3 skin.py launcher alle               alle PNGs aus Bilder\Minecraft-Skins (auch selbst abgelegte) in den Launcher
+  py -3 skin.py launcher alle               alle PNGs aus Bilder/Minecraft-Skins (auch selbst abgelegte) in den Launcher
   py -3 skin.py liste                       vorhandene Skins
 
 Rezept (alles optional außer name):
