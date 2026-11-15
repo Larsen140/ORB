@@ -60,7 +60,7 @@ DEFAULT_CFG = {
     "stimme": "de-DE-FlorianMultilingualNeural", "tempo": "+12%", "hoehe": "+0Hz", "lautstaerke": 160, "laut_v": 2,
     "farbe": "rot", "effekte": "mittel", "untertitel": True,
     "sfx": True, "sfxlaut": 60, "ambient": False,
-    "steuerung": "wort", "wakeword": "Jarvis", "schnipsen": True, "trading_start": True, "gaming_modus": True, "stimmung": True, "unterbrechen": True, "sprechen_unterbrechen": True, "nur_jarvis": True, "musik_schutz": True, "ducking": True,
+    "steuerung": "wort", "wakeword": "Jarvis", "schnipsen": True, "trading_start": True, "gaming_modus": True, "stimmung": True, "razer": True, "gesten": True, "unterbrechen": True, "sprechen_unterbrechen": True, "nur_jarvis": True, "musik_schutz": True, "ducking": True,
     "tts_anbieter": "edge",
     "klatschen": True, "dauerzuhoeren": True, "empfindlichkeit": 6, "schnips_empf": 6, "mikro": "TONOR", "kalib": {}, "satzpause": 2.0, "begruessung": True, "ort": "", "name": "",
     "schlafen": 5, "vollbild": True, "autostart": True, "schlaf_schliessen": True, "bildschirm": False,
@@ -69,7 +69,7 @@ DEFAULT_CFG = {
 }
 # Damit ORB immer dein Claude-Code-Login (Max-Abo) nutzt und nie einen API-Schlüssel
 CLAUDE_ENV_DROP = ("ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "ANTHROPIC_BASE_URL")
-VERSION = "94"
+VERSION = "95"
 ORB_UI = ("Deine Oberfläche (die Larsen gerade sieht): in der Mitte du als flüssige leuchtende Kugel mit Tropfen, "
           "Orbit-Ringen und Sternenhimmel; links eine Uhr und darunter der Gesprächsverlauf mit Eingabefeld; rechts "
           "Karten für System (CPU, RAM, Akku), Wetter mit Stundenvorschau, Aktivität (was du gerade tust) und Vorschläge; "
@@ -450,6 +450,7 @@ KURZ_PROMPT = ("Du sprichst gerade über ORB, eine Sprachoberfläche; deine Antw
 
 _cache, _lock, _cfg_lock = {}, threading.Lock(), threading.Lock()
 LAST_POLL = [0.0]
+LAST_WACH = [0.0]   # wann die Oberfläche zuletzt sichtbar und wach war (Razer-Licht)
 LAST_ACTIVE = [0.0]   # wann das Fenster zuletzt gesprochen/zugehört hat  # wann das Fenster zuletzt nachgefragt hat
 ON_SHOW = [None]    # wird von orb_app gesetzt: öffnet/zeigt das Fenster
 ON_HIDE = [None]    # schließt das Fenster (Schlaf spart Speicher)
@@ -2108,6 +2109,185 @@ def stimmung():
     return {"farbe": cfg.get("farbe", "rot"), "grund": "normal"}
 
 
+# ---------- Razer Chroma: Tastatur/Maus leuchten in ORBs Farbe, pulsieren beim Sprechen, blinken rot vor roten News ----------
+FARBEN = {"rot": (255, 50, 40), "blau": (50, 140, 255), "cyan": (30, 215, 255), "gruen": (30, 235, 130),
+          "lila": (170, 80, 255), "gold": (255, 180, 40), "weiss": (210, 225, 255)}
+FARBEN2 = {"rot": (255, 100, 180), "blau": (150, 90, 255), "cyan": (120, 110, 255), "gruen": (30, 190, 255),
+           "lila": (255, 80, 190), "gold": (255, 90, 60), "weiss": (150, 190, 255)}
+CHROMA_GERAETE = ("keyboard", "mouse", "mousepad", "headset", "keypad", "chromalink")
+
+
+class Chroma:
+    def __init__(self):
+        self.uri, self.zuletzt, self.farbe = None, 0.0, None
+
+    def _req(self, methode, url, daten=None):
+        req = urllib.request.Request(url, data=json.dumps(daten).encode() if daten is not None else None, method=methode,
+                                     headers={"Content-Type": "application/json"})
+        with urllib.request.urlopen(req, timeout=2) as r:
+            return json.loads(r.read().decode() or "{}")
+
+    def an(self):
+        if self.uri:
+            return True
+        try:
+            r = self._req("POST", "http://localhost:54235/razer/chromasdk", {
+                "title": "ORB", "description": "ORB Sprachassistent", "author": {"name": "ORB", "contact": "lokal"},
+                "device_supported": list(CHROMA_GERAETE), "category": "application"})
+            self.uri = r.get("uri")
+            time.sleep(0.6)   # Chroma braucht kurz, bis die Sitzung bereit ist
+        except Exception:
+            self.uri = None
+        return bool(self.uri)
+
+    def aus(self):
+        if self.uri:
+            try:
+                self._req("DELETE", self.uri)
+            except Exception:
+                pass
+        self.uri, self.farbe = None, None
+
+    def setzen(self, rgb):
+        if not self.an():
+            return
+        bgr = rgb[2] << 16 | rgb[1] << 8 | rgb[0]   # Chroma erwartet BGR
+        if bgr == self.farbe and time.time() - self.zuletzt < 5:
+            self._req("PUT", self.uri + "/heartbeat")
+            return
+        try:
+            for g in CHROMA_GERAETE:
+                self._req("PUT", f"{self.uri}/{g}", {"effect": "CHROMA_STATIC", "param": {"color": bgr}})
+            self.farbe, self.zuletzt = bgr, time.time()
+        except Exception:
+            self.uri = None
+
+
+def _dimmen(rgb, f):
+    return tuple(max(0, min(255, int(c * f))) for c in rgb)
+
+
+def chroma_loop():
+    """Leuchtet nur, solange ORB wach/sichtbar ist; im Schlaf, im Spiel oder ausgeschaltet gehört das Licht wieder Synapse."""
+    ch, gewarnt, t = Chroma(), set(), 0
+    cache = {"t": 0.0, "farbe": "rot", "news": [], "cfg": {}}
+    while True:
+        time.sleep(0.25)
+        t += 1
+        try:
+            if time.time() - cache["t"] > 20:   # Farbe/News/Einstellungen nur alle 20 s neu
+                cache["cfg"] = load_cfg()
+                cache["farbe"] = stimmung().get("farbe", cache["cfg"].get("farbe", "rot"))
+                try:
+                    cache["news"] = ff_news_heute()
+                except Exception:
+                    cache["news"] = []
+                cache["t"] = time.time()
+            cfg = cache["cfg"]
+            wach = time.time() - LAST_WACH[0] < 3
+            if not cfg.get("razer", True) or not wach or spiel_laeuft():
+                if ch.uri:
+                    ch.aus()
+                time.sleep(1.5)
+                continue
+            farbe = cache["farbe"]
+            basis, zweit = FARBEN.get(farbe, FARBEN["rot"]), FARBEN2.get(farbe, FARBEN2["rot"])
+            # rote News in 5 Minuten: 8 s rot blinken (einmal pro Termin)
+            warnung = False
+            try:
+                for n in cache["news"]:
+                    rest = (n["zeit"] - datetime.datetime.now().astimezone()).total_seconds()
+                    if n["impact"] == "High" and 0 < rest <= 300:
+                        key = n["zeit"].isoformat() + n["titel"]
+                        if key not in gewarnt:
+                            gewarnt.add(key)
+                            for i in range(16):
+                                ch.setzen((255, 0, 0) if i % 2 == 0 else (40, 0, 0))
+                                time.sleep(0.5)
+                            warnung = True
+            except Exception:
+                pass
+            if warnung:
+                continue
+            mode = read_state().get("mode", "idle")
+            if mode == "spricht":
+                ch.setzen(_dimmen(basis, 1.0 if t % 3 else 0.45))          # pulsiert beim Sprechen
+            elif mode in ("denkt", "auftrag"):
+                ch.setzen(_dimmen(zweit, 0.55 + 0.45 * abs(((t / 8) % 2) - 1)))   # atmet beim Arbeiten
+            else:
+                ch.setzen(_dimmen(basis, 0.7))
+        except Exception as e:
+            print("Razer:", e)
+            time.sleep(5)
+
+
+# ---------- PC-Wache: warnt von selbst bei vollem Speicher, voller Platte oder heißer Grafikkarte ----------
+def pc_wache():
+    zuletzt = {}
+    while True:
+        time.sleep(600)
+        try:
+            import psutil
+            warn = []
+            vm = psutil.virtual_memory()
+            if vm.percent >= 92:
+                warn.append(("ram", "Dein Arbeitsspeicher ist zu %d Prozent voll. Sag „PC-Doktor“, dann schaue ich, was ihn frisst." % vm.percent))
+            frei = shutil.disk_usage("C:\\").free / 2**30
+            if frei < 15:
+                warn.append(("platte", "Auf C: sind nur noch %d Gigabyte frei." % frei))
+            try:
+                t = int(subprocess.run(["nvidia-smi", "--query-gpu=temperature.gpu", "--format=csv,noheader,nounits"],
+                                       capture_output=True, text=True, timeout=8, creationflags=NO_WINDOW).stdout.strip())
+                if t >= 87:
+                    warn.append(("gpu", "Deine Grafikkarte ist mit %d Grad sehr heiß." % t))
+            except Exception:
+                pass
+            for art, text in warn:
+                if time.time() - zuletzt.get(art, 0) > 6 * 3600 and time.time() - LAST_WACH[0] < 60 and not spiel_laeuft():
+                    zuletzt[art] = time.time()
+                    say_when_free(text)
+        except Exception as e:
+            print("PC-Wache:", e)
+
+
+# ---------- Musik-Geschmack: merkt sich gehörte und übersprungene Spotify-Songs (für den DJ) ----------
+def musik_logger():
+    pfad = os.path.join(load_cfg()["ordner"], "musik", "geschmack.json")
+    os.makedirs(os.path.dirname(pfad), exist_ok=True)
+    try:
+        with open(pfad, encoding="utf-8") as f:
+            daten = json.load(f)
+    except Exception:
+        daten = {"songs": {}, "kuenstler": {}}
+    jetzt, start = None, 0.0
+    while True:
+        time.sleep(4)
+        try:
+            sp = spotify_now()
+            song = f"{sp['kuenstler']} - {sp['titel']}" if sp.get("spielt") else None
+            if song == jetzt or (song is None and jetzt):   # gleicher Song oder pausiert: nichts zählen
+                continue
+            if jetzt:   # vorheriger Song zu Ende oder übersprungen
+                dauer = time.time() - start
+                k = jetzt.split(" - ", 1)[0]
+                e = daten["songs"].setdefault(jetzt, {"gehoert": 0, "geskippt": 0})
+                ke = daten["kuenstler"].setdefault(k, {"gehoert": 0, "geskippt": 0})
+                art = "geskippt" if dauer < 30 else "gehoert"
+                e[art] += 1
+                ke[art] += 1
+                e["zuletzt"] = datetime.date.today().isoformat()
+                if len(daten["songs"]) > 3000:   # nicht endlos wachsen
+                    for alt in sorted(daten["songs"], key=lambda s: daten["songs"][s].get("zuletzt", ""))[:500]:
+                        del daten["songs"][alt]
+                tmp = pfad + ".tmp"
+                with open(tmp, "w", encoding="utf-8") as f:
+                    json.dump(daten, f, ensure_ascii=False, indent=0)
+                os.replace(tmp, pfad)
+            jetzt, start = song, time.time()
+        except Exception:
+            time.sleep(20)
+
+
 def say_when_free(text):
     """Ansage, sobald ORB nicht gerade selbst antwortet (max. 2 Min. warten)."""
     def run():
@@ -2366,6 +2546,8 @@ class Handler(BaseHTTPRequestHandler):
             self.send(200, page.replace(b"<head>", b"<head>" + inject, 1), "text/html; charset=utf-8")
         elif u.path == "/state":
             LAST_POLL[0] = time.time()
+            if q.get("wach") == "1":
+                LAST_WACH[0] = time.time()
             if q.get("aktiv") == "1":
                 LAST_ACTIVE[0] = time.time()
             st = read_state()

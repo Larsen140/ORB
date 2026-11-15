@@ -918,6 +918,8 @@
     <div class="row">Trading-Start (News, Gold, Chart – 1× am Tag)<input type="checkbox" class="sw" id="s_tstart"></div>
     <div class="row">Stimmungs-Licht (Nacht, Trading, Musik)<input type="checkbox" class="sw" id="s_stimmung"></div>
     <div class="row">Gaming-Modus (bei Spielen Platz machen)<input type="checkbox" class="sw" id="s_gaming"></div>
+    <div class="row">Razer-Licht (Tastatur/Maus in ORBs Farbe)<input type="checkbox" class="sw" id="s_razer"></div>
+    <div class="row">Gesten per Webcam (✋ zuhören · ✊ Stopp · 👎 weg · 👍 ja)<input type="checkbox" class="sw" id="s_gesten"></div>
     <div class="row">Einschlafen nach<select id="s_schlaf"><option value="0">nie</option><option value="2">2 Min.</option><option value="5">5 Min.</option><option value="10">10 Min.</option><option value="30">30 Min.</option></select></div>
     <div class="row">Dein Name<input type="text" id="s_name" placeholder="optional"></div>
     <div class="row">Ort fürs Wetter<input type="text" id="s_ort" placeholder="automatisch"></div>
@@ -2102,6 +2104,53 @@ async function startup() {
 }
 
 /* ================= Sprechen ================= */
+/* ---------- Gesten per Webcam (MediaPipe, läuft lokal; Kamera nur an, solange ORB sichtbar und wach ist) ---------- */
+const gest = { rec:null, video:null, timer:null, laedt:false, fehler:0, last:'', since:0, sperre:0 };
+const MP = 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14';
+async function gestenStart() {
+  if (gest.rec || gest.laedt || performance.now() < gest.fehler) return;
+  gest.laedt = true;
+  try {
+    const vision = await import(MP + '/vision_bundle.mjs');
+    const files = await vision.FilesetResolver.forVisionTasks(MP + '/wasm');
+    const opt = d => ({ baseOptions:{ modelAssetPath:'https://storage.googleapis.com/mediapipe-models/gesture_recognizer/gesture_recognizer/float16/1/gesture_recognizer.task', delegate:d },
+                        runningMode:'VIDEO', numHands:1, minHandDetectionConfidence:.6 });
+    let rec; try { rec = await vision.GestureRecognizer.createFromOptions(files, opt('GPU')); } catch (e) { rec = await vision.GestureRecognizer.createFromOptions(files, opt('CPU')); }
+    const st = await navigator.mediaDevices.getUserMedia({ video:{ width:320, height:240, frameRate:{ max:10 } } });
+    const v = document.createElement('video'); v.muted = true; v.playsInline = true; v.srcObject = st; await v.play();
+    gest.rec = rec; gest.video = v; gest.timer = setInterval(gestenTick, 160);
+  } catch (e) {
+    gest.fehler = performance.now() + 120000;   // Kamera fehlt/verweigert: in 2 Min. erneut versuchen
+    if (window.ORB_DEBUG) console.log('Gesten:', e);
+  }
+  gest.laedt = false;
+}
+function gestenStop() {
+  clearInterval(gest.timer); gest.timer = null;
+  if (gest.video) { try { gest.video.srcObject.getTracks().forEach(t => t.stop()); } catch (e) {} gest.video = null; }
+  try { gest.rec?.close(); } catch (e) {} gest.rec = null;
+}
+function gestenTick() {
+  if (!gest.rec || !gest.video || gest.video.readyState < 2) return;
+  let name = '';
+  try { const r = gest.rec.recognizeForVideo(gest.video, performance.now()); const g = r.gestures?.[0]?.[0]; if (g && g.score > .72) name = g.categoryName; } catch (e) { return; }
+  const now = performance.now();
+  if (name !== gest.last) { gest.last = name; gest.since = now; return; }
+  if (!name || name === 'None' || now < gest.sperre || now - gest.since < 550) return;   // Geste ~½ s halten
+  gest.sperre = now + 2500;
+  geste(name);
+}
+function geste(n) {
+  lastAct = performance.now();
+  if (n === 'Open_Palm') { hint('✋ Ich höre', 1500); wake(); }
+  else if (n === 'Closed_Fist') { stopAudio(); caption(''); if (S.busy) fetch('/stop', { method:'POST' }).catch(() => {}); if (convo) stopConvo(); hint('✊ Stopp', 1500); }
+  else if (n === 'Thumb_Down') { hint('👎 Bis gleich', 1500); SFX.close(); goSleep(true, 'Geste Daumen runter'); toBack(900, 'Geste Daumen runter'); }
+  else if (n === 'Thumb_Up') {
+    const l = history.filter(h => h.who === 'orb').slice(-1)[0];
+    if (l && /\?\s*$/.test(l.text) && Date.now() - l.t < 60000) { hint('👍 Ja', 1200); ask('Ja'); }   // ORB hatte gerade gefragt
+    else { hint('👍', 1000); SFX.done(); }
+  }
+}
 let waechterT = 0;
 function zuhoerWaechter() {
   const now = performance.now();
@@ -2112,6 +2161,8 @@ function zuhoerWaechter() {
     if (cfg.steuerung === 'wort' && !wakeRec && !listening && !convoRec && !bargeRec && !S.call) startWake();
     // hängt eine Erkennung (läuft lange, hört aber nichts mehr), neu starten
     for (const r of [wakeRec, convoRec, bargeRec]) if (r && now - r._t0 > 90000 && now - r._last > 45000) { try { r.abort(); } catch (e) {} }
+    // Gesten-Kamera nur, wenn ORB sichtbar, wach und kein Spiel/Meeting läuft
+    if (cfg.gesten !== false && !S.sleep && !document.hidden && !verborgen && !S.spiel && !S.call) gestenStart(); else if (gest.timer || gest.rec) gestenStop();
   } catch (e) {}
 }
 setInterval(zuhoerWaechter, 1000);
@@ -2524,7 +2575,7 @@ async function poll() {
   const ctl = new AbortController(), abbruch = setTimeout(() => ctl.abort(), 5000);
   try {
     const aktiv = speakingNow() || listening || !!convoRec ? '1' : '0';
-    const resp = await fetch('/state?aktiv=' + aktiv, { cache:'no-store', signal:ctl.signal });
+    const resp = await fetch('/state?aktiv=' + aktiv + '&wach=' + (!S.sleep && !document.hidden && !verborgen ? 1 : 0), { cache:'no-store', signal:ctl.signal });
     if (resp.status === 403 && !poll._reload) { poll._reload = true; setTimeout(() => location.reload(), 300); }   // ORB neu gestartet → neues Token
     const st = await resp.json(); lastOk = performance.now(); S.busy = !!st.busy; renderTasks(st.aufgaben);
     if (st.karten_v !== undefined && st.karten_v !== kartenV) { kartenV = st.karten_v; ladeKarten(); } if (st.bild) bildHolo(st.bild); if (st.gold !== undefined) goldHolo(st.gold); if (st.kamera_foto !== undefined) kamFoto(st.kamera_foto); if (st.kam_n !== undefined) kamInhalt(st.kam_n); if (st.web) webHolo(st.web);
@@ -4390,7 +4441,7 @@ document.querySelectorAll('.swc').forEach(el => el.onclick = () => { saveCfg({ f
 const segs = { seg_eff:'tempo_claude', seg_len:'laenge', seg_rechte:'rechte', seg_fx:'effekte' };
 for (const [id, key] of Object.entries(segs)) $(id).querySelectorAll('button').forEach(b => b.onclick = () => { saveCfg({ [key]:b.dataset.v }); SFX.click(); });
 function fillRange(el) { el.style.setProperty('--p', (el.value - el.min) / (el.max - el.min) * 100 + '%'); }
-const CHK = { s_stimmung:'stimmung', s_gaming:'gaming_modus', s_tstart:'trading_start', s_dauer:'dauerzuhoeren', s_unterbrechen:'unterbrechen', s_sprechunter:'sprechen_unterbrechen', s_nurjarvis:'nur_jarvis', s_musik:'musik_schutz', s_duck:'ducking', s_gruss:'begruessung', s_voll:'vollbild', s_auto:'autostart', s_schliessen:'schlaf_schliessen', s_screen:'bildschirm', s_unter:'untertitel', s_sfx:'sfx', s_amb:'ambient' };
+const CHK = { s_gesten:'gesten', s_razer:'razer', s_stimmung:'stimmung', s_gaming:'gaming_modus', s_tstart:'trading_start', s_dauer:'dauerzuhoeren', s_unterbrechen:'unterbrechen', s_sprechunter:'sprechen_unterbrechen', s_nurjarvis:'nur_jarvis', s_musik:'musik_schutz', s_duck:'ducking', s_gruss:'begruessung', s_voll:'vollbild', s_auto:'autostart', s_schliessen:'schlaf_schliessen', s_screen:'bildschirm', s_unter:'untertitel', s_sfx:'sfx', s_amb:'ambient' };
 function syncSettingsUI() {
   const set = (id, v) => { const el = $(id); if (el && document.activeElement !== el) el.value = v; };
   set('s_stimme', cfg.stimme); set('s_tempo', parseInt(cfg.tempo) || 0); set('s_hoehe', parseInt(cfg.hoehe) || 0);

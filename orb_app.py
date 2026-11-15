@@ -603,6 +603,9 @@ def main():
     threading.Thread(target=server.mikro_standard, daemon=True).start()   # gewähltes Mikro (TONOR) = Windows-Standard
     threading.Thread(target=clap_loop, daemon=True).start()
     threading.Thread(target=spiel_wache, daemon=True).start()
+    threading.Thread(target=server.chroma_loop, daemon=True).start()   # Razer-Licht
+    threading.Thread(target=server.pc_wache, daemon=True).start()      # warnt bei vollem RAM/Platte, heißer GPU
+    threading.Thread(target=server.musik_logger, daemon=True).start()  # Musikgeschmack für den Spotify-DJ
     threading.Thread(target=update_loop, daemon=True).start()
     threading.Thread(target=announce_update, daemon=True).start()
     threading.Thread(target=backup_jarvis, daemon=True).start()

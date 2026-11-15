@@ -45,7 +45,7 @@ try:
         b = p.chromium.launch(executable_path=edge if os.path.exists(edge) else None, args=[
             "--autoplay-policy=no-user-gesture-required", "--use-fake-ui-for-media-stream", "--use-fake-device-for-media-stream"])
         pg = b.new_page(viewport={"width": 1600, "height": 900})
-        pg.on("console", lambda m: fehler.append("Konsole: " + m.text) if m.type == "error" and "404" not in m.text
+        pg.on("console", lambda m: fehler.append("Konsole: " + m.text) if m.type == "error" and "404" not in m.text and "INFO:" not in m.text and "XNNPACK" not in m.text
               and "Failed to load resource" not in m.text else None)
         pg.on("pageerror", lambda e: fehler.append("JavaScript: " + str(e)))
         pg.goto("http://127.0.0.1:%d/" % PORT)
