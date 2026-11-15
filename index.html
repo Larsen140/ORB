@@ -915,6 +915,7 @@
     <div class="row">Bei Musik nur auf „Jarvis“ hören<input type="checkbox" class="sw" id="s_musik"></div>
     <div class="row">Musik leiser, während ich antworte<input type="checkbox" class="sw" id="s_duck"></div>
     <div class="row">Mit Wetter begrüßen<input type="checkbox" class="sw" id="s_gruss"></div>
+    <div class="row">Trading-Start (News, Gold, Chart – 1× am Tag)<input type="checkbox" class="sw" id="s_tstart"></div>
     <div class="row">Einschlafen nach<select id="s_schlaf"><option value="0">nie</option><option value="2">2 Min.</option><option value="5">5 Min.</option><option value="10">10 Min.</option><option value="30">30 Min.</option></select></div>
     <div class="row">Dein Name<input type="text" id="s_name" placeholder="optional"></div>
     <div class="row">Ort fürs Wetter<input type="text" id="s_ort" placeholder="automatisch"></div>
@@ -2048,6 +2049,7 @@ function goSleep(silent, grund = 'unbekannt') {
 let hideTimer;
 function wake(frage) {
   clearTimeout(hideTimer);
+  fetch('/tagesstart', { method:'POST' }).catch(() => {});   // erstes Öffnen am Tag: News, Gold, Chart (Server prüft das Datum)
   if (verborgen || document.hidden) { verborgen = false; fetch('/show', { method:'POST' }).catch(() => {}); }   // aus dem Hintergrund nach vorne
   if (!S.sleep) return frage === undefined ? startListening() : frage ? ask(frage) : undefined;
   S.sleep = false; document.body.classList.remove('sleeping');
@@ -3579,6 +3581,16 @@ function renderKarten(list) {
       const bw = Math.min(+c.breite || w, innerWidth - 32), bh = Math.min(+c.hoehe || h, innerHeight - 140);
       const n = kartenPlatz++ % 8;   // neue Hologramme versetzt in der Mitte stapeln
       el.style.width = bw + 'px'; el.style.height = bh + 'px';
+      if (c.pos) {   // feste Plätze: oben-links | oben-rechts | unten | mitte – im Bereich zwischen den Widget-Spalten
+        const L = ($('left')?.getBoundingClientRect().right || 0) + 16, R = ($('right')?.getBoundingClientRect().left || innerWidth) - 16;
+        const breit = Math.max(320, R - L), halb = (breit - 16) / 2;
+        let x = L, y = 80, w = bw, h = bh;
+        if (c.pos === 'oben-links') { w = Math.min(bw, halb); h = Math.min(bh, innerHeight * .34); }
+        else if (c.pos === 'oben-rechts') { w = Math.min(bw, halb); h = Math.min(bh, innerHeight * .34); x = R - w; }
+        else if (c.pos === 'unten') { w = breit; h = Math.max(260, innerHeight - 80 - innerHeight * .34 - 16 - 150); y = 80 + innerHeight * .34 + 16; }
+        else { x = L + (breit - w) / 2; }
+        el.style.width = w + 'px'; el.style.height = h + 'px'; el.style.left = x + 'px'; el.style.top = y + 'px';
+      } else {
       // freien Platz suchen (zuerst Mitte, dann links/rechts davon), sonst versetzt stapeln
       const belegt = Object.values(kartenEls).filter(k => k !== el && !k.classList.contains('weg')).map(k => ({ left:k.offsetLeft, top:k.offsetTop, right:k.offsetLeft + k.offsetWidth, bottom:k.offsetTop + k.offsetHeight }));   // ohne Einblend-Animation messen
       let pos = null;
@@ -3590,6 +3602,7 @@ function renderKarten(list) {
         }
       if (!pos) pos = [Math.max(16, Math.min(innerWidth - bw - 16, innerWidth / 2 - bw / 2 + (n % 4) * 34 - 50)), Math.max(70, Math.min(innerHeight - bh - 130, 90 + n * 30))];
       el.style.left = pos[0] + 'px'; el.style.top = pos[1] + 'px';
+      }
       el.querySelector('button').onclick = () => { SFX.close(); el.classList.add('weg'); fetch('/karte', { method:'POST', headers:{ 'Content-Type':'application/json' }, body:JSON.stringify({ id:c.id, zu:true }) }).catch(() => {}); };
       // verschieben am Kopf
       const kh = el.querySelector('.kh');
@@ -4348,7 +4361,7 @@ document.querySelectorAll('.swc').forEach(el => el.onclick = () => { saveCfg({ f
 const segs = { seg_eff:'tempo_claude', seg_len:'laenge', seg_rechte:'rechte', seg_fx:'effekte' };
 for (const [id, key] of Object.entries(segs)) $(id).querySelectorAll('button').forEach(b => b.onclick = () => { saveCfg({ [key]:b.dataset.v }); SFX.click(); });
 function fillRange(el) { el.style.setProperty('--p', (el.value - el.min) / (el.max - el.min) * 100 + '%'); }
-const CHK = { s_dauer:'dauerzuhoeren', s_unterbrechen:'unterbrechen', s_sprechunter:'sprechen_unterbrechen', s_nurjarvis:'nur_jarvis', s_musik:'musik_schutz', s_duck:'ducking', s_gruss:'begruessung', s_voll:'vollbild', s_auto:'autostart', s_schliessen:'schlaf_schliessen', s_screen:'bildschirm', s_unter:'untertitel', s_sfx:'sfx', s_amb:'ambient' };
+const CHK = { s_tstart:'trading_start', s_dauer:'dauerzuhoeren', s_unterbrechen:'unterbrechen', s_sprechunter:'sprechen_unterbrechen', s_nurjarvis:'nur_jarvis', s_musik:'musik_schutz', s_duck:'ducking', s_gruss:'begruessung', s_voll:'vollbild', s_auto:'autostart', s_schliessen:'schlaf_schliessen', s_screen:'bildschirm', s_unter:'untertitel', s_sfx:'sfx', s_amb:'ambient' };
 function syncSettingsUI() {
   const set = (id, v) => { const el = $(id); if (el && document.activeElement !== el) el.value = v; };
   set('s_stimme', cfg.stimme); set('s_tempo', parseInt(cfg.tempo) || 0); set('s_hoehe', parseInt(cfg.hoehe) || 0);

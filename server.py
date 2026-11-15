@@ -60,7 +60,7 @@ DEFAULT_CFG = {
     "stimme": "de-DE-FlorianMultilingualNeural", "tempo": "+12%", "hoehe": "+0Hz", "lautstaerke": 160, "laut_v": 2,
     "farbe": "rot", "effekte": "mittel", "untertitel": True,
     "sfx": True, "sfxlaut": 60, "ambient": False,
-    "steuerung": "wort", "wakeword": "Jarvis", "schnipsen": True, "unterbrechen": True, "sprechen_unterbrechen": True, "nur_jarvis": True, "musik_schutz": True, "ducking": True,
+    "steuerung": "wort", "wakeword": "Jarvis", "schnipsen": True, "trading_start": True, "unterbrechen": True, "sprechen_unterbrechen": True, "nur_jarvis": True, "musik_schutz": True, "ducking": True,
     "tts_anbieter": "edge",
     "klatschen": True, "dauerzuhoeren": True, "empfindlichkeit": 6, "schnips_empf": 6, "mikro": "TONOR", "kalib": {}, "satzpause": 2.0, "begruessung": True, "ort": "", "name": "",
     "schlafen": 5, "vollbild": True, "autostart": True, "schlaf_schliessen": True, "bildschirm": False,
@@ -69,7 +69,7 @@ DEFAULT_CFG = {
 }
 # Damit ORB immer dein Claude-Code-Login (Max-Abo) nutzt und nie einen API-Schlüssel
 CLAUDE_ENV_DROP = ("ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "ANTHROPIC_BASE_URL")
-VERSION = "91"
+VERSION = "92"
 ORB_UI = ("Deine Oberfläche (die Larsen gerade sieht): in der Mitte du als flüssige leuchtende Kugel mit Tropfen, "
           "Orbit-Ringen und Sternenhimmel; links eine Uhr und darunter der Gesprächsverlauf mit Eingabefeld; rechts "
           "Karten für System (CPU, RAM, Akku), Wetter mit Stundenvorschau, Aktivität (was du gerade tust) und Vorschläge; "
@@ -1880,6 +1880,170 @@ def tasks_list():
         return [dict(t, laeuft_seit=round(now - t["start"]), jetzt=now) for t in sorted(TASKS.values(), key=lambda t: t["start"])]
 
 
+# ---------- Trading-Tagesstart: beim ersten Öffnen am Tag 3 Hologramme (News, Gold, Chart) ----------
+TAGESSTART_DATEI = os.path.join(os.environ.get("LOCALAPPDATA", os.path.expanduser("~")), "ORB", "tagesstart.txt")
+FF_URL = "https://nfs.faireconomy.media/ff_calendar_thisweek.json"
+
+
+def _json_holen(url, timeout=12):
+    req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+    with urllib.request.urlopen(req, timeout=timeout) as r:
+        return json.loads(r.read().decode("utf-8", "ignore"))
+
+
+FF_CACHE = os.path.join(os.environ.get("LOCALAPPDATA", os.path.expanduser("~")), "ORB", "ff_kalender.json")
+
+
+def ff_kalender():
+    try:
+        if time.time() - os.path.getmtime(FF_CACHE) < 7200:
+            with open(FF_CACHE, encoding="utf-8") as f:
+                return json.load(f)
+    except OSError:
+        pass
+    try:
+        daten = _json_holen(FF_URL)
+        with open(FF_CACHE, "w", encoding="utf-8") as f:
+            json.dump(daten, f)
+        return daten
+    except Exception:
+        with open(FF_CACHE, encoding="utf-8") as f:   # gesperrt/offline: letzter Stand (gleiche Woche)
+            return json.load(f)
+
+
+def ff_news_heute():
+    """ForexFactory-Kalender: heutige Termine (Ortszeit), High + Medium, sortiert."""
+    heute, out = datetime.date.today(), []
+    for e in ff_kalender():
+        try:
+            t = datetime.datetime.fromisoformat(e["date"]).astimezone()   # in Ortszeit (MEZ/MESZ)
+        except Exception:
+            continue
+        if t.date() == heute and e.get("impact") in ("High", "Medium"):
+            out.append(dict(zeit=t, land=e.get("country", ""), titel=e.get("title", ""), impact=e["impact"],
+                            prognose=e.get("forecast", ""), vorher=e.get("previous", "")))
+    return sorted(out, key=lambda x: x["zeit"])
+
+
+def gold_daten():
+    d = {}
+    try:
+        d["preis"] = float(_json_holen("https://api.gold-api.com/price/XAU")["price"])
+    except Exception:
+        pass
+    try:
+        r = _json_holen("https://query1.finance.yahoo.com/v8/finance/chart/GC=F?interval=1d&range=5d")["chart"]["result"][0]
+        q = r["indicators"]["quote"][0]
+        tage = [(h, l, c) for h, l, c in zip(q["high"], q["low"], q["close"]) if h and l and c]
+        if len(tage) >= 2:
+            d["vortag_hoch"], d["vortag_tief"], d["vortag_schluss"] = tage[-2]
+            d["heute_hoch"], d["heute_tief"] = tage[-1][0], tage[-1][1]
+    except Exception:
+        pass
+    return d
+
+
+def session_jetzt():
+    h = datetime.datetime.now().hour + datetime.datetime.now().minute / 60
+    if datetime.date.today().weekday() >= 5:
+        return "Wochenende – Markt geschlossen"
+    if 8 <= h < 12:
+        return "London-Session läuft (08–12 Uhr)"
+    if 14 <= h < 18:
+        return "New-York-Session läuft (14–18 Uhr)"
+    if h < 8:
+        return "Vor London – Start 08:00"
+    if h < 14:
+        return "Pause bis New York – Start 14:00"
+    return "Sessions vorbei – heute keine Setups mehr"
+
+
+def _news_nachladen():
+    """ForexFactory hat abgelehnt (zu viele Abrufe): später erneut versuchen und dann ansagen."""
+    for warte in (300, 600, 1200):
+        time.sleep(warte)
+        try:
+            ff_kalender()
+        except Exception:
+            continue
+        try:
+            os.remove(TAGESSTART_DATEI)
+        except OSError:
+            pass
+        tagesstart(zwingen="nachladen")
+        return
+
+
+def tagesstart(zwingen=False):
+    """Beim ersten Öffnen am Tag: News, Gold und Live-Chart als Hologramme; News kurz ansagen."""
+    heute = datetime.date.today().isoformat()
+    try:
+        with open(TAGESSTART_DATEI, encoding="utf-8") as f:
+            if f.read().strip() == heute and not zwingen:
+                return False
+    except OSError:
+        pass
+    if not load_cfg().get("trading_start", True) and not zwingen:
+        return False
+    with open(TAGESSTART_DATEI, "w", encoding="utf-8") as f:
+        f.write(heute)
+
+    # 1) News
+    satz = ""
+    try:
+        news = ff_news_heute()
+        rote = [n for n in news if n["impact"] == "High"]
+        zeilen = [[n["zeit"].strftime("%H:%M"), ("🔴 " if n["impact"] == "High" else "🟠 ") + n["land"], n["titel"],
+                   n["prognose"] or "–"] for n in news]
+        inhalt = [{"typ": "zahl", "wert": str(len(rote)), "label": "rote News heute", "reihe": True},
+                  {"typ": "zahl", "wert": str(len(news) - len(rote)), "label": "mittlere", "reihe": True}]
+        if zeilen:
+            inhalt.append({"typ": "tabelle", "kopf": ["Zeit", "Land", "Termin", "Prognose"], "zeilen": zeilen})
+        sperren = [f"{(n['zeit'] - datetime.timedelta(minutes=30)):%H:%M}–{(n['zeit'] + datetime.timedelta(minutes=30)):%H:%M} "
+                   f"({n['land']} {n['titel']})" for n in rote if n["land"] in ("USD", "EUR", "GBP", "AUD", "JPY", "CAD", "CHF", "NZD")]
+        if sperren:
+            inhalt.append({"typ": "liste", "punkte": ["Kein Trade: " + s for s in sperren]})
+        else:
+            inhalt.append({"typ": "text", "text": "Keine roten News – freie Bahn (trotzdem vor jedem Entry kurz prüfen)."})
+        karte_setzen({"id": "ts_news", "titel": "ForexFactory · News heute", "groesse": "mittel", "pos": "oben-links", "farbe": "rot" if rote else "gruen",
+                      "inhalt": inhalt})
+        usd = [n for n in rote if n["land"] == "USD"]
+        if not rote:
+            satz = "Heute gibt es keine roten News bei ForexFactory."
+        else:
+            erste = ", ".join(f"{n['zeit']:%H:%M} {n['titel']}" for n in (usd or rote)[:3])
+            satz = (f"Heute {len(rote)} rote News" + (f", für Gold wichtig: {erste}." if usd else f": {erste}.")
+                    + " Eine halbe Stunde davor und danach nicht traden.")
+    except Exception:
+        karte_setzen({"id": "ts_news", "titel": "ForexFactory · News heute", "groesse": "klein", "pos": "oben-links",
+                      "inhalt": [{"typ": "text", "text": "ForexFactory lässt gerade keine Abfrage zu – ich versuche es in "
+                                                         "ein paar Minuten automatisch noch einmal."}]})
+        satz = "Den ForexFactory-Kalender lade ich gleich nach."
+        if zwingen != "nachladen":
+            threading.Thread(target=_news_nachladen, daemon=True).start()
+
+    # 2) Gold
+    g = gold_daten()
+    inhalt = []
+    if "preis" in g:
+        ch = "Spot (ca.)"
+        inhalt.append({"typ": "zahl", "wert": f"{g['preis']:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."),
+                       "einheit": "$", "label": "XAUUSD " + ch})
+    inhalt.append({"typ": "text", "text": session_jetzt()})
+    inhalt.append({"typ": "liste", "punkte": ["Setup-TF M1 · M5 · M15, Kontext M15/H1", "Entry 83,6 % · SL X ± 2 Pip · BE 1R · TP 2R",
+                                             "Alle 6 Confirmations – sonst kein Trade"]})
+    inhalt.append({"typ": "text", "text": "Broker: Vantage (XAUUSD, 1 Lot = 100 oz). Spot-Preis oben ca. – maßgeblich ist der Vantage-Kurs im Chart."})
+    karte_setzen({"id": "ts_gold", "titel": "Jarvis · Gold", "groesse": "klein", "farbe": "gelb", "pos": "oben-rechts", "inhalt": inhalt})
+
+    # 3) Live-Chart (TradingView)
+    karte_setzen({"id": "ts_chart", "titel": "XAUUSD · Vantage · M5", "groesse": "gross", "farbe": "gelb", "pos": "unten", "inhalt": [
+        {"typ": "web", "url": "https://s.tradingview.com/widgetembed/?symbol=VANTAGE%3AXAUUSD&interval=5&theme=dark"
+                              "&style=1&locale=de_DE&timezone=Europe%2FBerlin&hide_side_toolbar=0&withdateranges=1"}]})
+    if satz:
+        say_when_free(satz)
+    return True
+
+
 def say_when_free(text):
     """Ansage, sobald ORB nicht gerade selbst antwortet (max. 2 Min. warten)."""
     def run():
@@ -1994,6 +2158,7 @@ def karte_setzen(b):
                            "groesse": str(b.get("groesse") or alt.get("groesse") or "mittel"),
                            "breite": b.get("breite") or alt.get("breite"), "hoehe": b.get("hoehe") or alt.get("hoehe"),
                            "farbe": str(b.get("farbe") or alt.get("farbe") or ""), "inhalt": inhalt[-60:],
+                           "pos": str(b.get("pos") or alt.get("pos") or ""),
                            "dauer": float(b.get("dauer") or 0), "zeit": time.time(), "v": alt.get("v", 0) + 1}
             KARTEN_V[0] += 1
             return {"ok": True, "id": kid}
@@ -2348,6 +2513,9 @@ class Handler(BaseHTTPRequestHandler):
                 self.send(400, {"ok": False})
         elif u.path == "/neu":   # entwickler_lauf.ps1 am Ende: Einführung „Was ist neu?“
             self.send(200, {"ok": neu_nach_entwickler(str(b.get("art", "orb")), b.get("satz"))})
+        elif u.path == "/tagesstart":   # Fenster geöffnet: einmal am Tag News/Gold/Chart einblenden
+            self.send(200, {"ok": True})
+            threading.Thread(target=lambda: tagesstart(bool(b.get("zwingen"))), daemon=True).start()
         elif u.path == "/karte":   # holo.ps1: freies Hologramm anlegen/ändern/schließen
             self.send(200, karte_setzen(b if isinstance(b, dict) else {}))
         elif u.path == "/kamera":   # Oberfläche: Kamera an/aus (wird alle paar Sekunden bestätigt)
