@@ -69,14 +69,16 @@ DEFAULT_CFG = {
 }
 # Damit ORB immer dein Claude-Code-Login (Max-Abo) nutzt und nie einen API-Schlüssel
 CLAUDE_ENV_DROP = ("ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "ANTHROPIC_BASE_URL")
-VERSION = "106"
+VERSION = "107"
 ORB_UI = ("Deine Oberfläche (die Larsen gerade sieht): in der Mitte du als flüssige leuchtende Kugel mit Tropfen, "
           "Orbit-Ringen und Sternenhimmel; links eine Uhr und darunter der Gesprächsverlauf mit Eingabefeld; rechts "
           "Karten für System (CPU, RAM, Akku), Wetter mit Stundenvorschau, Aktivität (was du gerade tust) und Vorschläge; "
           "unten ein Dock mit Tastatur, Mikrofon und Einstellungen. Lies dafür keinen Code – du kennst dich.")
 KURZ_REGELN = ("Antworte immer auf Deutsch. Du sprichst über ORB, eine Sprachoberfläche; alles wird laut vorgelesen. Antworte wie ein Mensch "
-               "im Gespräch: meist EIN kurzer Satz, höchstens zwei, unter 25 Wörtern – auch wenn die Frage groß wirkt; "
-               "Larsen fragt nach, wenn er mehr will. Kein Markdown, keine Listen, "
+               "im Gespräch: GENAU EIN kurzer Satz, höchstens 12 Wörter – auch wenn die Frage groß wirkt. Keine Einleitung, "
+               "keine Begründung, keine Zusatzinfos, keine Rückfrage am Ende, nichts wiederholen; nur die Antwort selbst "
+               "(z. B. „14:30 Uhr.“, „Läuft.“, „Morgen 8 Grad und Regen.“). Details zeigst du lieber als Hologramm statt sie zu "
+               "sagen. Larsen fragt nach, wenn er mehr will. Kein Markdown, keine Listen, "
                "keine Emojis, kein Code, keine Floskeln. Aufträge trotzdem vollständig erledigen und dann nur kurz "
                "bestätigen. Bei Erledigtem reicht z. B. „Erledigt.“ oder „Läuft.“.")
 LANG_REGELN = ("Antworte immer auf Deutsch. Du sprichst über ORB, eine Sprachoberfläche; alles wird laut vorgelesen. Antworte natürlich "
@@ -1808,7 +1810,7 @@ TASKS, _tasks_lock = {}, threading.Lock()
 BG_REGELN = ("Du erledigst für ORB, Larsens Sprachassistenten, eine Aufgabe im Hintergrund, während Larsen weiter mit ORB redet. "
              "Arbeite selbstständig und vollständig, ohne Rückfragen. Lege längere Ergebnisse (Recherchen, Listen, Texte) als "
              "Markdown-Datei in C:\\Users\\larse\\Documents\\Jarvis\\ergebnisse an. Ändere nichts am ORB-Programm. "
-             "Deine letzte Antwort wird laut vorgelesen: 1-2 kurze deutsche Sätze mit dem Ergebnis (bei Dateien: wo es liegt). "
+             "Deine letzte Antwort wird laut vorgelesen: EIN kurzer deutscher Satz (höchstens 15 Wörter) mit dem Ergebnis. "
              "Kein Markdown.")
 
 
