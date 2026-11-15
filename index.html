@@ -1546,6 +1546,37 @@ function setAmbient(on) {
 /* ---------- Stimme: Stücke lückenlos ---------- */
 let curAid = null, mutedAid = null, partsQueued = 0, nextIdx = 0, pending = {}, sched = [], endTime = 0, fakeUntil = 0, curSay = '', altSay = '', sayAid = null;
 function speakingNow() { return (audioOk() && ac.currentTime < endTime - .02) || performance.now() < fakeUntil; }
+/* ---------- Echo-Schutz: ORBs eigene Stimme über das Mikro nie als Frage nehmen ---------- */
+// Mikro ist während und 1,5 s nach eigener Sprachausgabe für Fragen gesperrt (nur „Jarvis“, „Stopp“ oder klares Dazwischenreden);
+// zusätzlich wird Erkanntes mit den zuletzt gesagten Sätzen verglichen (Ähnlichkeit > 60 % = verwerfen), auch Update-/Neu-Ansagen.
+const ECHO_SPERRE_MS = 1500, gesagtListe = {};
+let sprachEnde = -1e9;
+setInterval(() => { if (speakingNow()) sprachEnde = performance.now(); }, 100);
+function nachSprache() { if (speakingNow()) sprachEnde = performance.now(); return performance.now() - sprachEnde < ECHO_SPERRE_MS; }
+function merkeGesagt(aid, t) {
+  if (!t) return; const now = performance.now(); gesagtListe[aid || 'x' + now] = { t:now, text:t };
+  for (const k in gesagtListe) if (now - gesagtListe[k].t > 180000) delete gesagtListe[k];
+}
+const echoStamm = t => (String(t).toLowerCase().replace(NAME_RE(), ' ').replace(/(?<![a-zäöüß])orb(?![a-zäöüß])/g, ' ').match(/[a-zäöüß0-9]+/g) || []).map(w => w.slice(0, 5));
+function echoTreffer(a, b) {   // längste gemeinsame Wortfolge (Stämme)
+  const d = Array(b.length + 1).fill(0);
+  for (let i = 1; i <= a.length; i++) { let prev = 0; for (let j = 1; j <= b.length; j++) { const tmp = d[j]; d[j] = a[i - 1] === b[j - 1] ? prev + 1 : Math.max(d[j], d[j - 1]); prev = tmp; } }
+  return d[b.length];
+}
+function echoAehnlichkeit(t, texte) {
+  const h = echoStamm(t); if (h.length < 3) return 0;   // „Ja“, „Stopp“ … nie verwerfen
+  let best = 0;
+  for (const g of texte) {
+    const s = g.split(/(?<=[.!?…])\s+/).filter(x => x.trim());
+    for (const st of [...s, ...s.slice(1).map((x, i) => s[i] + ' ' + x), g]) {
+      const w = echoStamm(st); if (!w.length) continue;
+      const m = echoTreffer(h, w);
+      best = Math.max(best, 2 * m / (h.length + w.length), h.length >= 4 ? m / h.length - .25 : 0);
+    }
+  }
+  return best;
+}
+function istEcho(t) { return echoAehnlichkeit(t, Object.values(gesagtListe).map(x => x.text).concat(curSay ? [curSay] : [])) > .6; }
 function stopAudio() {
   for (const x of sched) if (x.src) try { x.src.stop(); } catch (e) {}
   sched = []; endTime = 0; pending = {}; fakeUntil = 0;
@@ -1563,7 +1594,7 @@ function onParts(st, first) {
     if (KAM.an && st.holo && st.holo.typ === 'wetter') aiNeu('wetter');
     if (st.holo && st.holo.titel) holoShow({ ico:st.holo.typ === 'wetter' ? WX(st.holo.code) : '🚀', titel:st.holo.titel, sub:st.holo.sub }, 7000);
   }
-  if (st.say) { if (st.aid !== sayAid) { altSay = curSay; sayAid = st.aid; } curSay = st.say; orbMsg(st.aid, st.say, st.final); caption(st.say); }
+  if (st.say) { if (st.aid !== sayAid) { altSay = curSay; sayAid = st.aid; } curSay = st.say; merkeGesagt(st.aid, st.say); orbMsg(st.aid, st.say, st.final); caption(st.say); }
   while (partsQueued < st.parts.length) { fetchPart(st.aid, partsQueued, st.parts[partsQueued]); partsQueued++; }
 }
 async function fetchPart(aid, i, text) {
@@ -2174,7 +2205,8 @@ function ohrStand(o) {
 function ohrEreignis(e) {
   if (e.typ === 'wake') return onWake('Jarvis');
   const t = (e.text || '').trim(); if (!t) return;
-  if (speakingNow()) {   // ORB spricht: nur „Stopp“ oder „Jarvis“ zählt (Rest ist meist Echo)
+  if (istEcho(t)) return;   // ORBs eigener Satz (Whisper liefert ihn oft erst nach der Ansage)
+  if (nachSprache()) {   // ORB spricht (oder eben noch): nur „Stopp“ oder „Jarvis“ zählt (Rest ist meist Echo)
     if (STOP_RE.test(t.replace(/[.!?,]+$/g, ''))) { stopAudio(); caption(''); if (S.busy) fetch('/stop', { method:'POST' }).catch(() => {}); return convo ? stopConvo() : hint('Okay', 1200); }
     if (NAME_RE().test(t)) return interrupt();
     return;
@@ -2208,8 +2240,9 @@ const NAME_VARIANTEN = 'jarvis|jarwis|jarvi|jarviz|jarves|jervis|javis|charvis|t
 const NAME_RE = () => new RegExp('(?<![a-zäöüß])(' + NAME_VARIANTEN + '|' + ((cfg.wakeword || 'jarvis').toLowerCase().replace(/[^a-zäöüß]/g, '') || 'jarvis') + ')(?![a-zäöüß])', 'i');
 const STOP_WORT = /(?<![a-zäöüß])(stopp?|hör auf|hör mal auf|aufhören|ruhe|sei still|schluss|genug|das war'?s|tschüss)(?![a-zäöüß])/i;
 const STOP_RE = { test: t => { t = t.trim(); return t.split(/\s+/).length <= 5 && STOP_WORT.test(t); } };   // kurze Sätze mit Stopp-Wort
-async function ask(text) {
+async function ask(text, getippt) {
   text = text.trim(); if (!text) return;
+  if (!getippt && istEcho(text)) { liveMsg(null); hlog && hlog('Echo verworfen: ' + text.slice(0, 60)); return; }   // eigene Ansage wieder eingefangen
   lastAct = performance.now();
   if (S.sleep) { S.sleep = false; document.body.classList.remove('sleeping'); }
   const t0 = text.replace(/[.!?,]+$/g, '').trim();
@@ -2238,8 +2271,8 @@ async function ask(text) {
   if (STOP_RE.test(text.replace(/[.!?,]+$/g, ''))) { goldZu(); stopAudio(); return convo ? stopConvo() : hint('Okay'); }
   liveMsg(null); addMsg('me', text); stopAudio(); SFX.send(); ripple(1.1); caption('');
   try {
-    const r = await fetch('/ask', { method:'POST', headers:{ 'Content-Type':'application/json' }, body:JSON.stringify({ text }) });
-    if (r.ok) { const j = await r.json().catch(() => ({})); if (j.parallel) { hint('Läuft parallel – eigenes Hologramm', 2500); SFX.holo(); } if (j.lokal) { hint('Erledigt', 1500); SFX.done(); } }
+    const r = await fetch('/ask', { method:'POST', headers:{ 'Content-Type':'application/json' }, body:JSON.stringify({ text, getippt:!!getippt }) });
+    if (r.ok) { const j = await r.json().catch(() => ({})); if (j.echo) return; if (j.parallel) { hint('Läuft parallel – eigenes Hologramm', 2500); SFX.holo(); } if (j.lokal) { hint('Erledigt', 1500); SFX.done(); } }
     if (r.status === 409) { hint('Ich arbeite noch – „Jarvis“ oder Esc unterbricht', 4000); addMsg('orb', 'Moment, ich bin noch an der letzten Sache dran. Sag „Jarvis“ oder drück Esc, dann höre ich auf.'); }
     fastPoll();
   } catch (e) { hint('Server nicht erreichbar'); }
@@ -2414,13 +2447,15 @@ function handleConvo(t, info = {}) {
     if (vorne || info.cut) t = t.slice(m.index + m[0].length).replace(/^[\s,.!?:;]+/, '');   // „Jarvis, …“ → nur die Frage (beim Unterbrechen: eigene Stimme davor weg)
     if (t.replace(/[.!?,\s]+/g, '').length <= 2) { liveMsg(null); followUntil = performance.now() + FOLLOW_MS; SFX.listenOn(); ripple(.6); hint('Ich höre …', FOLLOW_MS); return; }
   } else if (!info.named && pegelN >= 3 && info.pk > 0 && info.pk < pegelNah * .3) { liveMsg(null); return; }   // viel leiser als Larsen → Hintergrund
+  const reinGeredet = info.cut && !m;   // klar dazwischengeredet: Text enthält ORBs Stimme davor, ist aber echt
+  if ((!reinGeredet && istEcho(t)) || (nachSprache() && !m && !info.named)) { liveMsg(null); return; }   // eigene Stimme: in der Sperrzeit nur mit „Jarvis“, sonst ähnlich zu ORBs Sätzen
   if (fragRest.t && performance.now() < fragRest.bis && !t.toLowerCase().startsWith(fragRest.t.toLowerCase())) t = fragRest.t + ' ' + t;   // Fortsetzung des abgebrochenen Satzes anhängen
   fragRest.t = '';
   const kern = t.replace(/[.!?,…]+/g, ' ').trim(), worte = kern.split(/\s+/).filter(Boolean);
   if (!worte.length || worte.every(w => FUELLWORT.test(w))) { liveMsg(null); return; }   // nur „äh“, „hm“
   // abgeschnitten oder sehr unsicher erkannt → nachfragen statt Unsinn abschicken
   if ((worte.length >= 2 && HAENGT.test(kern)) || (info.conf > 0 && info.conf < .42 && worte.length <= 6)) return nachfragen(kern);
-  followUntil = 0; killConvoRec(); askGap = performance.now() + 1800; ask(t);
+  followUntil = 0; killConvoRec(); askGap = performance.now() + 1800; ask(t, reinGeredet);
   if (!cfg.dauerzuhoeren) stopConvo(true);   // ohne Dauerzuhören: eine Frage, dann wieder nur auf „Jarvis“
 }
 let fragRest = { t:'', bis:0 };
@@ -4051,7 +4086,7 @@ $('wlist').querySelectorAll('input').forEach(i => {
 setTimeout(applyWidgets, 0);
 document.querySelectorAll('.chip').forEach(b => b.onclick = () => {
   SFX.click(); const t = b.textContent;
-  if (t.endsWith(': ')) { $('txt').value = t; $('txt').focus(); } else ask(t);
+  if (t.endsWith(': ')) { $('txt').value = t; $('txt').focus(); } else ask(t, true);
 });
 tick(); setInterval(tick, 1000); loadWeather(); setInterval(loadWeather, 600000);
 
@@ -4442,7 +4477,7 @@ function toggleSettings(on) { const el = $('set'); on = on ?? !el.classList.cont
 // leiser Tick beim Überfahren von Knöpfen (höchstens alle 80 ms)
 let lastHover = 0;
 document.addEventListener('mouseover', e => { if (e.target.closest('.ic, .chip, .btn, .seg button, .swc, .done') && performance.now() - lastHover > 80) { lastHover = performance.now(); SFX.hover(); } });
-function sendTyped() { const v = $('txt').value.trim(); if (!v) return; ask(v); $('txt').value = ''; }
+function sendTyped() { const v = $('txt').value.trim(); if (!v) return; ask(v, true); $('txt').value = ''; }
 $('send').onclick = sendTyped;
 $('txt').addEventListener('keydown', e => { if (e.key === 'Enter') sendTyped(); if (e.key === 'Escape') $('txt').blur(); e.stopPropagation(); });
 const mic = $('mic');

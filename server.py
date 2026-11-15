@@ -69,7 +69,7 @@ DEFAULT_CFG = {
 }
 # Damit ORB immer dein Claude-Code-Login (Max-Abo) nutzt und nie einen API-Schlüssel
 CLAUDE_ENV_DROP = ("ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "ANTHROPIC_BASE_URL")
-VERSION = "98"
+VERSION = "99"
 ORB_UI = ("Deine Oberfläche (die Larsen gerade sieht): in der Mitte du als flüssige leuchtende Kugel mit Tropfen, "
           "Orbit-Ringen und Sternenhimmel; links eine Uhr und darunter der Gesprächsverlauf mit Eingabefeld; rechts "
           "Karten für System (CPU, RAM, Akku), Wetter mit Stundenvorschau, Aktivität (was du gerade tust) und Vorschläge; "
@@ -452,6 +452,46 @@ _cache, _lock, _cfg_lock = {}, threading.Lock(), threading.Lock()
 LAST_POLL = [0.0]
 LAST_WACH = [0.0]
 LAST_SPRICHT = [0.0]   # wann ORB zuletzt hörbar gesprochen hat (Echo-Schutz fürs lokale Ohr)
+GESAGT = {}   # aid → [Zeit, Text]: was ORB zuletzt gesagt hat (Antworten, Ansagen, Update-/Neu-Hinweise) – gegen Echo-Schleifen
+ECHO_SPERRE = 1.5   # so lange nach eigener Sprachausgabe zählt nur „Jarvis“/„Stopp“
+_NAMEN = re.compile(r"(?i)\b(jarvis|orb)\b")
+
+
+def gesagt_merken(aid, text):
+    text = str(text or "").strip()
+    if not text:
+        return
+    now = time.time()
+    GESAGT[aid or "x%d" % int(now * 1000)] = [now, text]
+    for k in [k for k, v in list(GESAGT.items()) if now - v[0] > 180]:
+        GESAGT.pop(k, None)
+
+
+def _stamm(t):
+    return [w[:5] for w in re.findall(r"[a-zäöüß0-9]+", _NAMEN.sub(" ", str(t).lower()))]
+
+
+def echo_aehnlichkeit(text, gesagt):
+    """0..1: wie sehr der gehörte Text einem von ORB gesagten Satz (oder zwei aufeinanderfolgenden) gleicht."""
+    h = _stamm(text)
+    if len(h) < 3:
+        return 0.0   # „Ja“, „Stopp“ … nie als Echo verwerfen
+    best = 0.0
+    for g in gesagt:
+        saetze = [x for x in re.split(r"(?<=[.!?…])\s+", g) if x.strip()] or [g]
+        for st in saetze + [a + " " + b for a, b in zip(saetze, saetze[1:])] + [g]:
+            w = _stamm(st)
+            if not w:
+                continue
+            treffer = sum(x.size for x in difflib.SequenceMatcher(None, h, w, autojunk=False).get_matching_blocks())
+            # Dice-Wert; bei längeren Stücken auch: steckt das Gehörte fast ganz in ORBs Satz (nur ein Teil wurde erkannt)?
+            best = max(best, 2 * treffer / (len(h) + len(w)), treffer / len(h) - .25 if len(h) >= 4 else 0)
+    return best
+
+
+def ist_echo(text, frist=180):
+    now = time.time()
+    return echo_aehnlichkeit(text, [v[1] for v in list(GESAGT.values()) if now - v[0] < frist]) > .6
 OHR = {"t": 0.0, "n": 0, "ev": []}   # lokales Ohr (ohr.py): letzter Kontakt, Ereignisse für die Oberfläche   # wann die Oberfläche zuletzt sichtbar und wach war (Razer-Licht)
 LAST_ACTIVE = [0.0]   # wann das Fenster zuletzt gesprochen/zugehört hat  # wann das Fenster zuletzt nachgefragt hat
 ON_SHOW = [None]    # wird von orb_app gesetzt: öffnet/zeigt das Fenster
@@ -638,6 +678,8 @@ def write_state(**kw):
     with _state_lock:
         st = read_state()
         st.update(kw)
+        if kw.get("say"):
+            gesagt_merken(st.get("aid"), kw["say"])
         st["seq"] = int(st.get("seq", 0)) + 1
         st["time"] = time.time()
         os.makedirs(HOME, exist_ok=True)
@@ -2698,6 +2740,9 @@ class Handler(BaseHTTPRequestHandler):
             text = str(b.get("text", "")).strip()
             if not text:
                 return self.send(400, {"ok": False})
+            if not b.get("getippt") and ist_echo(text):   # ORBs eigene Stimme über das Mikro – nie als Frage weitergeben
+                print("Echo verworfen:", text[:80])
+                return self.send(200, {"ok": False, "echo": True})
             r = ask(text)
             self.send(200 if r else 409, {"ok": True, "parallel": r == "parallel", "lokal": r == "lokal"})
         elif u.path == "/stop":
@@ -2836,8 +2881,9 @@ class Handler(BaseHTTPRequestHandler):
         elif u.path == "/ohr":   # ohr.py: „Hey Jarvis“ erkannt oder Satz mitgeschrieben
             OHR["t"] = time.time()
             typ, text = str(b.get("typ", "")), str(b.get("text", "")).strip()
-            echo = time.time() - LAST_SPRICHT[0] < 1.2
-            name_stopp = re.search(r"(?i)\b(jarvis|orb|stopp?|hör auf|aufhören|sei still|ruhe)\b", text)
+            eigen = typ == "text" and ist_echo(text)   # Whisper liefert ORBs eigenen Satz oft erst nach der Ansage
+            echo = time.time() - LAST_SPRICHT[0] < ECHO_SPERRE or eigen
+            name_stopp = re.search(r"(?i)\b(jarvis|orb|stopp?|hör auf|aufhören|sei still|ruhe)\b", text) and not eigen
             if typ == "text" and echo and not name_stopp:
                 return self.send(200, {"ok": False, "grund": "Echo – ORB sprach gerade"})
             if typ == "wake" and time.time() - LAST_WACH[0] > 3 and ON_SHOW[0]:
