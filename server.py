@@ -69,7 +69,7 @@ DEFAULT_CFG = {
 }
 # Damit ORB immer dein Claude-Code-Login (Max-Abo) nutzt und nie einen API-Schlüssel
 CLAUDE_ENV_DROP = ("ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "ANTHROPIC_BASE_URL")
-VERSION = "97"
+VERSION = "98"
 ORB_UI = ("Deine Oberfläche (die Larsen gerade sieht): in der Mitte du als flüssige leuchtende Kugel mit Tropfen, "
           "Orbit-Ringen und Sternenhimmel; links eine Uhr und darunter der Gesprächsverlauf mit Eingabefeld; rechts "
           "Karten für System (CPU, RAM, Akku), Wetter mit Stundenvorschau, Aktivität (was du gerade tust) und Vorschläge; "
@@ -500,6 +500,8 @@ def clean_exit(grund):
     """Gewolltes Beenden: protokollieren, Markierung entfernen, Prozess sofort beenden."""
     log_close(grund)
     mark_running(False)
+    if OHR.get("pid"):   # lokales Ohr mitbeenden
+        subprocess.run(["taskkill", "/F", "/PID", str(OHR["pid"])], capture_output=True, creationflags=NO_WINDOW)
     for t in list(TASKS.values()):
         if t.get("status") == "laeuft" and t.get("pid"):
             subprocess.run(["taskkill", "/F", "/T", "/PID", str(t["pid"])], capture_output=True, creationflags=NO_WINDOW)

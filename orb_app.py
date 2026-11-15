@@ -115,6 +115,13 @@ OHR_PY = os.path.join(os.environ.get("LOCALAPPDATA", ""), "ORB", "ohr", "venv", 
 def ohr_wache():
     """Startet ORBs lokales Ohr (ohr.py im eigenen venv), sobald es installiert ist, und hält es am Laufen."""
     p = None
+    try:   # Ohr eines vorherigen ORB (vor Update/Neustart) beenden – sonst laufen zwei
+        import psutil
+        for q in psutil.process_iter(["name", "cmdline"]):
+            if (q.info["name"] or "").lower() in ("pythonw.exe", "python.exe") and any("ohr.py" in c for c in (q.info["cmdline"] or [])):
+                q.kill()
+    except Exception:
+        pass
     while True:
         try:
             an = server.load_cfg().get("ohr", True) and os.path.exists(OHR_PY)

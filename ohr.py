@@ -15,6 +15,22 @@ import urllib.request
 import numpy as np
 import sounddevice as sd
 
+
+def _cuda_pfade():
+    """NVIDIA-Bibliotheken aus den pip-Paketen (nvidia-cublas/cudnn) für ctranslate2 auffindbar machen."""
+    import glob
+    import site
+    for sp in site.getsitepackages() + [os.path.join(sys.prefix, "Lib", "site-packages")]:
+        for d in glob.glob(os.path.join(sp, "nvidia", "*", "bin")):
+            try:
+                os.add_dll_directory(d)
+            except Exception:
+                pass
+            os.environ["PATH"] = d + os.pathsep + os.environ.get("PATH", "")
+
+
+_cuda_pfade()
+
 BASIS = os.path.join(os.environ.get("LOCALAPPDATA", ""), "ORB")
 PORT = int(os.environ.get("ORB_PORT", "8766"))
 URL = "http://127.0.0.1:%d" % PORT
@@ -78,6 +94,16 @@ class Whisper:
 
     def text(self, audio):
         self.laden()
+        try:
+            return self._text(audio)
+        except RuntimeError as e:   # Grafikkarte geht nicht (Treiber/Bibliothek) → auf CPU weitermachen statt taub zu sein
+            log("GPU-Fehler, wechsle auf CPU:", e)
+            from faster_whisper import WhisperModel
+            with self.lock:
+                self.m = WhisperModel("small", device="cpu", compute_type="int8")
+            return self._text(audio)
+
+    def _text(self, audio):
         segs, _ = self.m.transcribe(audio, language="de", beam_size=1, vad_filter=True, condition_on_previous_text=False,
                                     initial_prompt="Jarvis, ORB, Stopp.", without_timestamps=True)
         self.zuletzt = time.time()
