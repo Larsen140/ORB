@@ -69,7 +69,7 @@ DEFAULT_CFG = {
 }
 # Damit ORB immer dein Claude-Code-Login (Max-Abo) nutzt und nie einen API-Schlüssel
 CLAUDE_ENV_DROP = ("ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "ANTHROPIC_BASE_URL")
-VERSION = "93"
+VERSION = "94"
 ORB_UI = ("Deine Oberfläche (die Larsen gerade sieht): in der Mitte du als flüssige leuchtende Kugel mit Tropfen, "
           "Orbit-Ringen und Sternenhimmel; links eine Uhr und darunter der Gesprächsverlauf mit Eingabefeld; rechts "
           "Karten für System (CPU, RAM, Akku), Wetter mit Stundenvorschau, Aktivität (was du gerade tust) und Vorschläge; "
@@ -2063,6 +2063,14 @@ def spiel_laeuft():
             for p in psutil.process_iter(["exe", "name"]):
                 exe = (p.info.get("exe") or "").lower()
                 n = (p.info.get("name") or "").lower()
+                if n in ("javaw.exe", "java.exe"):   # Minecraft Java (jede Version, Fabric/Forge/LabyMod/Lunar …)
+                    try:
+                        cl = " ".join(p.cmdline()).lower()
+                    except Exception:
+                        cl = ""
+                    if ("net.minecraft" in cl or ".minecraft" in cl or "labymod" in cl or "lunarclient" in cl) and "nogui" not in cl:
+                        name = "Minecraft"
+                        break
                 if exe and any(o in exe for o in SPIEL_ORDNER) and not any(k in n for k in KEIN_SPIEL):
                     name = p.info.get("name") or "Spiel"
                     break
@@ -2376,7 +2384,9 @@ class Handler(BaseHTTPRequestHandler):
             st["kamera_foto"] = KAMERA["foto"] if time.time() - KAMERA["foto_zeit"] < 15 else 0   # kamera.ps1 wartet auf ein Standbild
             st["web"] = {"n": WEB["n"], "url": WEB["url"], "titel": WEB["titel"], "modus": WEB["modus"],
                          "lebt": web_lebt(), "rein": WEB["rein"]}   # Web-Hologramm
-            st["anruf"] = in_call() or bool(spiel_laeuft())   # Meeting oder Spiel: nicht zuhören   # während Meet/Teams/Zoom nicht zuhören
+            st["spiel"] = spiel_laeuft()
+            # Meeting oder Spiel: nicht zuhören – außer Minecraft: da hört ORB weiter auf „Jarvis“ (Befehle im Spiel)
+            st["anruf"] = in_call() or bool(st["spiel"] and st["spiel"] != "Minecraft")   # während Meet/Teams/Zoom nicht zuhören
             st["version"] = VERSION   # Fenster lädt sich neu, wenn eine neue Version läuft
             for i, p in enumerate(st.get("parts") or []):   # Stimme für alle Stücke vorbereiten
                 ensure((st.get("aid"), i), p)

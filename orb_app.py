@@ -142,8 +142,11 @@ def spiel_wache():
             spiel = server.spiel_laeuft()
             if spiel and not vorher and window_open() and time.time() - server.LAST_ACTIVE[0] > 20:
                 server.log_close("Gaming-Modus: %s gestartet" % spiel)
-                server.BRAIN.kill() if not server.BRAIN.busy else None
-                hide_window()
+                if spiel == "Minecraft":
+                    hide_window(keep=True)   # nur ausblenden: ORB hört weiter auf „Jarvis“ und steuert das Spiel
+                else:
+                    server.BRAIN.kill() if not server.BRAIN.busy else None
+                    hide_window()
             vorher = spiel
         except Exception as e:
             print("Spiel-Wache:", e)
