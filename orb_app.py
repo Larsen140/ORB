@@ -83,6 +83,32 @@ def bring_front():
         print("Fenster nach vorne:", e)
 
 
+def mini(an=True):
+    """Mini-ORB: Fenster als kleine Kugel unten rechts, immer obenauf – bzw. zurück auf groß/Vollbild."""
+    u = ctypes.windll.user32
+    sw, sh = u.GetSystemMetrics(0), u.GetSystemMetrics(1)
+    for h in orb_windows():
+        r = (ctypes.c_long * 4)()
+        u.GetWindowRect(h, ctypes.byref(r))
+        voll = r[0] <= 0 and r[1] <= 0 and r[2] >= sw and r[3] >= sh
+        u.ShowWindow(h, 9 if u.IsIconic(h) else 5)
+        u.keybd_event(0x12, 0, 0, 0); u.keybd_event(0x12, 0, 2, 0)
+        u.SetForegroundWindow(h)
+        if an:
+            if voll:
+                u.keybd_event(0x7A, 0, 0, 0); u.keybd_event(0x7A, 0, 2, 0)   # F11: Vollbild verlassen
+                time.sleep(.45)
+            u.ShowWindow(h, 9)   # wiederherstellen (nicht maximiert)
+            w, hh = 300, 360
+            u.SetWindowPos(h, -1, sw - w - 18, sh - hh - 60, w, hh, 0x40)   # HWND_TOPMOST, SWP_SHOWWINDOW
+        else:
+            u.SetWindowPos(h, -2, 0, 0, 0, 0, 0x3 | 0x40)   # HWND_NOTOPMOST, Größe/Ort behalten
+            u.ShowWindow(h, 3)   # maximieren
+            if server.load_cfg().get("vollbild", True):
+                time.sleep(.3)
+                u.keybd_event(0x7A, 0, 0, 0); u.keybd_event(0x7A, 0, 2, 0)   # F11: wieder Vollbild
+
+
 def hide_hidden_soon():
     """Gerade gestartetes Fenster sofort ausblenden (Start im Hintergrund, damit „Jarvis“ trotzdem zuhört)."""
     end = time.time() + 20
@@ -594,6 +620,7 @@ def main():
         pass
     server.ON_SHOW[0] = show
     server.ON_HIDE[0] = hide_window
+    server.ON_MINI[0] = mini
     server.ON_UPDATE[0] = apply_update
     if hasattr(sys.modules.get("__main__"), "local_sha"):
         server.ON_CHECK[0] = check_update

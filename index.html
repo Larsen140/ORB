@@ -366,6 +366,14 @@
     padding:16px 28px 15px; border-radius:24px; text-align:center; color:#fff; opacity:0;
     transform:translate(-50%,-100%) scale(.94); transform-origin:50% 100%; transition:opacity .45s var(--ease), transform .6s var(--ease); }
   #holo.on { opacity:1; transform:translate(-50%,-100%) scale(1); }
+  /* Mini-ORB: im kleinen Fenster nur Kugel, Untertitel und ein Knopf zurück */
+  body.mini #left, body.mini #right, body.mini #dock, body.mini #tasks, body.mini #karten, body.mini #island,
+  body.mini #holo, body.mini #set { display:none !important; }
+  body.mini #caption { font-size:13px !important; bottom:14px !important; max-width:92vw; left:50% !important; transform:translateX(-50%); }
+  body.mini #hint { font-size:12px; top:8px !important; }
+  #miniback { display:none; position:fixed; top:8px; right:8px; z-index:40; width:30px; height:30px; border-radius:50%; border:0;
+    background:rgba(255,255,255,.12); color:#fff; font-size:15px; cursor:pointer; backdrop-filter:blur(6px); }
+  body.mini #miniback { display:block; }
   /* Freie Hologramme (holo.ps1): beliebig viele, verschiebbar, Größe per Ecke */
   #karten { position:fixed; inset:0; z-index:6; pointer-events:none; }
   .karte { --hl:rgb(var(--c3)); --hgt:color-mix(in srgb, var(--hl) 11%, transparent); --hgg:color-mix(in srgb, var(--hl) 13%, transparent); --hgk:color-mix(in srgb, var(--hl) 75%, transparent);
@@ -975,6 +983,7 @@
 </aside>
 <div id="tasks"></div>
 <div id="karten"></div>
+<button id="miniback" title="Wieder groß">⤢</button>
 <div id="start"><div class="glass rim">Tippen zum Aktivieren</div></div>
 
 <script>
@@ -2182,6 +2191,9 @@ async function ask(text) {
   lastAct = performance.now();
   if (S.sleep) { S.sleep = false; document.body.classList.remove('sleeping'); }
   const t0 = text.replace(/[.!?,]+$/g, '').trim();
+  // Mini-ORB per Sprache: „Mini-Modus“ / „mach dich klein“ – „mach dich groß“ / „Vollbild“
+  if (/^((orb|jarvis),?\s*)?(mini[- ]?modus|mini[- ]?orb|mach dich klein|werd klein|in die ecke)$/i.test(t0)) { addMsg('me', text); SFX.close(); return miniModus(true); }
+  if (/^((orb|jarvis),?\s*)?(mach dich (wieder )?groß|werd groß|vollbild|groß(er)? modus)$/i.test(t0)) { addMsg('me', text); SFX.open(); return miniModus(false); }
   // „Kamera an“ / „Kamera aus“ – nur auf ausdrücklichen Befehl, „aus“ beendet sofort
   if (KAM_RE.test(t0)) { addMsg('me', text); if (KAM_AUS_RE.test(t0)) { kameraAus(); hint('Kamera ist aus', 2000); } else kameraAn(); return; }
   // „Sphäre in meine Hand“ (schaltet die Kamera dafür ein) und lokale Kamera-Befehle („zeig mir das Wetter“, „zeichnen“, „räum auf“)
@@ -4107,7 +4119,10 @@ function layout() {
   return { mid, cw:W - L - Rr };
 }
 let LAY = { mid:innerWidth / 2, cw:innerWidth };
-addEventListener('resize', () => { LAY = layout(); });
+function miniPruefen() { document.body.classList.toggle('mini', innerWidth < 520 && innerHeight < 620); }
+miniPruefen();
+addEventListener('resize', () => { miniPruefen(); LAY = layout(); });
+const miniModus = an => fetch('/mini', { method:'POST', headers:{ 'Content-Type':'application/json' }, body:JSON.stringify({ an }) }).catch(() => {});
 
 let lastT = performance.now();
 function frame(now) {
@@ -4518,6 +4533,7 @@ $('up_btn').onclick = async () => {
 };
 $('schlafjetzt').onclick = () => { toggleSettings(false); goSleep(false, 'Knopf „Jetzt schlafen“'); };
 $('resetLayout').onclick = () => { try { localStorage.removeItem('orbLayout'); } catch (e) {} location.reload(); };
+$('miniback').onclick = () => { SFX.open(); miniModus(false); };
 $('beenden').onclick = async () => { SFX.sleep(); await fetch('/quit', { method:'POST', headers:{ 'Content-Type':'application/json' }, body:JSON.stringify({ grund:'Knopf „ORB ganz beenden“' }) }).catch(() => {}); setTimeout(() => window.close(), 300); };
 $('probe').onclick = async () => {
   initAudio(); if (!audioOk()) return;

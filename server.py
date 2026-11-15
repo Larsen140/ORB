@@ -69,7 +69,7 @@ DEFAULT_CFG = {
 }
 # Damit ORB immer dein Claude-Code-Login (Max-Abo) nutzt und nie einen API-Schlüssel
 CLAUDE_ENV_DROP = ("ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "ANTHROPIC_BASE_URL")
-VERSION = "95"
+VERSION = "96"
 ORB_UI = ("Deine Oberfläche (die Larsen gerade sieht): in der Mitte du als flüssige leuchtende Kugel mit Tropfen, "
           "Orbit-Ringen und Sternenhimmel; links eine Uhr und darunter der Gesprächsverlauf mit Eingabefeld; rechts "
           "Karten für System (CPU, RAM, Akku), Wetter mit Stundenvorschau, Aktivität (was du gerade tust) und Vorschläge; "
@@ -453,7 +453,8 @@ LAST_POLL = [0.0]
 LAST_WACH = [0.0]   # wann die Oberfläche zuletzt sichtbar und wach war (Razer-Licht)
 LAST_ACTIVE = [0.0]   # wann das Fenster zuletzt gesprochen/zugehört hat  # wann das Fenster zuletzt nachgefragt hat
 ON_SHOW = [None]    # wird von orb_app gesetzt: öffnet/zeigt das Fenster
-ON_HIDE = [None]    # schließt das Fenster (Schlaf spart Speicher)
+ON_HIDE = [None]
+ON_MINI = [None]    # Mini-ORB an/aus (orb_app.mini)    # schließt das Fenster (Schlaf spart Speicher)
 ON_UPDATE = [None]  # neuesten Stand von GitHub holen und neu starten
 ON_CHECK = [None]   # liefert den neueren GitHub-Stand (sha) oder None, wenn ORB aktuell ist
 
@@ -2819,6 +2820,10 @@ class Handler(BaseHTTPRequestHandler):
             web_schliessen_fenster()   # Webansicht verschwindet mit ORB
             if ON_HIDE[0]:
                 threading.Thread(target=ON_HIDE[0], kwargs={"keep": keep}, daemon=True).start()
+        elif u.path == "/mini":   # Mini-ORB: kleine Kugel in der Ecke, immer obenauf
+            self.send(200, {"ok": bool(ON_MINI[0])})
+            if ON_MINI[0]:
+                threading.Thread(target=ON_MINI[0], args=(bool(b.get("an", True)),), daemon=True).start()
         elif u.path == "/show":  # Fenster öffnen bzw. nach vorne holen (z. B. zweiter Doppelklick auf ORB.exe)
             if ON_SHOW[0]:
                 threading.Thread(target=ON_SHOW[0], kwargs={"wake": bool(b.get("wake"))}, daemon=True).start()
