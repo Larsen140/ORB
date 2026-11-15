@@ -382,6 +382,11 @@
      "name": "Pixel-Art-Bauer",
      "text": "Baut Bilder und Logos aus Blöcken in deine Welt – mit Vorschau.",
      "beispiel": "Jarvis, bau mein Logo als Pixel-Art"
+    },
+    {
+     "name": "Skins bearbeiten & Pixel-genau",
+     "text": "Jede Figur Pixel für Pixel – auch bekannte; vorhandene Skins ändern, Original bleibt.",
+     "beispiel": "Jarvis, gib meinem Skin ein Omnitrix"
     }
    ]
   },

@@ -14,6 +14,12 @@ Rezept (alles optional außer name):
  "helm":{"stil":"ritter|kappe|krone|kapuze","farbe":"#d4af37","visier":"#151515"},
  "details":[{"teil":"kopf|koerper|arm_r|arm_l|bein_r|bein_l","seite":"front|back|left|right|top|bottom","ebene":"basis|overlay",
              "x":0,"y":0,"w":1,"h":1,"farbe":"#ff0000"}]}
+Freies Pixel-Malen (jede Figur, jedes Logo, jedes Gesicht): "pixel":[{"teil":"kopf","seite":"front","ebene":"basis",
+  "x":0,"y":0,"zeilen":["HHHHHHHH","HSSSSSSH","SWESSEWS",...],"farben":{"H":"#3b2516","S":"#e8b48f","W":"#ffffff","E":"#2e9e3e"}}]
+  – je Zeichen ein Pixel, "." = unverändert lassen, "_" = durchsichtig (nur Overlay). Seitengrößen: Kopf 8×8; Körper front/back 8×12,
+  left/right 4×12, top/bottom 8×4; Arme/Beine front/back/left/right 4×12 (slim-Arme 3×12), top/bottom 4×4.
+Vorhandenen Skin bearbeiten: "basis":"<Dateiname im Skin-Ordner ohne .png oder voller Pfad>" – dann wird nur gemalt, was im Rezept
+  steht (details/pixel und angegebene Teile), der Rest bleibt wie im Original. "schatten": false = exakte Farben ohne Schattierung.
 Koordinaten in "details" sind lokal je Seite (x nach rechts, y nach unten; Kopf 8×8, Körper-Front 8×12, Arme/Beine-Front 4×12).
 """
 import base64
@@ -106,8 +112,53 @@ class Skin:
             self.px[x, y] = mischen((r, g, b), f) + (a,)
 
 
+def basis_laden(name):
+    pfad = name if os.path.isfile(name) else os.path.join(ORDNER, os.path.splitext(name)[0] + ".png")
+    img = Image.open(pfad).convert("RGBA")
+    if img.size == (64, 32):   # altes Format: linke Gliedmaßen aus den rechten spiegeln
+        neu = Image.new("RGBA", (64, 64), (0, 0, 0, 0))
+        neu.paste(img, (0, 0))
+        neu.paste(img.crop((0, 16, 16, 32)).transpose(Image.FLIP_LEFT_RIGHT), (16, 48))
+        neu.paste(img.crop((40, 16, 56, 32)).transpose(Image.FLIP_LEFT_RIGHT), (32, 48))
+        img = neu
+    return img.resize((64, 64), Image.NEAREST) if img.size != (64, 64) else img
+
+
+def pixel_malen(sk, ops):
+    for o in ops or []:
+        try:
+            farben = {k: (rgb(v) if v not in ("_", "transparent") else None) for k, v in (o.get("farben") or {}).items()}
+            ebene, teil, seite = o.get("ebene", "basis"), o["teil"], o.get("seite", "front")
+            fx, fy, fw, fh = sk.flaechen(teil, ebene)[seite]
+            for dy, zeile in enumerate(o.get("zeilen") or []):
+                for dx, ch in enumerate(zeile):
+                    x, y = int(o.get("x", 0)) + dx, int(o.get("y", 0)) + dy
+                    if ch == "." or not (0 <= x < fw and 0 <= y < fh):
+                        continue
+                    if ch == "_" or farben.get(ch, 0) is None:
+                        sk.px[fx + x, fy + y] = (0, 0, 0, 0)
+                        sk.seite.pop((fx + x, fy + y), None)
+                    elif ch in farben:
+                        sk.setzen(fx + x, fy + y, farben[ch], seite)
+        except Exception as e:
+            print("Pixel-Fehler:", e, file=sys.stderr)
+
+
 def bauen(r):
     sk = Skin(r.get("modell") == "slim")
+    if r.get("basis"):   # vorhandenen Skin bearbeiten: nur das Angegebene ändern
+        sk.img = basis_laden(r["basis"])
+        sk.px = sk.img.load()
+        for d in r.get("details") or []:
+            try:
+                sk.rechteck(d["teil"], d.get("seite", "front"), int(d.get("x", 0)), int(d.get("y", 0)), int(d.get("w", 1)),
+                            int(d.get("h", 1)), rgb(d["farbe"]), d.get("ebene", "basis"))
+            except Exception:
+                pass
+        pixel_malen(sk, r.get("pixel"))
+        if r.get("schatten", False):
+            sk.schattieren(r.get("name", "skin"))
+        return sk.img
     haut = rgb(r.get("haut", "#c68e6a"))
     for t in TEILE:
         sk.ganz(t, haut)
@@ -244,7 +295,9 @@ def bauen(r):
                         int(d.get("h", 1)), rgb(d["farbe"]), d.get("ebene", "basis"))
         except Exception:
             pass
-    sk.schattieren(r.get("name", "skin"))
+    pixel_malen(sk, r.get("pixel"))
+    if r.get("schatten", True):
+        sk.schattieren(r.get("name", "skin"))
     return sk.img
 
 
