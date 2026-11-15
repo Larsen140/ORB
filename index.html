@@ -835,6 +835,9 @@
   .ftg li .b:hover { transform:scale(1.05); background:rgba(var(--ac),.3); }
   #ft_list mark { background:rgba(var(--ac),.35); color:inherit; border-radius:3px; }
   #ft_list .leer { color:var(--sub); font-size:12px; padding:6px 0; }
+  #ft_list .leer .b { padding:2px 9px; border-radius:999px; cursor:pointer; color:var(--txt); background:rgba(var(--ac),.14); transition:background .3s; }
+  #ft_list .leer .b:hover { background:rgba(var(--ac),.3); }
+  #ft_q::-webkit-search-cancel-button, #ft_q::-webkit-search-decoration { -webkit-appearance:none; appearance:none; }
   /* Drag & Drop der Widgets */
   .col > [data-w] h5, .col > [data-w] > header, #clockc { cursor:grab; }
   .dragging, .dropping { position:fixed !important; z-index:50; margin:0 !important; pointer-events:none; animation:none !important; }
@@ -908,7 +911,7 @@
   </div>
   <div id="featc" data-w="faehigkeiten" class="glass acc enter" style="animation-delay:.22s;--ac:var(--c3);--ac2:var(--c2)">
     <h5><i class="dot"></i>Was Jarvis kann<span id="ft_n"></span></h5>
-    <label id="ft_such"><span>⌕</span><input id="ft_q" placeholder="Funktion suchen …" autocomplete="off"></label>
+    <label id="ft_such"><span>⌕</span><input id="ft_q" type="search" name="orb_funktionssuche" placeholder="Funktion suchen …" autocomplete="off" spellcheck="false" data-lpignore="true"></label>
     <div id="ft_list"><div class="leer">lädt …</div></div>
   </div>
   <div id="chipsc" data-w="vorschlaege" class="glass acc enter" style="animation-delay:.26s;--ac:var(--c4);--ac2:var(--c3)">
@@ -987,8 +990,9 @@
   </div><div style="margin-top:9px"><button class="btn" id="neu">⟲ Neue Unterhaltung</button></div></div>
   <div class="grp"><h4>iCloud-Kalender</h4><div class="card">
     <div class="row">Status<span id="ic_stat">nicht verbunden</span></div>
-    <div class="row col" id="ic_felder">Apple-ID<input type="text" id="s_icid" autocomplete="off" spellcheck="false">
-      App-spezifisches Passwort<input type="password" id="s_icpw" autocomplete="off" placeholder="xxxx-xxxx-xxxx-xxxx"></div>
+    <!-- eigenes Formular: sonst setzt Edges Passwort-Manager den gespeicherten Benutzernamen in andere Felder (z. B. die Funktionssuche) -->
+    <form class="row col" id="ic_felder" onsubmit="return false">Apple-ID<input type="text" id="s_icid" name="s_icid" autocomplete="username" spellcheck="false">
+      App-spezifisches Passwort<input type="password" id="s_icpw" name="s_icpw" autocomplete="current-password" placeholder="xxxx-xxxx-xxxx-xxxx"></form>
   </div><div style="margin-top:9px"><button class="btn" id="ic_btn">Verbinden</button></div>
   <p class="note">Passwort erstellen unter account.apple.com → Anmeldung und Sicherheit → App-spezifische Passwörter. Es wird nur in der Windows-Anmeldeinformationsverwaltung gespeichert.</p></div>
   <div class="grp"><h4>Aussehen</h4><div class="card">
@@ -4101,10 +4105,10 @@ addEventListener('mousemove', e => {
 loadLayout();
 
 /* ================= Widget „Was Jarvis kann“ (aus features.json) ================= */
-let FEAT = [], featAuf = [];
+let FEAT = [], featAuf = [], featQ = '';   // featQ: nur was Larsen selbst ins Suchfeld tippt (kein Autofill)
 try { featAuf = JSON.parse(localStorage.getItem('orbFeatAuf') || '[]') || []; } catch (e) {}
 function featZeigen() {
-  const q = $('ft_q').value.trim().toLowerCase(), hl = t => {
+  const q = featQ, hl = t => {
     t = esc(t); if (!q) return t;
     const i = t.toLowerCase().indexOf(esc(q)); return i < 0 ? t : t.slice(0, i) + '<mark>' + t.slice(i, i + esc(q).length) + '</mark>' + t.slice(i + esc(q).length);
   };
@@ -4118,11 +4122,14 @@ function featZeigen() {
       fs.map(f => `<li><div class="n">${hl(f.name)}</div>${f.text ? `<div class="t">${hl(f.text)}</div>` : ''}` +
         (f.beispiel ? `<span class="b" title="In das Eingabefeld übernehmen">„${hl(f.beispiel)}“</span>` : '') + '</li>').join('') + '</ul></div>';
   }).join('');
-  $('ft_list').innerHTML = html || `<div class="leer">${FEAT.length ? 'Nichts gefunden' : 'Liste nicht erreichbar'}</div>`;
+  $('ft_list').innerHTML = html || (FEAT.length ? `<div class="leer">Nichts gefunden – <span class="b" data-weg>Suche löschen</span></div>`
+    : `<div class="leer">Liste nicht erreichbar – <span class="b" data-neu>neu laden</span></div>`);
   $('ft_n').textContent = gesamt ? (q ? treffer + ' / ' + gesamt : gesamt) : '';
 }
 $('ft_list').addEventListener('click', e => {
   const b = e.target.closest('.ftg > button'), bsp = e.target.closest('.b');
+  if (e.target.closest('[data-weg]')) { $('ft_q').value = ''; featQ = ''; featZeigen(); SFX.click(); return; }
+  if (e.target.closest('[data-neu]')) { featLaden(); SFX.click(); return; }
   if (b) {
     const g = b.parentNode, n = g.dataset.g; g.classList.toggle('auf');
     featAuf = featAuf.filter(x => x !== n); if (g.classList.contains('auf')) featAuf.push(n);
@@ -4133,9 +4140,19 @@ $('ft_list').addEventListener('click', e => {
     $('txt').value = /^\d|→|^(kommt|startet)/.test(t) ? '' : t; $('txt').focus(); SFX.click();
   }
 });
-$('ft_q').addEventListener('input', featZeigen);
+// Suchbegriff nur übernehmen, wenn Larsen im Feld tippt; fremd eingesetzte Werte (Passwort-Autofill) wieder leeren
+$('ft_q').addEventListener('input', e => {
+  if (document.activeElement !== e.target) { e.target.value = ''; featQ = ''; }
+  else featQ = e.target.value.trim().toLowerCase();
+  featZeigen();
+});
+$('ft_q').addEventListener('change', e => { if (document.activeElement !== e.target) { e.target.value = ''; featQ = ''; featZeigen(); } });
+$('ft_q').value = '';
 async function featLaden() {
-  try { FEAT = (await (await fetch('/features')).json()).bereiche || []; } catch (e) { FEAT = []; }
+  try {
+    const r = await fetch('/features', { cache:'no-store' }), j = r.ok ? await r.json() : {};
+    if (Array.isArray(j.bereiche) && j.bereiche.length) FEAT = j.bereiche;   // bei Fehlern die zuletzt geladene Liste behalten
+  } catch (e) {}
   featZeigen();
 }
 featLaden(); setInterval(featLaden, 10 * 60000);
