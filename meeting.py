@@ -1,11 +1,11 @@
-"""„Mach mich ins Meeting“: KATI-Online-Seminar betreten – stumm und ohne Kamera, Teilnahme erbitten.
+"""„Mach mich ins Meeting“: KATI-Online-Seminar in Larsens EIGENEM Opera GX betreten – stumm, ohne Kamera, Teilnahme erbitten.
 
-  py -3 meeting.py            (ORB ruft das auf; Opera-GX-Fenster bleibt danach offen)
+  py -3 meeting.py            (ORB ruft das auf)          py -3 meeting.py --probe   (alles bis vor „Teilnahme erbitten“)
 
-Ablauf: kati-bst.de → Einloggen → Kurs „K2609-34a-O-AK 28.09.2026 - 18.12.2026“ → Online-Seminar → im Vorschau-Feld
-Mikrofon und Kamera aus → „Teilnahme erbitten“. Eigenes Edge-Profil (%LOCALAPPDATA%\\ORB\\meeting-profil): beim ersten Mal
-loggt Larsen sich dort selbst ein (ORB tippt nie Passwörter) – danach bleibt er angemeldet.
-Ergebnis als JSON-Zeile; bei einem Problem mit Schritt, Grund und Screenshot (für ORBs Bildschirm-Hilfe).
+Steuert Opera über die Windows-Barrierefreiheit (UI Automation) – wie ein Screenreader: Knöpfe werden per Name gefunden
+und ausgelöst, Larsens normales Opera-Profil bleibt, kein Fernsteuer-Port.
+Ablauf: kati-bst.de → Einloggen (Zugang lokal in %LOCALAPPDATA%\\ORB\\meeting_login.json) → Kurs K2609-34a-O-AK →
+„Zum Online-Seminar“ (Google Meet) → Mikrofon aus, Kamera aus → „Teilnahme erbitten“.
 """
 import json
 import os
@@ -16,12 +16,10 @@ import time
 
 URL = "https://kati-bst.de"
 KURS = "K2609-34a-O-AK"
-PORT = 9334
-PROFIL = os.path.join(os.environ.get("LOCALAPPDATA", ""), "ORB", "meeting-opera")   # eigenes Opera-GX-Profil (bleibt eingeloggt)
+PROBE = "--probe" in sys.argv
+OPERA = os.path.join(os.environ.get("LOCALAPPDATA", ""), "Programs", "Opera GX", "opera.exe")
 LOG = os.path.join(os.environ.get("LOCALAPPDATA", ""), "ORB", "meeting.log")
-# Larsens Browser: immer Opera GX
-OPERA = next((p for p in (os.path.join(os.environ.get("LOCALAPPDATA", ""), "Programs", "Opera GX", "opera.exe"),
-                          os.path.join(os.environ.get("LOCALAPPDATA", ""), "Programs", "Opera GX", "launcher.exe")) if os.path.exists(p)), "opera")
+SHOT = os.path.join(os.environ.get("LOCALAPPDATA", ""), "ORB", "screen", "meeting.png")
 
 
 def log(*x):
@@ -30,157 +28,155 @@ def log(*x):
 
 
 def ende(ok, **kw):
+    try:
+        from PIL import ImageGrab
+        os.makedirs(os.path.dirname(SHOT), exist_ok=True)
+        ImageGrab.grab().save(SHOT)   # Screenshot für ORB (bei Problemen ansehen)
+        kw.setdefault("screenshot", SHOT)
+    except Exception:
+        pass
     print(json.dumps(dict(ok=ok, **kw), ensure_ascii=False))
     sys.exit(0)
 
 
-def opera_starten():
-    import urllib.request
+def zugang():
     try:
-        urllib.request.urlopen(f"http://127.0.0.1:{PORT}/json/version", timeout=1)
-        return False   # läuft schon
+        with open(os.path.join(os.environ.get("LOCALAPPDATA", ""), "ORB", "meeting_login.json"), encoding="utf-8") as f:
+            return json.load(f)
     except Exception:
-        pass
-    os.makedirs(PROFIL, exist_ok=True)
-    subprocess.Popen([OPERA, f"--remote-debugging-port={PORT}", f"--user-data-dir={PROFIL}", "--start-maximized",
-                      "--no-first-run", "--no-default-browser-check", URL])
-    for _ in range(40):
+        return {}
+
+
+def opera_fenster(auto, titel, timeout=25):
+    """Opera-Fenster finden, dessen aktiver Tab `titel` im Namen hat."""
+    t = time.time()
+    while time.time() - t < timeout:
+        for w in auto.GetRootControl().GetChildren():
+            if w.ClassName.startswith("Chrome_WidgetWin") and "Opera" in (w.Name or "") and re.search(titel, w.Name or "", re.I):
+                return w
         time.sleep(0.5)
-        try:
-            urllib.request.urlopen(f"http://127.0.0.1:{PORT}/json/version", timeout=1)
-            return True
-        except Exception:
-            pass
-    ende(False, schritt="Opera GX starten", grund="Opera-GX-Fenster ließ sich nicht öffnen")
-
-
-def klick_text(seite, muster, timeout=15):
-    """Sichtbares Element (Link/Knopf/Zeile) mit passendem Text klicken. Gibt den Klick-Ort zurück oder None."""
-    rx = re.compile(muster, re.I)
-    ende_t = time.time() + timeout
-    while time.time() < ende_t:
-        for frame in seite.frames:
-            for sel in ("button", "a", "[role=button]", "input[type=submit]", "input[type=button]", "td", "li", "div", "span"):
-                try:
-                    loc = frame.locator(sel).filter(has_text=rx) if not sel.startswith("input") else frame.locator(sel)
-                    n = min(loc.count(), 30)
-                    for i in range(n):
-                        el = loc.nth(i)
-                        if sel.startswith("input"):
-                            if not rx.search(el.get_attribute("value") or ""):
-                                continue
-                        if el.is_visible():
-                            el.click(timeout=3000)
-                            return True
-                except Exception:
-                    continue
-        time.sleep(0.6)
-    return False
-
-
-def schalter_aus(seite, art):
-    """Mikrofon bzw. Kamera im Vorschau-Feld ausschalten – nur klicken, wenn es gerade AN ist."""
-    an = {"mikro": r"mikro|microphone|audio|stumm|mute", "kamera": r"kamera|camera|video|webcam"}[art]
-    schon_aus = r"aufheben|einschalten|aktivieren|starten|unmute|turn on|start|enable|ist aus|off\b"
-    for frame in seite.frames:
-        try:
-            knoepfe = frame.locator("button, [role=button], [role=switch], input[type=checkbox]")
-            for i in range(min(knoepfe.count(), 80)):
-                k = knoepfe.nth(i)
-                if not k.is_visible():
-                    continue
-                text = " ".join(filter(None, [k.get_attribute("aria-label"), k.get_attribute("title"),
-                                              k.get_attribute("data-tooltip"), (k.inner_text(timeout=500) or "")[:60]]))
-                if not re.search(an, text, re.I):
-                    continue
-                gedrueckt = k.get_attribute("aria-pressed") or k.get_attribute("aria-checked")
-                if gedrueckt == "false" and re.search(r"stumm|mute", text, re.I):
-                    k.click(timeout=3000); return "geklickt (" + text[:40] + ")"
-                if re.search(schon_aus, text, re.I) or gedrueckt == "false":
-                    return "war schon aus (" + text[:40] + ")"
-                k.click(timeout=3000)
-                return "ausgeschaltet (" + text[:40] + ")"
-        except Exception:
-            continue
     return None
 
 
-def knoepfe_protokollieren(seite):
-    for frame in seite.frames:
-        try:
-            k = frame.locator("button, [role=button], a")
-            for i in range(min(k.count(), 60)):
-                e = k.nth(i)
-                if e.is_visible():
-                    log("  Knopf:", (e.get_attribute("aria-label") or "") + " | " + (e.inner_text(timeout=300) or "")[:50].replace("\n", " "))
-        except Exception:
-            pass
+def dokument(auto, w, titel, timeout=20):
+    t = time.time()
+    while time.time() - t < timeout:
+        d = w.DocumentControl(searchDepth=30, RegexName=titel)
+        if d.Exists(1):
+            return d
+    return None
+
+
+def finde(doc, muster, typen=("ButtonControl", "HyperlinkControl"), timeout=15):
+    t = time.time()
+    while time.time() - t < timeout:
+        for ty in typen:
+            c = getattr(doc, ty)(searchDepth=45, RegexName=muster)
+            if c.Exists(0.5):
+                return c
+    return None
+
+
+def ausloesen(c):
+    """Element auslösen: erst Barrierefreiheits-Aktion (ohne Maus), sonst echter Klick."""
+    try:
+        c.GetInvokePattern().Invoke()
+        return
+    except Exception:
+        pass
+    try:
+        c.GetLegacyIAccessiblePattern().DoDefaultAction()
+        return
+    except Exception:
+        pass
+    c.Click(simulateMove=False)
 
 
 def main():
-    from playwright.sync_api import sync_playwright
-    neu = opera_starten()
-    with sync_playwright() as p:
-        browser = p.chromium.connect_over_cdp(f"http://127.0.0.1:{PORT}")
-        ctx = browser.contexts[0]
-        try:
-            ctx.grant_permissions(["microphone", "camera"], origin=URL)
-        except Exception:
-            pass
-        seite = ctx.pages[0] if ctx.pages else ctx.new_page()
-        if not neu:
-            seite.goto(URL)
-        seite.bring_to_front()
-        seite.wait_for_load_state("domcontentloaded")
-        shot = os.path.join(os.environ.get("LOCALAPPDATA", ""), "ORB", "screen", "meeting.png")
-        os.makedirs(os.path.dirname(shot), exist_ok=True)
-
-        # 1) Einloggen (falls nicht schon angemeldet)
-        if seite.get_by_text(KURS).count() == 0:   # noch nicht im Kursbereich
-            klick_text(seite, r"^\s*(einloggen|login|anmelden)\s*$", 8)
-            seite.wait_for_load_state("domcontentloaded")
-        # angemeldet? Sonst auf Larsens Login warten (Passwort tippt er selbst)
-        t0 = time.time()
-        while seite.get_by_text(KURS).count() == 0 and time.time() - t0 < 150:
-            if time.time() - t0 < 2:
-                log("Warte auf Login …")
+    import uiautomation as auto
+    auto.SetGlobalSearchTimeout(2)
+    subprocess.Popen([OPERA, URL])   # KATI in Larsens Opera öffnen (neuer Tab bzw. Opera startet)
+    w = opera_fenster(auto, r"KATI")
+    if not w:
+        ende(False, schritt="Opera", grund="KATI-Tab in Opera GX nicht gefunden")
+    w.SetActive()
+    doc = dokument(auto, w, r"KATI")
+    if not doc:
+        ende(False, schritt="Seite", grund="KATI-Seite lädt nicht")
+    # 1) Einloggen (falls nötig)
+    knopf = finde(doc, r"(?i)^\s*einloggen\s*$", timeout=4)
+    if knopf:
+        ausloesen(knopf)
+        time.sleep(2.5)
+        doc = dokument(auto, w, r"KATI") or doc
+        z = zugang()
+        mail_feld = doc.EditControl(searchDepth=45, RegexName=r"(?i)mail|benutzer|login")
+        pw_feld = doc.EditControl(searchDepth=45, RegexName=r"(?i)passwort|password")
+        if mail_feld.Exists(8) and pw_feld.Exists(3) and z.get("passwort"):
+            for mail in [z.get("email_alt"), z.get("email")]:
+                if not mail:
+                    continue
+                mail_feld.GetValuePattern().SetValue(mail)
+                pw_feld.GetValuePattern().SetValue(z["passwort"])
+                w.SetActive()
+                pw_feld.SetFocus()   # Absenden per echter Enter-Taste (der Knopf reagiert nicht auf Barrierefreiheits-Klick)
+                time.sleep(0.3)
+                auto.SendKeys("{Enter}")
+                time.sleep(3.5)
+                doc = dokument(auto, w, r"KATI") or doc
+                if not doc.EditControl(searchDepth=45, RegexName=r"(?i)passwort|password").Exists(1.5):
+                    log("Eingeloggt mit", mail)
+                    break
+        else:
+            log("Login-Felder nicht gefunden")
+    # 2) Kurs
+    kurs = finde(doc, ".*" + re.escape(KURS) + ".*", ("HyperlinkControl", "ButtonControl", "TextControl", "ListItemControl", "DataItemControl"), 15)
+    if not kurs:
+        ende(False, schritt="Kurs", grund="Kurs K2609-34a-O-AK nicht gefunden (Login prüfen)")
+    ausloesen(kurs)
+    time.sleep(3)
+    doc = dokument(auto, w, r"KATI") or doc
+    # 3) Zum Online-Seminar → Google Meet öffnet sich als neuer Tab
+    seminar = finde(doc, r"(?i)zum\s+online[- ]?seminar", timeout=15)
+    if not seminar:
+        ende(False, schritt="Online-Seminar", grund="Knopf „Zum Online-Seminar“ nicht gefunden")
+    ausloesen(seminar)
+    mw = opera_fenster(auto, r"Meet", 30)
+    if not mw:
+        ende(False, schritt="Google Meet", grund="Meet-Tab hat sich nicht geöffnet")
+    mw.SetActive()
+    meet = dokument(auto, mw, r"Meet", 30)
+    if not meet:
+        ende(False, schritt="Google Meet", grund="Meet-Seite lädt nicht")
+    # 4) Mikrofon und Kamera aus – nur wenn an; danach prüfen
+    for teil in ("Mikrofon", "Kamera"):
+        an = finde(meet, rf"(?i)^{teil} deaktivieren", ("ButtonControl",), 12)
+        if an:
+            ausloesen(an)
             time.sleep(1)
-            if seite.get_by_text(re.compile(r"einloggen|login", re.I)).count() == 0 and seite.get_by_text(KURS).count() == 0:
-                klick_text(seite, r"kurse|meine kurse|dashboard|übersicht", 2)
-        if seite.get_by_text(KURS).count() == 0:
-            seite.screenshot(path=shot)
-            ende(False, schritt="Login", grund="Kurs nicht gefunden – bitte im Opera-GX-Fenster einmal einloggen (angemeldet bleiben), dann nochmal",
-                 screenshot=shot, erster_login=True)
-        # 2) Kurs öffnen
-        if not klick_text(seite, re.escape(KURS), 15):
-            seite.screenshot(path=shot)
-            ende(False, schritt="Kurs", grund="Kurs K2609-34a-O-AK nicht anklickbar", screenshot=shot)
-        seite.wait_for_load_state("domcontentloaded")
-        # 3) Online-Seminar (öffnet evtl. einen neuen Tab)
-        vorher = len(ctx.pages)
-        if not klick_text(seite, r"online[- ]?seminar", 20):
-            seite.screenshot(path=shot)
-            ende(False, schritt="Online-Seminar", grund="Knopf „Online-Seminar“ nicht gefunden", screenshot=shot)
-        time.sleep(3)
-        if len(ctx.pages) > vorher:
-            seite = ctx.pages[-1]
-            seite.bring_to_front()
-        seite.wait_for_load_state("domcontentloaded")
-        time.sleep(4)   # Vorschau mit Kamera/Mikro baut sich auf
-        knoepfe_protokollieren(seite)
-        # 4) stumm + Kamera aus im großen Vorschau-Feld
-        mikro = schalter_aus(seite, "mikro")
-        kamera = schalter_aus(seite, "kamera")
-        log("Mikro:", mikro, "| Kamera:", kamera)
-        time.sleep(1)
-        # 5) Teilnahme erbitten
-        if not klick_text(seite, r"teilnahme\s+erbitten|teilnahme\s+anfragen|beitritt\s+(erbitten|anfragen)|ask to join", 20):
-            seite.screenshot(path=shot)
-            ende(False, schritt="Teilnahme erbitten", grund="Knopf nicht gefunden", mikro=mikro, kamera=kamera, screenshot=shot)
-        time.sleep(2)
-        seite.screenshot(path=shot)
-        ende(True, mikro=mikro or "Knopf nicht gefunden – bitte prüfen", kamera=kamera or "Knopf nicht gefunden – bitte prüfen",
-             screenshot=shot)
+    noch_an = [t for t in ("Mikrofon", "Kamera") if finde(meet, rf"(?i)^{t} deaktivieren", ("ButtonControl",), 1.5)]
+    if noch_an:
+        ende(False, schritt="Mikro/Kamera", grund=" und ".join(noch_an) + " ließ sich nicht ausschalten – NICHT beigetreten")
+    log("Mikrofon und Kamera aus")
+    # Name (nur als Gast nötig), Hinweis „Mit Google-Konto anmelden“ wegklicken
+    try:
+        ok = meet.ButtonControl(searchDepth=45, Name="Ok")
+        if ok.Exists(1):
+            ausloesen(ok)
+        name = meet.EditControl(searchDepth=45)
+        if name.Exists(1) and not (name.GetValuePattern().Value or "").strip():
+            name.GetValuePattern().SetValue("Larsen Hanna")
+    except Exception:
+        pass
+    if PROBE:
+        ende(True, probe=True, hinweis="Probelauf: stumm und ohne Kamera, Teilnahme NICHT erbeten")
+    # 5) Teilnahme erbitten (bzw. „Jetzt teilnehmen“, wenn bei Google angemeldet)
+    join = finde(meet, r"(?i)^(teilnahme erbitten|jetzt teilnehmen|ask to join|join now)", ("ButtonControl",), 15)
+    if not join:
+        ende(False, schritt="Teilnahme erbitten", grund="Knopf nicht gefunden")
+    ausloesen(join)
+    time.sleep(3)
+    ende(True, mikro="aus", kamera="aus")
 
 
 if __name__ == "__main__":
