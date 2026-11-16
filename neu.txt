@@ -1,1 +1,1 @@
-134|ORB erkennt deine Stimme und ignoriert andere, Telegram-Sprachnachrichten
+135|ORB kann dir Bilder und Dateien per Telegram schicken

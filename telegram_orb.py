@@ -184,7 +184,22 @@ def main():
                     pass
 
 
+def senden(pfad, text=""):
+    """Für ORB: Datei/Bild/Video aufs Handy schicken –  py -3 telegram_orb.py senden <pfad> ["Begleittext"]"""
+    import mimetypes
+    c = cfg_laden()
+    typ = mimetypes.guess_type(pfad)[0] or "application/octet-stream"
+    methode, feld = ("sendPhoto", "photo") if typ.startswith("image/") and not pfad.lower().endswith(".gif") else         ("sendVideo", "video") if typ.startswith("video/") else ("sendAudio", "audio") if typ.startswith("audio/") else ("sendDocument", "document")
+    with open(pfad, "rb") as f:
+        r = tg(c["token"], methode, {"chat_id": c["chat_id"], "caption": text[:1000]}, (feld, os.path.basename(pfad), f.read(), typ), timeout=180)
+    print("ok" if r.get("ok") else r)
+
+
 if __name__ == "__main__":
+    import sys
+    if len(sys.argv) > 2 and sys.argv[1] == "senden":
+        senden(sys.argv[2], sys.argv[3] if len(sys.argv) > 3 else "")
+        raise SystemExit
     while True:
         try:
             main()
