@@ -1454,7 +1454,7 @@ async function prepVoice(buf, text) {
       for (let i = 0; i < fade; i++) { d[i] *= i / fade; d[len - 1 - i] *= i / fade; } }
     const eq = (type, f, g, q) => { const x = oc.createBiquadFilter(); x.type = type; x.frequency.value = f; if (g != null) x.gain.value = g; if (q != null) x.Q.value = q; return x; };
     const src = oc.createBufferSource(); src.buffer = inp;
-    const k = [eq('highpass', 75, null, .7), eq('peaking', 260, -2, 1), eq('peaking', 3200, 2.5, .9), eq('highshelf', 8500, 2)];
+    const k = [eq('highpass', 70, null, .7), eq('peaking', 260, -1, 1), eq('peaking', 3200, .8, .9), eq('highshelf', 8500, .5)];   // dezent: starker Präsenz-/Höhen-Boost klang blechern
     src.connect(k[0]); k[0].connect(k[1]); k[1].connect(k[2]); k[2].connect(k[3]); k[3].connect(oc.destination); src.start();
     const out = await oc.startRendering(), ch = [];
     for (let c = 0; c < nc; c++) ch.push(out.getChannelData(c));
@@ -1464,9 +1464,10 @@ async function prepVoice(buf, text) {
     const v = vGain[key];
     if (v != null) gdb = Math.min(v + 1.5, Math.max(v - 1.5, gdb));
     if (len > sr * 1.2) vGain[key] = v == null ? gdb : v * .7 + gdb * .3;
-    const G = Math.pow(10, gdb / 20) * Math.max(1, (+cfg.lautstaerke) / 100);
+    // Lauter nur bis +4 dB: mehr presst der Limiter die Stimme platt – klingt dann flach und roboterhaft
+    const G = Math.pow(10, gdb / 20) * Math.min(1.6, Math.max(1, (+cfg.lautstaerke) / 100));
     // 3) Limiter mit Vorschau: Mindest-Verstärkung im 5-ms-Fenster voraus, Erholung 80 ms, Rampe geglättet -> nie über der Decke
-    const ceil = .89, LA = Math.max(1, Math.round(sr * .005)), rc = 1 - Math.exp(-1 / (sr * .08));
+    const ceil = .93, LA = Math.max(1, Math.round(sr * .006)), rc = 1 - Math.exp(-1 / (sr * .25));   // längere Erholung = kein Pumpen
     const req = new Float32Array(len);
     for (let i = 0; i < len; i++) { let pk = 0; for (let c = 0; c < nc; c++) pk = Math.max(pk, Math.abs(ch[c][i])); req[i] = pk * G > ceil ? ceil / (pk * G) : 1; }
     const mn = new Float32Array(len), dq = new Int32Array(len); let h = 0, t = 0;   // gleitendes Minimum über [i, i+LA]
