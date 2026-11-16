@@ -4304,12 +4304,13 @@ const MINI_RE = MINI_KERN(/^(mach dich |werd(e)? |verwandel(e)? dich |verwandle 
 const GROSS_RE = MINI_KERN(/^(mach dich |werd(e)? |geh |wechsel(e)? |schalt(e)? |zurück |zeig dich )*(zu |zur |in |auf |den |die |das |ins |)?(groß(e[rn]?)?|vollbild|volle größe|normal(e[rn]?)?|große ansicht|großer modus|groß ?modus|normale ansicht|normale oberfläche|normaler modus|ganz groß)( machen| werden| wechseln| gehen| schalten| ansicht| modus| oberfläche)?$/, true);
 const miniModus = an => fetch('/mini', { method:'POST', headers:{ 'Content-Type':'application/json' }, body:JSON.stringify({ an }) }).catch(() => {});
 
+const SPIEL_HTML = document.documentElement.classList.contains('spiel');
 let lastT = performance.now();
 function frame(now) {
   requestAnimationFrame(frame);
   const speaking = speakingNow();
   const active = speaking || listening || convoRec || S.mode === 'denkt' || S.mode === 'auftrag' || S.mode === 'wartet' || S.boot < 1 || waves.length || sparks.length;
-  const fps = Math.min(KAM.an ? (KAM.stufe ? 20 : 30) : 999,   // Kamera-Ansicht verdeckt die Kugel fast ganz → Kugel sparsam, damit die Kamera flüssig läuft
+  const fps = Math.min(KAM.an ? (KAM.stufe ? 20 : 30) : 999, SPIEL_HTML ? (active ? 30 : 15) : 999,   // im Spiel: Grafikkarte fürs Spiel lassen   // Kamera-Ansicht verdeckt die Kugel fast ganz → Kugel sparsam, damit die Kamera flüssig läuft
     S.sleep && S.sleepVis > .95 && !active ? 24 : active ? [30, 60, 120, 60][Q()] : [24, 40, 60, 60][Q()]);   // Kino: gleichmäßig 60 fps   // im Leerlauf weniger Bilder = weniger CPU
   if (now - lastT < 1000 / fps - 3) return;
   const t = now / 1000, dt = Math.min(.08, (now - lastT) / 1000); lastT = now; EASE_DT = Math.max(.001, dt);

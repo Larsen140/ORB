@@ -1,1 +1,1 @@
-131|Agenten arbeiten schneller und prüfen ihr Ergebnis selbst, Bauten mit Vorschau
+132|Systemcheck: Ohr verpasst keine Befehle mehr, Stimme stabiler, Kugel schont im Spiel die Grafikkarte

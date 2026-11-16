@@ -71,7 +71,7 @@ DEFAULT_CFG = {
 }
 # Damit ORB immer dein Claude-Code-Login (Max-Abo) nutzt und nie einen API-Schlüssel
 CLAUDE_ENV_DROP = ("ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "ANTHROPIC_BASE_URL")
-VERSION = "131"
+VERSION = "132"
 ORB_UI = ("Deine Oberfläche (die Larsen gerade sieht): in der Mitte du als flüssige leuchtende Kugel mit Tropfen, "
           "Orbit-Ringen und Sternenhimmel; links eine Uhr und darunter der Gesprächsverlauf mit Eingabefeld; rechts "
           "Karten für System (CPU, RAM, Akku), Wetter mit Stundenvorschau, Aktivität (was du gerade tust) und Vorschläge; "
@@ -834,7 +834,8 @@ def _edge_einmal(text, cfg, frist):
 
     async def run():
         buf = bytearray()
-        com = edge_tts.Communicate(text, cfg["stimme"], rate=cfg["tempo"], pitch=cfg["hoehe"])
+        stimme = cfg["stimme"] if "Neural" in str(cfg.get("stimme", "")) else "de-DE-SeraphinaMultilingualNeural"   # lokal:… → Netz-Ersatz
+        com = edge_tts.Communicate(text, stimme, rate=cfg["tempo"], pitch=cfg["hoehe"])
         it = com.stream().__aiter__()
         while True:
             try:
@@ -899,7 +900,10 @@ def synth_edge(text, cfg=None):
 
     def versuch(nr):
         try:
-            data = _edge_einmal(text, cfg, 18)
+            c = cfg
+            if nr >= 2 and any("NoAudio" in (f or "") for f in fehler):   # Stimme/Parameter abgelehnt → Standardstimme, normale Einstellungen
+                c = dict(cfg, stimme="de-DE-SeraphinaMultilingualNeural", tempo="+0%", hoehe="+0Hz")
+            data = _edge_einmal(text, c, 18)
             q.put((nr, data if len(data) > 400 else None, None if len(data) > 400 else "leere Antwort"))   # leer = Fehler
         except Exception as e:
             q.put((nr, None, "%s: %s" % (type(e).__name__, str(e)[:120] or "Zeitüberschreitung")))

@@ -149,7 +149,8 @@ def main():
         name_allein = re.match(r"(?i)^\W*jarvis\W*$", txt)
         if name_allein:
             orb("/ohr", {"typ": "wake"})   # sofort „Ich höre …“ zeigen, Frage kommt gleich
-        if HAENGT.search(txt) or not re.search(r"[.!?…]\s*$", txt) or name_allein:
+        frage = re.search(r"[?!]\s*$", txt)   # „Hörst du mich?“ ist fertig, auch wenn es auf „mich“ endet
+        if (HAENGT.search(txt) and not frage) or not re.search(r"[.!?…]\s*$", txt) or name_allein:
             offen.update(text=txt, bis=time.time() + (3.5 if name_allein else 1.8))
             log("halte (unvollständig):", txt)
             return
@@ -209,10 +210,11 @@ def main():
                     try:
                         t0 = time.time()
                         txt = wh.text(audio)
-                        unsinn = ("untertitel", "vielen dank fürs zuschauen", "sous-titr", "amara", "copyright", "swr ", "zdf",
-                                  "bis zum nächsten mal", "danke fürs zuschauen", "musik", "amen.", "thank you", "thanks for watching",
-                                  "you", "bye.", "untertitelung")
-                        if txt and len(txt) > 1 and not any(txt.lower().startswith(u) or txt.lower() == u for u in unsinn):
+                        anfang = ("untertitel", "vielen dank fürs zuschauen", "sous-titr", "amara", "copyright", "swr ", "zdf",
+                                  "bis zum nächsten mal", "danke fürs zuschauen", "thank you", "thanks for watching")
+                        ganz = ("musik", "amen", "you", "bye", "hm", "mhm")   # nur wenn das ALLES ist
+                        klein = txt.lower().strip(" .!?…,*[]()")
+                        if txt and len(txt) > 1 and klein not in ganz and not any(klein.startswith(u) for u in anfang):
                             log("Text (%.1f s):" % (time.time() - t0), txt)
                             senden(txt, dauer)
                     except Exception as e:
