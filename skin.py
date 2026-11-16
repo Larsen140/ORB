@@ -401,6 +401,15 @@ def main():
         namen = [os.path.splitext(n)[0] for n in sys.argv[2:]] or sorted(f[:-4] for f in os.listdir(ORDNER) if f.lower().endswith(".png") and "_vorschau" not in f)[:3]
         holo(namen)
         print(json.dumps({"ok": True, "skins": namen}, ensure_ascii=False))
+    elif cmd == "vergleich":   # Vorschau mehrerer Skins nebeneinander (für ORBs Selbstkontrolle mit Read)
+        namen = sys.argv[2:]
+        bilder = [vorschau(basis_laden(n)) for n in namen]
+        bild = Image.new("RGBA", (400 * len(bilder), 380), (28, 30, 40, 255))
+        for i, b in enumerate(bilder):
+            bild.alpha_composite(b, (i * 400, 30))
+        ziel = os.path.join(tempfile.gettempdir(), "orb_skin_vergleich.png")
+        bild.save(ziel)
+        print(json.dumps({"ok": True, "bild": ziel, "reihenfolge": namen}, ensure_ascii=False))
     elif cmd == "liste":
         print(json.dumps(sorted(f[:-4] for f in os.listdir(ORDNER) if f.endswith(".png") and "_vorschau" not in f), ensure_ascii=False))
 
