@@ -2309,8 +2309,8 @@ async function ask(text, getippt) {
   if (S.sleep) { S.sleep = false; document.body.classList.remove('sleeping'); }
   const t0 = text.replace(/[.!?,]+$/g, '').trim();
   // Mini-ORB per Sprache: „Mini-Modus“ / „mach dich klein“ – „mach dich groß“ / „Vollbild“
-  if (/^((orb|jarvis),?\s*)?(mini[- ]?modus|mini[- ]?orb|mach dich klein|werd klein|in die ecke)$/i.test(t0)) { addMsg('me', text); SFX.close(); return miniModus(true); }
-  if (/^((orb|jarvis),?\s*)?(mach dich (wieder )?groß|werd groß|vollbild|groß(er)? modus)$/i.test(t0)) { addMsg('me', text); SFX.open(); return miniModus(false); }
+  if (MINI_RE.test(t0)) { addMsg('me', text); SFX.close(); return miniModus(true); }
+  if (GROSS_RE.test(t0)) { addMsg('me', text); SFX.open(); return miniModus(false); }
   // „Kamera an“ / „Kamera aus“ – nur auf ausdrücklichen Befehl, „aus“ beendet sofort
   if (KAM_RE.test(t0)) { addMsg('me', text); if (KAM_AUS_RE.test(t0)) { kameraAus(); hint('Kamera ist aus', 2000); } else kameraAn(); return; }
   // „Sphäre in meine Hand“ (schaltet die Kamera dafür ein) und lokale Kamera-Befehle („zeig mir das Wetter“, „zeichnen“, „räum auf“)
@@ -4296,6 +4296,12 @@ let LAY = { mid:innerWidth / 2, cw:innerWidth };
 function miniPruefen() { document.body.classList.toggle('mini', innerWidth < 520 && innerHeight < 620); }
 miniPruefen();
 addEventListener('resize', () => { miniPruefen(); LAY = layout(); });
+// Mini-ORB-Befehle: Name/„bitte“/„mal“ vorne und hinten egal, auch „Mini Kugel“, „Minikugel“, „mach dich zu einer Mini-Kugel“
+const MINI_KERN = (k, wort) => ({ test: t => {
+  t = t.toLowerCase().replace(NAME_RE(), ' ').replace(/[,;:.!]/g, ' ').replace(/(?<![a-zäöüß])(orb|bitte|mal|doch|jetzt|wieder|einfach|kannst du|könntest du)(?![a-zäöüß])/g, ' ').replace(/^[^a-zäöüß]+|[^a-zäöüß?]+$/g, '').replace(/\s+/g, ' ').trim();
+  return t.split(' ').length <= 9 && !/^(klein|groß|normal)(e[rn]?)?$/.test(t) && k.test(t) && (!wort || !/\?/.test(t)); } });
+const MINI_RE = MINI_KERN(/^(mach dich |werd(e)? |verwandel(e)? dich |verwandle dich |geh |wechsel(e)? |schalt(e)? |zeig dich )?(zu |zur |in |als |auf |den |die |das |)?(eine[rnm]? |ne[rnm]? |)?(kleine[rn]? |schwebende[rn]? )*(mini ?-?(modus|orb|kugel|ansicht|fenster|ball|form)|minikugel|klein(e[rn]?)? ?(modus|kugel|ansicht|fenster)?|in die ecke|schrumpf(en)?|mini)( machen| werden| wechseln| gehen| schalten)?$/, true);
+const GROSS_RE = MINI_KERN(/^(mach dich |werd(e)? |geh |wechsel(e)? |schalt(e)? |zurück |zeig dich )*(zu |zur |in |auf |den |die |das |ins |)?(groß(e[rn]?)?|vollbild|volle größe|normal(e[rn]?)?|große ansicht|großer modus|groß ?modus|normale ansicht|normale oberfläche|normaler modus|ganz groß)( machen| werden| wechseln| gehen| schalten| ansicht| modus| oberfläche)?$/, true);
 const miniModus = an => fetch('/mini', { method:'POST', headers:{ 'Content-Type':'application/json' }, body:JSON.stringify({ an }) }).catch(() => {});
 
 let lastT = performance.now();

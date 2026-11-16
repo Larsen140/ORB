@@ -83,30 +83,70 @@ def bring_front():
         print("Fenster nach vorne:", e)
 
 
+def _voll(h):
+    u = ctypes.windll.user32
+    r = (ctypes.c_long * 4)()
+    u.GetWindowRect(h, ctypes.byref(r))
+    return r[0] <= 0 and r[1] <= 0 and r[2] >= u.GetSystemMetrics(0) and r[3] >= u.GetSystemMetrics(1)
+
+
+def _neu_oeffnen(extra, hash_=""):
+    """Fenster schließen und neu öffnen (ein mit --start-fullscreen geöffnetes Fenster lässt sich nicht verkleinern)."""
+    hide_window()
+    time.sleep(1.2)
+    browser = find_browser()
+    if not browser:
+        return
+    profile = os.path.join(os.environ.get("LOCALAPPDATA", os.path.expanduser("~")), "ORB", "fenster")
+    _win["opened"] = time.time()
+    subprocess.Popen([browser, "--app=" + URL + "/" + hash_, "--user-data-dir=" + profile] + LEAN + extra)
+    for _ in range(80):
+        time.sleep(0.1)
+        if orb_windows():
+            time.sleep(0.3)
+            return
+
+
 def mini(an=True):
-    """Mini-ORB: Fenster als kleine Kugel unten rechts, immer obenauf – bzw. zurück auf groß/Vollbild."""
+    """Mini-ORB: Fenster als kleine schwebende Kugel unten rechts (immer obenauf, an der Titelleiste verschiebbar,
+    hört weiter zu) – bzw. zurück auf groß/Vollbild. Klappt das Umschalten nicht, wird das Fenster passend neu geöffnet."""
     u = ctypes.windll.user32
     sw, sh = u.GetSystemMetrics(0), u.GetSystemMetrics(1)
-    for h in orb_windows():
-        r = (ctypes.c_long * 4)()
-        u.GetWindowRect(h, ctypes.byref(r))
-        voll = r[0] <= 0 and r[1] <= 0 and r[2] >= sw and r[3] >= sh
+    w, hh = 300, 360
+    x, y = sw - w - 18, sh - hh - 60
+    hs = orb_windows()
+    if not hs:
+        if an:
+            _neu_oeffnen(["--window-size=%d,%d" % (w, hh), "--window-position=%d,%d" % (x, y)], "#wake")
+            hs = orb_windows()
+        else:
+            return show()
+    for h in hs:
         u.ShowWindow(h, 9 if u.IsIconic(h) else 5)
         u.keybd_event(0x12, 0, 0, 0); u.keybd_event(0x12, 0, 2, 0)
         u.SetForegroundWindow(h)
         if an:
-            if voll:
+            if _voll(h):
                 u.keybd_event(0x7A, 0, 0, 0); u.keybd_event(0x7A, 0, 2, 0)   # F11: Vollbild verlassen
                 time.sleep(.45)
+            if _voll(h):   # Start-Vollbild lässt sich nicht verlassen → klein neu öffnen
+                _neu_oeffnen(["--window-size=%d,%d" % (w, hh), "--window-position=%d,%d" % (x, y)], "#wake")
+                hs2 = orb_windows()
+                if not hs2:
+                    return
+                h = hs2[0]
             u.ShowWindow(h, 9)   # wiederherstellen (nicht maximiert)
-            w, hh = 300, 360
-            u.SetWindowPos(h, -1, sw - w - 18, sh - hh - 60, w, hh, 0x40)   # HWND_TOPMOST, SWP_SHOWWINDOW
-        else:
-            u.SetWindowPos(h, -2, 0, 0, 0, 0, 0x3 | 0x40)   # HWND_NOTOPMOST, Größe/Ort behalten
-            u.ShowWindow(h, 3)   # maximieren
-            if server.load_cfg().get("vollbild", True):
-                time.sleep(.3)
-                u.keybd_event(0x7A, 0, 0, 0); u.keybd_event(0x7A, 0, 2, 0)   # F11: wieder Vollbild
+            u.SetWindowPos(h, -1, x, y, w, hh, 0x40)   # HWND_TOPMOST, SWP_SHOWWINDOW
+            return
+        u.SetWindowPos(h, -2, 0, 0, 0, 0, 0x3 | 0x40)   # HWND_NOTOPMOST, Größe/Ort behalten
+        u.ShowWindow(h, 3)   # maximieren
+        if server.load_cfg().get("vollbild", True) and not _voll(h):
+            time.sleep(.3)
+            u.keybd_event(0x7A, 0, 0, 0); u.keybd_event(0x7A, 0, 2, 0)   # F11: wieder Vollbild
+            time.sleep(.6)
+            if not _voll(h):
+                _neu_oeffnen(["--start-fullscreen"], "#wake")
+        return
 
 
 OHR_PY = os.path.join(os.environ.get("LOCALAPPDATA", ""), "ORB", "ohr", "venv", "Scripts", "pythonw.exe")
@@ -250,10 +290,14 @@ def spiel_mini_oeffnen():
         time.sleep(0.1)
         hs = orb_windows()
         if hs:
-            for hw in hs:
+            time.sleep(0.4)
+            for hw in orb_windows():
+                if u.IsZoomed(hw):
+                    u.ShowWindow(hw, 4)            # Profil merkt sich „maximiert“ → erst wiederherstellen (ohne Aktivieren)
                 u.SetWindowPos(hw, -1, x, y, w, h, 0x10 | 0x40)   # TOPMOST, nicht aktivieren
-            u.keybd_event(0x12, 0, 0, 0); u.keybd_event(0x12, 0, 2, 0)
-            u.SetForegroundWindow(spiel_fenster)
+            if spiel_fenster and spiel_fenster not in orb_windows():
+                u.keybd_event(0x12, 0, 0, 0); u.keybd_event(0x12, 0, 2, 0)
+                u.SetForegroundWindow(spiel_fenster)
             break
 
 
@@ -272,6 +316,16 @@ def spiel_wache():
             elif not spiel and vorher and mini_an:
                 mini_an = False
                 hide_window()
+            elif spiel and mini_an and server.load_cfg().get("spiel_mini", True) and time.time() - server.LAST_ACTIVE[0] > 60:
+                # Während des Spiels groß geworden (Klatschen, Neustart, Update) und 1 Min. nicht benutzt → zurück zur Mini-Kugel
+                u = ctypes.windll.user32
+                for hw in orb_windows():
+                    r = (ctypes.c_long * 4)()
+                    u.GetWindowRect(hw, ctypes.byref(r))
+                    if u.IsWindowVisible(hw) and r[2] - r[0] > 600:
+                        server.log_close("Gaming-Modus: zurück zur Mini-Kugel")
+                        spiel_mini_oeffnen()
+                        break
             elif spiel and not vorher and window_open() and time.time() - server.LAST_ACTIVE[0] > 20:
                 server.log_close("Gaming-Modus: %s gestartet" % spiel)
                 if spiel == "Minecraft":
