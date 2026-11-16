@@ -5,7 +5,7 @@
 # Es entsteht KEINE neue exe. Nur wenn orb_launcher.py geändert wurde: -Exe anhängen (baut den Installer neu
 # und stellt ihn als GitHub-Release „ORB.exe“ bereit).
 # Protokoll: C:\Users\larse\Orb\update.log
-param([switch]$Exe)
+param([switch]$Exe, [string]$Nachricht = '')
 $ErrorActionPreference = 'Stop'
 $o    = 'C:\Users\larse\Orb'
 $git  = 'C:\Program Files\Git\cmd\git.exe'
@@ -34,9 +34,11 @@ try {
     $s = Get-Content "$o\server.py" -Raw -Encoding UTF8
     [IO.File]::WriteAllText("$o\server.py", [regex]::Replace($s, '(?m)^VERSION = "\d+"', "VERSION = `"$v`""), (New-Object Text.UTF8Encoding $false))
 
+    # „Was ist neu“ für ORBs Meldung „Update installiert“ (neu.txt wird mit hochgeladen)
+    if ($Nachricht) { [IO.File]::WriteAllText("$o\neu.txt", "$v|$Nachricht", (New-Object Text.UTF8Encoding $false)) }
     Log "Lade Version $v zu GitHub hoch …"
     Git add -A | Out-Null
-    Git commit -q -m "ORB Version $v" | Out-Null
+    Git commit -q -m ("ORB Version $v" + $(if ($Nachricht) { ": $Nachricht" } else { '' })) | Out-Null
     try { Git push -q origin main | Out-Null } catch { Git pull -q --rebase origin main | Out-Null; Git push -q origin main | Out-Null }
     Log 'Hochgeladen.'
 

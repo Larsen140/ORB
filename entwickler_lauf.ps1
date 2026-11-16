@@ -66,7 +66,7 @@ Regeln:
 - Setze den Auftrag vollständig und sauber um, passend zum bestehenden Design (Liquid-Glass, Palette mit --c/--c2/--c3/--c4).
 - Ändere nur, was für den Auftrag nötig ist. Keine privaten Daten (Schlüssel, Mailadressen) in den Code – das Repo ist öffentlich.
 - Prüfe mit:  py -3 check.py   (muss „OK“ ausgeben; Fehler beheben).
-- Veröffentliche danach mit:  powershell -NoProfile -ExecutionPolicy Bypass -File C:\Users\larse\Orb\update.ps1
+- Veröffentliche danach mit:  powershell -NoProfile -ExecutionPolicy Bypass -File C:\Users\larse\Orb\update.ps1 -Nachricht "<in einem kurzen Satz, was neu ist>"   (der Satz erscheint bei Larsen in „Update installiert … Neu: …“)
   (nur wenn orb_launcher.py geändert wurde, zusätzlich -Exe). ORB spielt das Update dann selbst ein.
 - NIEMALS selbst PyInstaller ausführen, exe-Dateien bauen/kopieren oder ORB beenden/starten. Nicht auf ORB warten.
 - Ist der Auftrag unklar oder würde er ORB beschädigen, setze die sinnvollste kleine Version um.

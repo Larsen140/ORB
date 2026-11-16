@@ -612,7 +612,15 @@ def announce_update():
                 server.neu_zeigen("orb", n["punkte"], n["nutzen"])
                 server.write_answer("Update installiert. Neu: %s" % n["punkte"][0], heard="")
             else:
-                server.write_answer("Update installiert, Version %s." % server.VERSION, heard="")
+                neu = ""
+                try:   # neu.txt kommt mit dem Update: "<Version>|<was ist neu>"
+                    with open(os.path.join(os.path.dirname(os.path.abspath(server.__file__)), "neu.txt"), encoding="utf-8") as f:
+                        v, _, txt = f.read().strip().partition("|")
+                    if v.strip() == str(server.VERSION) and txt.strip():
+                        neu = txt.strip().rstrip(".")
+                except Exception:
+                    pass
+                server.write_answer("Update installiert, Version %s.%s" % (server.VERSION, (" Neu: " + neu + ".") if neu else ""), heard="")
 
 
 def backup_jarvis():
