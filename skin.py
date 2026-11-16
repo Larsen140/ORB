@@ -354,13 +354,15 @@ def launcher(n):
         d = {"customSkins": {}, "version": 1}
     jetzt = dt.datetime.now(dt.timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.000Z")
     sid = "skin_" + str(uuid.uuid4())
-    d.setdefault("customSkins", {})[sid] = {"created": jetzt, "id": sid, "modelImage": b64(vorschau(img, meta.get("modell") == "slim")),
-                                            "name": meta.get("anzeige", n), "skinImage": b64(img), "slim": meta.get("modell") == "slim",
+    anzeige = meta.get("anzeige", n)
+    d["customSkins"] = {k: v for k, v in d.get("customSkins", {}).items() if v.get("name") != anzeige}   # gleichnamige ersetzen statt doppeln
+    d["customSkins"][sid] = {"created": jetzt, "id": sid, "modelImage": b64(vorschau(img, meta.get("modell") == "slim")),
+                                            "name": anzeige, "skinImage": b64(img), "slim": meta.get("modell") == "slim",
                                             "textureId": "", "updated": jetzt}
     with open(LAUNCHER, "w", encoding="utf-8") as f:
         json.dump(d, f, indent=2)
-    laeuft = subprocess.run(["tasklist", "/FI", "IMAGENAME eq MinecraftLauncher.exe"], capture_output=True, text=True,
-                            creationflags=NO_WINDOW).stdout.count("MinecraftLauncher.exe") > 0
+    laeuft = (subprocess.run(["tasklist", "/FI", "IMAGENAME eq MinecraftLauncher.exe"], capture_output=True, text=True,
+                            encoding="oem", errors="ignore", creationflags=NO_WINDOW).stdout or "").count("MinecraftLauncher.exe") > 0
     return {"ok": True, "id": sid, "launcher_offen": laeuft,
             "hinweis": "Launcher läuft – bitte einmal schließen und neu öffnen, dann steht der Skin unter „Skins“." if laeuft
             else "Beim nächsten Öffnen des Launchers steht der Skin unter „Skins“ – anklicken und „Verwenden“."}
