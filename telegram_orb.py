@@ -87,7 +87,7 @@ def antworten_weiterleiten(token, chat):
     while True:
         time.sleep(1)
         try:
-            st = json.loads(orb("/state"))
+            st = json.loads(orb("/state?von=extern"))
         except Exception:
             continue
         if time.time() - aktiv["t"] < 900:

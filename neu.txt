@@ -1,1 +1,1 @@
-137|Klatschen klappt auch während Google Meet, im Meet hört ORB erst zu, wenn du ihn holst
+138|Klatschen im Hintergrund funktioniert wieder (Telegram hatte es blockiert)

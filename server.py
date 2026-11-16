@@ -71,7 +71,7 @@ DEFAULT_CFG = {
 }
 # Damit ORB immer dein Claude-Code-Login (Max-Abo) nutzt und nie einen API-Schlüssel
 CLAUDE_ENV_DROP = ("ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "ANTHROPIC_BASE_URL")
-VERSION = "137"
+VERSION = "138"
 ORB_UI = ("Deine Oberfläche (die Larsen gerade sieht): in der Mitte du als flüssige leuchtende Kugel mit Tropfen, "
           "Orbit-Ringen und Sternenhimmel; links eine Uhr und darunter der Gesprächsverlauf mit Eingabefeld; rechts "
           "Karten für System (CPU, RAM, Akku), Wetter mit Stundenvorschau, Aktivität (was du gerade tust) und Vorschläge; "
@@ -2782,7 +2782,8 @@ class Handler(BaseHTTPRequestHandler):
                       "o.headers=Object.assign({},o.headers||{},{'X-ORB-Token':T});return f(u,o)}})()</script>" % TOKEN).encode()
             self.send(200, page.replace(b"<head>", b"<head>" + inject, 1), "text/html; charset=utf-8")
         elif u.path == "/state":
-            LAST_POLL[0] = time.time()
+            if q.get("von") != "extern":   # nur das ORB-Fenster zählt als „Fenster offen“ (Telegram & Co. fragen mit von=extern)
+                LAST_POLL[0] = time.time()
             if q.get("wach") == "1":
                 LAST_WACH[0] = time.time()
             if q.get("spricht") == "1":
