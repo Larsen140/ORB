@@ -71,7 +71,7 @@ DEFAULT_CFG = {
 }
 # Damit ORB immer dein Claude-Code-Login (Max-Abo) nutzt und nie einen API-Schlüssel
 CLAUDE_ENV_DROP = ("ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "ANTHROPIC_BASE_URL")
-VERSION = "136"
+VERSION = "137"
 ORB_UI = ("Deine Oberfläche (die Larsen gerade sieht): in der Mitte du als flüssige leuchtende Kugel mit Tropfen, "
           "Orbit-Ringen und Sternenhimmel; links eine Uhr und darunter der Gesprächsverlauf mit Eingabefeld; rechts "
           "Karten für System (CPU, RAM, Akku), Wetter mit Stundenvorschau, Aktivität (was du gerade tust) und Vorschläge; "
@@ -572,6 +572,17 @@ _call = {"t": 0.0, "v": False}
 CALL_TITLES = ("google meet", "meet – ", "meet - ", "zoom meeting", "zoom-meeting", "microsoft teams", "webex", "discord")
 CALL_APPS = ("opera.exe", "chrome.exe", "firefox.exe", "brave.exe", "discord.exe", "teams.exe", "ms-teams.exe",
              "zoom.exe", "ciscocollabhost.exe", "webex.exe", "skype.exe")
+
+
+CALL_FREI = [False]   # im Meet: Larsen hat ORB selbst geholt (Klatschen) → ORB hört zu, bis er wieder weg ist
+
+
+def call_aktiv():
+    """Meeting läuft UND Larsen hat ORB nicht selbst dazugeholt → nicht zuhören."""
+    if not in_call():
+        CALL_FREI[0] = False
+        return False
+    return not CALL_FREI[0]
 
 
 def in_call():
@@ -2798,7 +2809,7 @@ class Handler(BaseHTTPRequestHandler):
                          "lebt": web_lebt(), "rein": WEB["rein"]}   # Web-Hologramm
             st["spiel"] = spiel_laeuft()
             # Meeting oder Spiel: nicht zuhören – außer Minecraft: da hört ORB weiter auf „Jarvis“ (Befehle im Spiel)
-            st["anruf"] = in_call() or bool(st["spiel"] and st["spiel"] != "Minecraft")   # während Meet/Teams/Zoom nicht zuhören
+            st["anruf"] = call_aktiv() or bool(st["spiel"] and st["spiel"] != "Minecraft")   # während Meet/Teams/Zoom nicht zuhören
             st["version"] = VERSION   # Fenster lädt sich neu, wenn eine neue Version läuft
             for i, p in enumerate(st.get("parts") or []):   # Stimme für alle Stücke vorbereiten
                 ensure((st.get("aid"), i), p)
@@ -2809,7 +2820,7 @@ class Handler(BaseHTTPRequestHandler):
         elif u.path == "/ohr/modus":   # ohr.py fragt: lauschen? mitschreiben?
             OHR["t"] = time.time()
             spiel = spiel_laeuft()
-            an = load_cfg().get("ohr", True) and not in_call() and not (spiel and spiel != "Minecraft")
+            an = load_cfg().get("ohr", True) and not call_aktiv() and not (spiel and spiel != "Minecraft")
             self.send(200, {"an": an, "mitschreiben": an and time.time() - LAST_WACH[0] < 3,
                             "stimmcheck": load_cfg().get("nur_meine_stimme", True)})
         elif u.path == "/stimmung":
@@ -3077,6 +3088,7 @@ class Handler(BaseHTTPRequestHandler):
                 write_answer(text, heard="")
             self.send(200, {"ok": bool(text)})
         elif u.path == "/hide":
+            CALL_FREI[0] = False   # weggeschickt → im Meet wieder taub
             self.send(200, {"ok": True})
             keep = bool(b.get("keep"))   # nur ausblenden: Seite hört weiter auf „Jarvis“
             log_close("Fenster %s: %s" % ("ausgeblendet" if keep else "geschlossen", b.get("grund") or "unbekannt"))
@@ -3103,6 +3115,7 @@ class Handler(BaseHTTPRequestHandler):
             if ON_MINI[0]:
                 threading.Thread(target=ON_MINI[0], args=(bool(b.get("an", True)),), daemon=True).start()
         elif u.path == "/show":  # Fenster öffnen bzw. nach vorne holen (z. B. zweiter Doppelklick auf ORB.exe)
+            CALL_FREI[0] = True   # Larsen hat ORB selbst geholt (Klatschen) → auch im Meet zuhören
             if ON_SHOW[0]:
                 threading.Thread(target=ON_SHOW[0], kwargs={"wake": bool(b.get("wake"))}, daemon=True).start()
             self.send(200, {"ok": True})

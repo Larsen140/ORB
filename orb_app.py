@@ -274,6 +274,8 @@ def window_process_running():
 
 
 def show(wake=False, hidden=False):
+    if wake:
+        server.CALL_FREI[0] = True   # per Klatschen geholt → auch während eines Meetings zuhören
     if window_open() or window_process_running():
         if hidden:
             return
@@ -391,6 +393,7 @@ def spiel_wache():
 def hide_window(keep=False):
     """ORB-Fenster schließen (spart ~800 MB) – im Hintergrund wird weiter auf Klatschen gelauscht.
     keep=True: nur ausblenden – die Seite läuft weiter und hört auf „Jarvis“, Klatschen und Schnipsen."""
+    server.CALL_FREI[0] = False
     if keep:
         try:
             for h in orb_windows():
@@ -529,7 +532,9 @@ class KlatschErkenner:
                 if len(c[3]) >= 2 and c[3][1] - f > (c[1] - f) * .5:
                     rms = max(rms, c[1])   # klang nicht sofort ab (Silbe/Ton) -> kein Knall
                 # Klatschen klingt kurz nach (auf Rauschniveau zurück); Mausklick im selben Moment -> verwerfen
-                if rms < max(c[1] * .35, f * 1.7) and maus_ok:
+                vor = getattr(self, "cand_pre", 0.0)
+                abgeklungen = rms < max(c[1] * .35, f * 1.7, min(vor * 1.3, c[1] * .5)) or pk * 6 < c[2]   # Spitze ist weg, nur noch Sprache
+                if abgeklungen and maus_ok:   # abgeklungen (auf Rauschen bzw. Meet-Sprache)
                     self.last = c[0]
                     self.claps = [t for t in self.claps if self.last - t < 1.1] + [self.last]
                     self.pks = (self.pks + [c[2]])[-2:]
@@ -538,8 +543,12 @@ class KlatschErkenner:
                     if len(self.claps) >= 2 and .22 < self.claps[-1] - self.claps[-2] < 1.0 and gleich:
                         self.claps = []
                         treffer = True
-                elif rms >= max(c[1] * .35, f * 1.7):
-                    self.claps = []   # Dauergeräusch statt Knall
+                        try:
+                            server.log_close("Doppelklatschen im Hintergrund erkannt", server.HOER_LOG)
+                        except Exception:
+                            pass
+                elif not self.pks or c[2] >= self.pks[-1] * .5:
+                    self.claps = []   # lautes Dauergeräusch statt Knall (leise Silben-Anfänge im Meet löschen den ersten Klatscher nicht)
                 self.cand = None
         else:
             thr_pk, thr_rms = self.schwellen()
@@ -550,9 +559,21 @@ class KlatschErkenner:
                 hf = max(d - rn * self.nhf, 0.0) / max(e - rn, e * .05)
                 ex_pre = max(pre - f * 1.1, 0.0)                   # was vorher ÜBER dem Rauschen lag (Sprache/Musik)
                 ex_rms = rms - f
-                if (hf < 2.6 and pk / rms < 18 and ex_pre < ex_rms * .3 and maus_ok
-                        and snap_ratio(x, self.sr, self.nprof) < 1.4):
+                # Vorher-Geräusch (Sprache im Meet, Musik): Knall zählt trotzdem, wenn er klar lauter ist
+                laut_genug = ex_pre < ex_rms * .3 or (rms > pre * 3.5 and pk > thr_pk * 1.5)
+                sr_ = snap_ratio(x, self.sr, self.nprof)
+                if hf < 2.6 and pk / rms < 18 and laut_genug and maus_ok and sr_ < 1.4:
                     self.cand = (now, rms, pk, [])
+                    self.cand_pre = pre
+                elif now - getattr(self, "_log_t", 0) > 2:
+                    self._log_t = now
+                    warum = ("Maus/Tastatur" if not maus_ok else "zu hell (Klick/Schnipser)" if hf >= 2.6 or sr_ >= 1.4
+                             else "zu spitz" if pk / rms >= 18 else "vorher zu laut (Sprache/Musik)")
+                    try:
+                        server.log_close("Klatschen im Hintergrund? nein: %s · Spitze %.3f · vorher %.4f · jetzt %.4f"
+                                         % (warum, pk, pre, rms), server.HOER_LOG)
+                    except Exception:
+                        pass
         # Grundrauschen nachführen: Stille schnell übernehmen, nach oben langsam und ohne Knall-Ausreißer
         if rms < f:
             self.floor = f * .7 + rms * .3
