@@ -111,8 +111,8 @@
      "beispiel": "Jarvis, stopp"
     },
     {
-     "name": "Bildschirm sehen",
-     "text": "ORB schaut auf deinen Bildschirm und erklärt, was da ist.",
+     "name": "Bildschirm in Echtzeit",
+     "text": "ORB sieht deinen Bildschirm laufend (alle 1,5 s) und kann sofort helfen oder klicken.",
      "beispiel": "Jarvis, was steht da?"
     },
     {

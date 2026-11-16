@@ -142,7 +142,11 @@ def main():
         if time.time() - modus["t"] > 1.0:
             m = orb("/ohr/modus") or {}
             modus.update(t=time.time(), mit=bool(m.get("mitschreiben")), an=m.get("an", True))
-            if not modus["mit"]:
+            if modus["mit"]:
+                if wh.m is None:   # ORB ist wach → Whisper SOFORT vorladen, nicht erst beim ersten Satz (sonst 3–7 s Verzögerung)
+                    threading.Thread(target=wh.laden, daemon=True).start()
+                wh.zuletzt = time.time()   # solange wach: geladen lassen
+            else:
                 wh.frei()
         if not modus["an"]:
             sprache, puffer = False, []
@@ -168,7 +172,7 @@ def main():
             puffer.append(x)
             stille = stille + 1 if pegel < max(rausch * 2.2, 200) else 0
             dauer = len(puffer) * BLOCK / SR
-            if stille >= 10 or dauer > 20:          # 0,8 s Pause = Satzende (ORB fügt Fortsetzungen selbst zusammen)
+            if stille >= 8 or dauer > 20:           # 0,64 s Pause = Satzende (ORB fügt Fortsetzungen selbst zusammen)
                 sprache = False
                 if dauer - stille * BLOCK / SR >= 0.35:
                     audio = np.concatenate(puffer).astype(np.float32) / 32768.0
@@ -177,7 +181,8 @@ def main():
                         t0 = time.time()
                         txt = wh.text(audio)
                         unsinn = ("untertitel", "vielen dank fürs zuschauen", "sous-titr", "amara", "copyright", "swr ", "zdf",
-                                  "bis zum nächsten mal", "danke fürs zuschauen", "musik", "amen.")
+                                  "bis zum nächsten mal", "danke fürs zuschauen", "musik", "amen.", "thank you", "thanks for watching",
+                                  "you", "bye.", "untertitelung")
                         if txt and len(txt) > 1 and not any(txt.lower().startswith(u) or txt.lower() == u for u in unsinn):
                             log("Text (%.1f s):" % (time.time() - t0), txt)
                             orb("/ohr", {"typ": "text", "text": txt, "dauer": round(dauer, 1)})

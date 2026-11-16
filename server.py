@@ -71,7 +71,7 @@ DEFAULT_CFG = {
 }
 # Damit ORB immer dein Claude-Code-Login (Max-Abo) nutzt und nie einen API-Schlüssel
 CLAUDE_ENV_DROP = ("ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "ANTHROPIC_BASE_URL")
-VERSION = "124"
+VERSION = "125"
 ORB_UI = ("Deine Oberfläche (die Larsen gerade sieht): in der Mitte du als flüssige leuchtende Kugel mit Tropfen, "
           "Orbit-Ringen und Sternenhimmel; links eine Uhr und darunter der Gesprächsverlauf mit Eingabefeld; rechts "
           "Karten für System (CPU, RAM, Akku), Wetter mit Stundenvorschau, Aktivität (was du gerade tust) und Vorschläge; "
@@ -1301,11 +1301,10 @@ class Brain:
             self.last_used = self.last_out = time.time()
             write_state(mode="denkt", heard=text, log=[], task="", detail="", say="", parts=[], aid=self.aid, final=False, holo=None)
             if load_cfg().get("bildschirm"):
-                try:   # aktueller Bildschirm für ORB (nur ansehen, wenn die Frage ihn betrifft)
-                    subprocess.run(["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File",
-                                    os.path.join(RES, "bildschirm.ps1")], capture_output=True, timeout=8, creationflags=NO_WINDOW)
-                    text = ("[Bildschirm-Modus: aktueller Screenshot liegt unter %s – nur ansehen, wenn die Frage den "
-                            "Bildschirm betrifft.]\n" % os.path.join(os.environ.get("LOCALAPPDATA", ""), "ORB", "screen", "bildschirm.png")) + text
+                try:   # Live-Bild (alle 1,5 s frisch) – keine Wartezeit mehr vor der Antwort
+                    alter = time.time() - LIVE["t"]
+                    text = ("[Bildschirm live: %s (%.0f s alt, Klick-Maßstab %.2f) – nur ansehen, wenn die Frage den Bildschirm "
+                            "betrifft; für Klicks diese Bild-Koordinaten an steuern.ps1 geben.]\n" % (LIVE_BILD, alter, LIVE["massstab"])) + text
                 except Exception as e:
                     print("Screenshot:", e)
             if skin_still():
@@ -2410,6 +2409,78 @@ def musik_logger():
             jetzt, start = song, time.time()
         except Exception:
             time.sleep(20)
+
+
+# ---------- Bildschirm in Echtzeit: alle 1,5 s ein frisches Bild (ORB selbst ist aus der Aufnahme ausgeblendet) ----------
+LIVE_BILD = os.path.join(os.environ.get("LOCALAPPDATA", ""), "ORB", "screen", "live.png")
+LIVE = {"t": 0.0, "groesse": (0, 0), "massstab": 1.0}
+
+
+def _bildschirm_png(breite_max=1600):
+    """Bildschirm per GDI aufnehmen, auf ≤1600 px verkleinern, als PNG speichern – ohne Zusatzpakete (ctypes + zlib)."""
+    import ctypes
+    import struct
+    import zlib
+    from ctypes import wintypes
+    u, g = ctypes.windll.user32, ctypes.windll.gdi32
+    sw, sh = u.GetSystemMetrics(0), u.GetSystemMetrics(1)   # ORB ist nicht DPI-bewusst: logische Größe (Aufnahme passt dazu)
+    f = min(1.0, breite_max / sw)
+    w, h = int(sw * f), int(sh * f)
+    hdc = u.GetDC(0)
+    mdc = g.CreateCompatibleDC(hdc)
+    bmp = g.CreateCompatibleBitmap(hdc, w, h)
+    g.SelectObject(mdc, bmp)
+    g.SetStretchBltMode(mdc, 4)   # HALFTONE: sauber verkleinern
+    g.StretchBlt(mdc, 0, 0, w, h, hdc, 0, 0, sw, sh, 0x00CC0020 | 0x40000000)   # SRCCOPY | CAPTUREBLT
+
+    class BIH(ctypes.Structure):
+        _fields_ = [("biSize", wintypes.DWORD), ("biWidth", wintypes.LONG), ("biHeight", wintypes.LONG),
+                    ("biPlanes", wintypes.WORD), ("biBitCount", wintypes.WORD), ("biCompression", wintypes.DWORD),
+                    ("biSizeImage", wintypes.DWORD), ("biXPelsPerMeter", wintypes.LONG), ("biYPelsPerMeter", wintypes.LONG),
+                    ("biClrUsed", wintypes.DWORD), ("biClrImportant", wintypes.DWORD)]
+    bi = BIH(ctypes.sizeof(BIH), w, -h, 1, 24, 0, 0, 0, 0, 0, 0)
+    stride = (w * 3 + 3) & ~3
+    buf = ctypes.create_string_buffer(stride * h)
+    g.GetDIBits(mdc, bmp, 0, h, buf, ctypes.byref(bi), 0)
+    g.DeleteObject(bmp)
+    g.DeleteDC(mdc)
+    u.ReleaseDC(0, hdc)
+    raw = buf.raw
+    zeilen = bytearray()
+    for y in range(h):
+        z = raw[y * stride:y * stride + w * 3]
+        rgb = bytearray(z)
+        rgb[0::3], rgb[2::3] = z[2::3], z[0::3]   # BGR -> RGB
+        zeilen += b"\x00" + rgb
+    def chunk(t, d):
+        return struct.pack(">I", len(d)) + t + d + struct.pack(">I", zlib.crc32(t + d) & 0xffffffff)
+    png = b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", struct.pack(">IIBBBBB", w, h, 8, 2, 0, 0, 0)) + \
+        chunk(b"IDAT", zlib.compress(bytes(zeilen), 3)) + chunk(b"IEND", b"")
+    os.makedirs(os.path.dirname(LIVE_BILD), exist_ok=True)
+    tmp = LIVE_BILD + ".tmp"
+    with open(tmp, "wb") as fh:
+        fh.write(png)
+    os.replace(tmp, LIVE_BILD)
+    hdc2 = u.GetDC(0)
+    echt_w = g.GetDeviceCaps(hdc2, 118) or sw   # DESKTOPHORZRES: echte Pixelbreite (bei 150 % Skalierung größer)
+    u.ReleaseDC(0, hdc2)
+    LIVE.update(t=time.time(), groesse=(w, h), massstab=echt_w / w)
+    with open(os.path.join(os.path.dirname(LIVE_BILD), "massstab.txt"), "w") as fh:
+        fh.write("%.4f" % (echt_w / w))   # für steuern.ps1 (Klick-Koordinaten in echten Pixeln)
+
+
+def live_bildschirm():
+    """Solange „ORB sieht meinen Bildschirm“ an ist: alle 1,5 s neu aufnehmen (im Spiel und im Schlaf Pause)."""
+    while True:
+        time.sleep(1.5)
+        try:
+            if not load_cfg().get("bildschirm") or spiel_laeuft():
+                time.sleep(3)
+                continue
+            _bildschirm_png()
+        except Exception as e:
+            print("Live-Bildschirm:", e)
+            time.sleep(5)
 
 
 def say_when_free(text):

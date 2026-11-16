@@ -165,6 +165,20 @@ def stimme_wache():
         time.sleep(10)
 
 
+def orb_unsichtbar_fuer_aufnahme():
+    """Mit „ORB sieht meinen Bildschirm“: ORBs eigenes Fenster aus Bildschirmaufnahmen ausblenden
+    (WDA_EXCLUDEFROMCAPTURE) – so sieht ORB, was UNTER ihm liegt, statt sich selbst."""
+    u = ctypes.windll.user32
+    while True:
+        try:
+            an = bool(server.load_cfg().get("bildschirm"))
+            for h in orb_windows():
+                u.SetWindowDisplayAffinity(h, 0x11 if an else 0)
+        except Exception:
+            pass
+        time.sleep(5)
+
+
 def hide_hidden_soon():
     """Gerade gestartetes Fenster sofort ausblenden (Start im Hintergrund, damit „Jarvis“ trotzdem zuhört)."""
     end = time.time() + 20
@@ -699,6 +713,8 @@ def main():
     threading.Thread(target=server.musik_logger, daemon=True).start()  # Musikgeschmack für den Spotify-DJ
     threading.Thread(target=ohr_wache, daemon=True).start()            # lokales Ohr: „Hey Jarvis“ + Whisper
     threading.Thread(target=stimme_wache, daemon=True).start()         # lokale KI-Stimme (Chatterbox)
+    threading.Thread(target=server.live_bildschirm, daemon=True).start()  # Bildschirm in Echtzeit
+    threading.Thread(target=orb_unsichtbar_fuer_aufnahme, daemon=True).start()
     threading.Thread(target=update_loop, daemon=True).start()
     threading.Thread(target=announce_update, daemon=True).start()
     threading.Thread(target=backup_jarvis, daemon=True).start()
