@@ -112,7 +112,23 @@ def main():
         z = zugang()
         mail_feld = doc.EditControl(searchDepth=45, RegexName=r"(?i)mail|benutzer|login")
         pw_feld = doc.EditControl(searchDepth=45, RegexName=r"(?i)passwort|password")
-        if mail_feld.Exists(8) and pw_feld.Exists(3) and z.get("passwort"):
+        vorausgefuellt = False
+        try:
+            vorausgefuellt = bool(mail_feld.Exists(8) and (mail_feld.GetValuePattern().Value or "").strip())
+        except Exception:
+            pass
+        if vorausgefuellt:   # Opera hat die Anmeldedaten schon eingetragen → nur abschicken
+            time.sleep(0.8)
+            w.SetActive()
+            pw_feld.SetFocus()
+            time.sleep(0.3)
+            auto.SendKeys("{Enter}")
+            time.sleep(3.5)
+            doc = dokument(auto, w, r"KATI") or doc
+            if not doc.EditControl(searchDepth=45, RegexName=r"(?i)passwort|password").Exists(1.5):
+                log("Eingeloggt mit Operas gespeicherten Daten")
+                z = {}   # Ersatz-Zugang nicht mehr nötig
+        if z and mail_feld.Exists(2) and pw_feld.Exists(3) and z.get("passwort"):
             for mail in [z.get("email_alt"), z.get("email")]:
                 if not mail:
                     continue
