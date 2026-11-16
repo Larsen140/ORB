@@ -1,1 +1,1 @@
-125|Schneller zuhören (Whisper bleibt geladen) und Bildschirm in Echtzeit
+126|Besser zuhören: genauere Erkennung, angefangene Sätze werden abgewartet

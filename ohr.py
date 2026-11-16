@@ -6,6 +6,7 @@ geschlossenem Fenster. Erkanntes geht an  POST /ohr  {typ: "wake"|"text", text}.
 """
 import json
 import os
+import re
 import queue
 import sys
 import threading
@@ -37,6 +38,11 @@ URL = "http://127.0.0.1:%d" % PORT
 SR, BLOCK = 16000, 1280                    # 80 ms – Blockgröße von openWakeWord
 MODELL = os.environ.get("ORB_WHISPER", "large-v3-turbo")
 LOG = os.path.join(BASIS, "ohr.log")
+# Wörter, die Larsen oft sagt – Whisper erkennt sie damit zuverlässiger (z. B. „Minecraft“ statt „Microfass“)
+PROMPT = ("Jarvis, ORB. Stopp. Minecraft, Skin, Overlay, Meeting, Seminar, Opera, TikTok, Video, Gold, Trading, Chart, "
+          "Hologramm, Spotify, Entwickler, Update, Larsens World, Casino, Ultimatrix, Omnitrix, Vantage, ForexFactory.")
+HAENGT = re.compile(r"(?i)(\b(und|oder|aber|weil|dass|wenn|ob|also|äh|ähm|ich|du|mir|mich|mein|meine|meinen|der|die|das|den|dem|"
+                    r"ein|eine|einen|zu|mit|für|von|im|in|auf|bitte|noch|mal)\W*$)|^\W*jarvis\W*$")
 
 
 def log(*x):
@@ -104,8 +110,8 @@ class Whisper:
             return self._text(audio)
 
     def _text(self, audio):
-        segs, _ = self.m.transcribe(audio, language="de", beam_size=1, vad_filter=True, condition_on_previous_text=False,
-                                    initial_prompt="Jarvis, ORB, Stopp.", without_timestamps=True)
+        segs, _ = self.m.transcribe(audio, language="de", beam_size=4, vad_filter=True, condition_on_previous_text=False,
+                                    initial_prompt=PROMPT, without_timestamps=True)
         self.zuletzt = time.time()
         return " ".join(s.text.strip() for s in segs).strip()
 
@@ -133,7 +139,30 @@ def main():
     log("Ohr gestartet")
     rausch, sprache, stille, puffer, vorlauf = 120.0, False, 0, [], []
     letzter_wake = 0.0
+    offen = {"text": "", "bis": 0.0}
+
+    def senden(txt, dauer=0.0):
+        """Angefangene Sätze („Jarvis.“, „… und“, ohne Satzende) kurz halten und mit der Fortsetzung verbinden."""
+        if offen["text"]:
+            txt = offen["text"].rstrip(" .") + (", " if re.match(r"(?i)^\W*jarvis\W*$", offen["text"]) else " ") + txt[0].lower() + txt[1:]
+            offen["text"] = ""
+        name_allein = re.match(r"(?i)^\W*jarvis\W*$", txt)
+        if name_allein:
+            orb("/ohr", {"typ": "wake"})   # sofort „Ich höre …“ zeigen, Frage kommt gleich
+        if HAENGT.search(txt) or not re.search(r"[.!?…]\s*$", txt) or name_allein:
+            offen.update(text=txt, bis=time.time() + (3.5 if name_allein else 1.8))
+            log("halte (unvollständig):", txt)
+            return
+        log("sende:", txt)
+        orb("/ohr", {"typ": "text", "text": txt, "dauer": round(dauer, 1)})
+
     while True:
+        if offen["text"] and time.time() > offen["bis"]:   # keine Fortsetzung gekommen → so abschicken
+            t_ = offen["text"]
+            offen["text"] = ""
+            if not re.match(r"(?i)^\W*jarvis\W*$", t_):
+                log("sende (ohne Fortsetzung):", t_)
+                orb("/ohr", {"typ": "text", "text": t_})
         try:
             x = q.get(timeout=1)
         except queue.Empty:
@@ -185,7 +214,7 @@ def main():
                                   "you", "bye.", "untertitelung")
                         if txt and len(txt) > 1 and not any(txt.lower().startswith(u) or txt.lower() == u for u in unsinn):
                             log("Text (%.1f s):" % (time.time() - t0), txt)
-                            orb("/ohr", {"typ": "text", "text": txt, "dauer": round(dauer, 1)})
+                            senden(txt, dauer)
                     except Exception as e:
                         log("Whisper-Fehler:", e)
                 puffer = []
