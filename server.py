@@ -39,6 +39,7 @@ icloud = _lade_icloud()  # iCloud-Kalender (CalDAV)
 TTS_PS = os.path.join(RES, "tts.ps1")
 MIKRO_PS = os.path.join(RES, "mikro.ps1")
 PORT = int(os.environ.get("ORB_PORT", "8766"))  # ORB_PORT nur für Tests (update.ps1 prüft auf 8799)
+TESTSERVER = PORT != 8766   # nicht nach ORB_PORT fragen: der echte ORB setzt es selbst (für Telegram & Ohr)
 NO_WINDOW = 0x08000000
 # Schutz gegen fremde Webseiten: nur Anfragen mit diesem Token (steht nur in ORBs eigener Seite und in einer
 # Datei im Benutzerordner) dürfen etwas tun.
@@ -71,7 +72,7 @@ DEFAULT_CFG = {
 }
 # Damit ORB immer dein Claude-Code-Login (Max-Abo) nutzt und nie einen API-Schlüssel
 CLAUDE_ENV_DROP = ("ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "ANTHROPIC_BASE_URL")
-VERSION = "139"
+VERSION = "140"
 ORB_UI = ("Deine Oberfläche (die Larsen gerade sieht): in der Mitte du als flüssige leuchtende Kugel mit Tropfen, "
           "Orbit-Ringen und Sternenhimmel; links eine Uhr und darunter der Gesprächsverlauf mit Eingabefeld; rechts "
           "Karten für System (CPU, RAM, Akku), Wetter mit Stundenvorschau, Aktivität (was du gerade tust) und Vorschläge; "
@@ -514,7 +515,7 @@ HOER_LOG = os.path.join(HOME, "hoeren.log")       # Spracherkennung: welcher Erk
 
 def log_close(grund, path=CLOSE_LOG):
     """Grund fürs Schließen/Ausblenden mit Uhrzeit protokollieren (Datei bleibt klein)."""
-    if os.environ.get("ORB_PORT"):
+    if TESTSERVER:
         return   # Test-Server
     try:
         os.makedirs(HOME, exist_ok=True)
@@ -3163,18 +3164,18 @@ def make_server():
         return None
     srv.daemon_threads = True
     _install_crash_log()
-    if os.environ.get("ORB_PORT"):
+    if TESTSERVER:
         pass   # Test-Server (check.py) – echtes Protokoll nicht anfassen
     elif os.path.exists(RUN_MARK):
         log_close("Gestartet – vorher unerwartet beendet (Absturz, Abmelden oder PC aus)")
     else:
         log_close("Gestartet")
-    if not os.environ.get("ORB_PORT"):
+    if not TESTSERVER:
         mark_running(True)
     write_token()
     threading.Thread(target=load_apps, daemon=True).start()  # App-Liste vorab laden
     threading.Thread(target=idle_reaper, daemon=True).start()
-    if not os.environ.get("ORB_PORT"):
+    if not TESTSERVER:
         threading.Thread(target=bild_wache, daemon=True).start()   # neue Bilder als Hologramm
         threading.Thread(target=_mixer_wache, daemon=True).start()   # ORB im Windows-Mixer auf 100 %
     return srv

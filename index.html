@@ -1625,6 +1625,10 @@ function echoAehnlichkeit(t, texte) {
 }
 function istEcho(t) { return echoAehnlichkeit(t, Object.values(gesagtListe).map(x => x.text).concat(curSay ? [curSay] : [])) > .6; }
 function stopAudio() {
+  if (speakingNow()) {   // Fehlersuche „Stimme fehlt“: wer hat ORB das Wort abgeschnitten?
+    const wer = (new Error().stack || '').split('\n').slice(2, 4).map(z => (z.match(/at (\S+)/) || [])[1] || '?').join(' ← ');
+    hlog('Stimme abgebrochen durch ' + wer);
+  }
   for (const x of sched) if (x.src) try { x.src.stop(); } catch (e) {}
   sched = []; endTime = 0; pending = {}; fakeUntil = 0;
   if (curAid) mutedAid = curAid;
@@ -1647,8 +1651,11 @@ function onParts(st, first) {
 async function fetchPart(aid, i, text) {
   let buf = null;
   if (voiceOn && audioOk()) {
-    try { const r = await fetch(`/tts?aid=${encodeURIComponent(aid)}&i=${i}`); if (r.ok) buf = await prepVoice(await ac.decodeAudioData(await r.arrayBuffer()), text); } catch (e) {}
-  }
+    let fehler = '';
+    try { const r = await fetch(`/tts?aid=${encodeURIComponent(aid)}&i=${i}`); if (r.ok) buf = await prepVoice(await ac.decodeAudioData(await r.arrayBuffer()), text); else fehler = 'Server ' + r.status; }
+    catch (e) { fehler = String(e && e.message || e); }
+    if (!buf && aid === curAid) hlog('Stimme fehlt (Stück ' + i + '): ' + (fehler || 'leer'));
+  } else if (aid === curAid) hlog('Stimme nicht abgespielt: ' + (voiceOn ? 'Audio ' + (ac ? ac.state : 'fehlt') : 'Stimme ausgeschaltet (Taste M)'));
   if (aid !== curAid || aid === mutedAid) return;
   pending[i] = { buf, text }; scheduleReady();
 }
