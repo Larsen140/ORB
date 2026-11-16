@@ -1,1 +1,1 @@
-129|Mini-Kugel wird jetzt wirklich klein und bleibt obenauf
+130|Hintergrund-Aufgaben und Bau-Agent legen sofort los statt lange zu planen

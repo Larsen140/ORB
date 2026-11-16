@@ -71,7 +71,7 @@ DEFAULT_CFG = {
 }
 # Damit ORB immer dein Claude-Code-Login (Max-Abo) nutzt und nie einen API-Schlüssel
 CLAUDE_ENV_DROP = ("ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "ANTHROPIC_BASE_URL")
-VERSION = "129"
+VERSION = "130"
 ORB_UI = ("Deine Oberfläche (die Larsen gerade sieht): in der Mitte du als flüssige leuchtende Kugel mit Tropfen, "
           "Orbit-Ringen und Sternenhimmel; links eine Uhr und darunter der Gesprächsverlauf mit Eingabefeld; rechts "
           "Karten für System (CPU, RAM, Akku), Wetter mit Stundenvorschau, Aktivität (was du gerade tust) und Vorschläge; "
@@ -1885,7 +1885,11 @@ BG_REGELN = ("Du erledigst für ORB, Larsens Sprachassistenten, eine Aufgabe im 
              "Arbeite selbstständig und vollständig, ohne Rückfragen. Lege längere Ergebnisse (Recherchen, Listen, Texte) als "
              "Markdown-Datei in C:\\Users\\larse\\Documents\\Jarvis\\ergebnisse an. Ändere nichts am ORB-Programm. "
              "Deine letzte Antwort wird laut vorgelesen: EIN kurzer deutscher Satz (höchstens 15 Wörter) mit dem Ergebnis. "
-             "Kein Markdown.")
+             "Kein Markdown. TEMPO: Sofort loslegen statt lange planen oder alte Dateien/Logs studieren – höchstens 2–3 kurze "
+             "Blicke zum Orientieren, dann handeln; Larsen sieht dein Hologramm und will Fortschritt sehen. MINECRAFT-BAUEN: in "
+             "≤ 1 Minute den ersten Block setzen. Ablauf: Teleport + Chat-Nachricht, Abriss mit EINEM großen /fill … air, dann den Bau "
+             "Abschnitt für Abschnitt (Boden → Wände → Dach → Innen → Technik) jeweils als Datei per minecraft.ps1 -Datei; nach jedem "
+             "Abschnitt kurz per aufgabe.ps1 melden. Redstone/Technik (Sortierer usw.) erst NACH dem Rohbau bauen und dann testen.")
 
 
 def umlaute(v):
@@ -2497,7 +2501,7 @@ def say_when_free(text):
 def run_task(tid, auftrag):
     cfg = load_cfg()
     args = [find_claude(), "-p", "--output-format", "stream-json", "--verbose", "--model", cfg["modell"],
-            "--permission-mode", "auto", "--append-system-prompt", BG_REGELN]
+            "--permission-mode", "auto", "--effort", "medium", "--append-system-prompt", BG_REGELN]   # medium: zügig statt ewig grübeln
     ordner = cfg["ordner"] if os.path.isdir(cfg["ordner"]) else os.path.expanduser("~")
     env = {k: v for k, v in os.environ.items() if k not in CLAUDE_ENV_DROP}
     env["ORB_RUN"] = "1"
