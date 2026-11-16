@@ -99,6 +99,11 @@
      "name": "KI-Stimme lokal",
      "text": "Sehr echte deutsche Stimmen (Thorsten, Lina) auf deiner Grafikkarte – kostenlos, ohne Limit, auch kommerziell.",
      "beispiel": "Einstellungen → Stimme → KI-Stimme Thorsten"
+    },
+    {
+     "name": "Ins Online-Seminar",
+     "text": "Öffnet KATI in Opera GX, geht in deinen Kurs, schaltet Mikro und Kamera aus und erbittet die Teilnahme.",
+     "beispiel": "Jarvis, mach mich ins Meeting"
     }
    ]
   },
