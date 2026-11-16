@@ -1,1 +1,1 @@
-130|Hintergrund-Aufgaben und Bau-Agent legen sofort los statt lange zu planen
+131|Agenten arbeiten schneller und prüfen ihr Ergebnis selbst, Bauten mit Vorschau

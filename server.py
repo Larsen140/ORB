@@ -71,7 +71,7 @@ DEFAULT_CFG = {
 }
 # Damit ORB immer dein Claude-Code-Login (Max-Abo) nutzt und nie einen API-Schlüssel
 CLAUDE_ENV_DROP = ("ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "ANTHROPIC_BASE_URL")
-VERSION = "130"
+VERSION = "131"
 ORB_UI = ("Deine Oberfläche (die Larsen gerade sieht): in der Mitte du als flüssige leuchtende Kugel mit Tropfen, "
           "Orbit-Ringen und Sternenhimmel; links eine Uhr und darunter der Gesprächsverlauf mit Eingabefeld; rechts "
           "Karten für System (CPU, RAM, Akku), Wetter mit Stundenvorschau, Aktivität (was du gerade tust) und Vorschläge; "
@@ -1885,11 +1885,16 @@ BG_REGELN = ("Du erledigst für ORB, Larsens Sprachassistenten, eine Aufgabe im 
              "Arbeite selbstständig und vollständig, ohne Rückfragen. Lege längere Ergebnisse (Recherchen, Listen, Texte) als "
              "Markdown-Datei in C:\\Users\\larse\\Documents\\Jarvis\\ergebnisse an. Ändere nichts am ORB-Programm. "
              "Deine letzte Antwort wird laut vorgelesen: EIN kurzer deutscher Satz (höchstens 15 Wörter) mit dem Ergebnis. "
-             "Kein Markdown. TEMPO: Sofort loslegen statt lange planen oder alte Dateien/Logs studieren – höchstens 2–3 kurze "
-             "Blicke zum Orientieren, dann handeln; Larsen sieht dein Hologramm und will Fortschritt sehen. MINECRAFT-BAUEN: in "
-             "≤ 1 Minute den ersten Block setzen. Ablauf: Teleport + Chat-Nachricht, Abriss mit EINEM großen /fill … air, dann den Bau "
-             "Abschnitt für Abschnitt (Boden → Wände → Dach → Innen → Technik) jeweils als Datei per minecraft.ps1 -Datei; nach jedem "
-             "Abschnitt kurz per aufgabe.ps1 melden. Redstone/Technik (Sortierer usw.) erst NACH dem Rohbau bauen und dann testen.")
+             "Kein Markdown. TEMPO: Sofort loslegen statt lange planen oder alte Dateien/Logs studieren – höchstens 2–3 kurze Blicke "
+             "zum Orientieren, dann handeln. Melde Fortschritt nach jedem Teilschritt per aufgabe.ps1 (Larsen sieht dein Hologramm). "
+             "Unabhängige Schritte (mehrere Suchen, Downloads, Dateien) parallel erledigen. QUALITÄT: Ergebnis am Ende selbst prüfen "
+             "(Bildschirm: %LOCALAPPDATA%\\ORB\\screen\\live.png ansehen, Dateien öffnen, Befehle testen) und Fehler sofort beheben, "
+             "bevor du fertig meldest. MINECRAFT-BAUEN: 1) Entwurf als Blöcke-JSON schreiben (Format in Jarvis/CLAUDE.md, Punkt Bau-Ideen; "
+             "schön: Fundament mit Rand, Wände mit Säulen aus anderem Material, Fensterreihen, gestuftes überstehendes Dach, Beleuchtung, "
+             "Pflanzen/Wege drumherum, 2–3 Materialien pro Bau), 2) `bauvorschau.py zeigen <json>` und das Vorschaubild mit Read ANSEHEN "
+             "– sieht es langweilig/kaputt aus, verbessern und neu zeigen, 3) Teleport an einen Zuschauerpunkt + Chat-Nachricht, Abriss "
+             "mit einem großen /fill … air, dann `bauvorschau.py bauen 1` (baut genau die Vorschau). Erster Block nach spätestens 2 Min. "
+             "Redstone/Technik (Sortierer usw.) erst NACH dem Rohbau bauen und im Spiel testen.")
 
 
 def umlaute(v):
