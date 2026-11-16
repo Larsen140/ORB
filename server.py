@@ -71,7 +71,7 @@ DEFAULT_CFG = {
 }
 # Damit ORB immer dein Claude-Code-Login (Max-Abo) nutzt und nie einen API-Schlüssel
 CLAUDE_ENV_DROP = ("ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "ANTHROPIC_BASE_URL")
-VERSION = "115"
+VERSION = "116"
 ORB_UI = ("Deine Oberfläche (die Larsen gerade sieht): in der Mitte du als flüssige leuchtende Kugel mit Tropfen, "
           "Orbit-Ringen und Sternenhimmel; links eine Uhr und darunter der Gesprächsverlauf mit Eingabefeld; rechts "
           "Karten für System (CPU, RAM, Akku), Wetter mit Stundenvorschau, Aktivität (was du gerade tust) und Vorschläge; "
@@ -678,8 +678,30 @@ def read_state():
 _state_lock = threading.Lock()
 
 
+# ---------- Stiller Skin-Modus: beim gemeinsamen Skin-Bauen nicht sprechen, bis Larsen „wir sind fertig“ sagt ----------
+SKIN_STILL = {"an": False, "zeit": 0.0}
+SKIN_WORT = re.compile(r"\bskin", re.I)
+SKIN_FERTIG = re.compile(r"\b(wir\s+sind|ich\s+bin|sind\s+wir)\s+fertig\b", re.I)
+
+
+def skin_still(an=None):
+    """Abfragen (an=None), einschalten (True, frischt auch die Zeit auf) oder ausschalten (False). Nach 30 Min. ohne
+    Skin-Tätigkeit schaltet er sich von selbst ab, damit ORB nie dauerhaft stumm bleibt."""
+    if an is True:
+        if not SKIN_STILL["an"]:
+            print("Skin-Modus: still")
+        SKIN_STILL.update(an=True, zeit=time.time())
+    elif an is False:
+        SKIN_STILL["an"] = False
+    elif SKIN_STILL["an"] and time.time() - SKIN_STILL["zeit"] > 1800:
+        SKIN_STILL["an"] = False
+    return SKIN_STILL["an"]
+
+
 def write_state(**kw):
     """Zustand schreiben – mit Lock (mehrere Threads) und Wiederholung, falls Windows die Datei kurz sperrt."""
+    if not kw.pop("laut", False) and kw.get("parts") and skin_still():
+        kw["parts"] = []   # Skin-Modus: Text nur anzeigen, nicht vorlesen
     with _state_lock:
         st = read_state()
         st.update(kw)
@@ -1286,6 +1308,10 @@ class Brain:
                             "Bildschirm betrifft.]\n" % os.path.join(os.environ.get("LOCALAPPDATA", ""), "ORB", "screen", "bildschirm.png")) + text
                 except Exception as e:
                     print("Screenshot:", e)
+            if skin_still():
+                text = ("[Stiller Skin-Modus: Larsen will beim Skin-Bauen keine gesprochenen Antworten, bis er „wir sind "
+                        "fertig“ sagt. Arbeite normal weiter (Skin bauen/ändern, 3D-Hologramm aktualisieren) und antworte "
+                        "nur mit einem Wort wie „Okay.“ – nichts erklären.]\n" + text)
             if kamera_aktiv():
                 text = ("[Kamera ist an – Standbild nur auf ausdrückliche Frage über kamera.ps1. Gezeigtes erscheint in der "
                         "Kamera-Ansicht, Widgets/3D-Objekte über kamera_zeigen.ps1.]\n" + text)
@@ -1323,7 +1349,8 @@ class Brain:
             self.full = (self.full + " " + said).strip()
             write_state(say=self.full, parts=list(self.spoken), aid=self.aid, final=final,
                         **({} if read_state().get("mode") == "auftrag" else {"mode": "spricht"}))
-            ensure((self.aid, len(self.spoken) - 1), said)  # Stimme sofort vorbereiten
+            if not skin_still():
+                ensure((self.aid, len(self.spoken) - 1), said)  # Stimme sofort vorbereiten
         elif final:
             write_state(final=True)
 
@@ -1405,6 +1432,12 @@ BRAIN = Brain()
 
 
 def ask(text):
+    if skin_still() and SKIN_FERTIG.search(text):   # Skin-Arbeit beendet: wieder normal sprechen
+        skin_still(False)
+        write_answer("Alles klar, ich rede wieder.", heard=text, laut=True)
+        return True
+    if SKIN_WORT.search(text):
+        skin_still(True)
     try:
         local = try_local(text)
     except Exception as e:
@@ -2737,6 +2770,7 @@ class Handler(BaseHTTPRequestHandler):
             c = load_cfg()
             self.send(200, {"config": c, "stimmen": STIMMEN})
         elif u.path == "/skin3d":   # drehbare 3D-Vorschau eines Minecraft-Skins (skinview3d)
+            skin_still(True)   # Skin-Vorschau offen: gemeinsames Skin-Bauen läuft
             n = re.sub(r"[^A-Za-z0-9_-]", "", q.get("n", ""))[:60]   # Großbuchstaben erlaubt (z. B. „Larscraft17-aktuell“)
             seite = ("<!doctype html><meta charset=utf-8><style>html,body{margin:0;height:100%;background:#0b0f1c;overflow:hidden}"
                      "canvas{display:block}</style><canvas id=c></canvas>"
