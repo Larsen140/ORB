@@ -229,14 +229,50 @@ def show(wake=False, hidden=False):
         threading.Thread(target=hide_hidden_soon, daemon=True).start()
 
 
+def spiel_mini_oeffnen():
+    """Im Spiel: ORB als kleine Kugel mit Mini-Hologramm unten rechts, immer obenauf – OHNE dem Spiel den Fokus zu klauen."""
+    u = ctypes.windll.user32
+    spiel_fenster = u.GetForegroundWindow()
+    if window_open() or window_process_running():
+        hide_window()                       # großes (Vollbild-)Fenster lässt sich nicht verkleinern → zu und klein neu öffnen
+        time.sleep(1.2)
+    browser = find_browser()
+    if not browser:
+        return
+    sw, sh = u.GetSystemMetrics(0), u.GetSystemMetrics(1)
+    w, h = 360, 600
+    x, y = sw - w - 14, sh - h - 56
+    profile = os.path.join(os.environ.get("LOCALAPPDATA", os.path.expanduser("~")), "ORB", "fenster")
+    _win["opened"] = time.time()
+    subprocess.Popen([browser, "--app=" + URL + "/#spiel", "--user-data-dir=" + profile, "--window-size=%d,%d" % (w, h),
+                      "--window-position=%d,%d" % (x, y)] + LEAN)
+    for _ in range(80):                     # Fenster abwarten, dann sofort Fokus zurück ans Spiel
+        time.sleep(0.1)
+        hs = orb_windows()
+        if hs:
+            for hw in hs:
+                u.SetWindowPos(hw, -1, x, y, w, h, 0x10 | 0x40)   # TOPMOST, nicht aktivieren
+            u.keybd_event(0x12, 0, 0, 0); u.keybd_event(0x12, 0, 2, 0)
+            u.SetForegroundWindow(spiel_fenster)
+            break
+
+
 def spiel_wache():
-    """Startet ein Spiel, schließt ORB sein Fenster (gibt GPU/RAM frei) – außer Larsen redet gerade mit ihm."""
-    vorher = ""
+    """Spiel gestartet → ORB wird zur kleinen Kugel mit Mini-Hologramm (Einstellung „spiel_mini“), sonst wie früher ausblenden.
+    Spiel beendet → Mini-Fenster zu, ORB wartet wieder im Hintergrund (Klatschen holt ihn groß)."""
+    vorher, mini_an = "", False
     while True:
         time.sleep(8)
         try:
             spiel = server.spiel_laeuft()
-            if spiel and not vorher and window_open() and time.time() - server.LAST_ACTIVE[0] > 20:
+            if spiel and not vorher and server.load_cfg().get("spiel_mini", True) and time.time() - server.LAST_ACTIVE[0] > 20:
+                server.log_close("Gaming-Modus: %s gestartet – Mini-ORB" % spiel)
+                spiel_mini_oeffnen()
+                mini_an = True
+            elif not spiel and vorher and mini_an:
+                mini_an = False
+                hide_window()
+            elif spiel and not vorher and window_open() and time.time() - server.LAST_ACTIVE[0] > 20:
                 server.log_close("Gaming-Modus: %s gestartet" % spiel)
                 if spiel == "Minecraft":
                     hide_window(keep=True)   # nur ausblenden: ORB hört weiter auf „Jarvis“ und steuert das Spiel

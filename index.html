@@ -1,6 +1,7 @@
 <!doctype html>
 <html lang="de">
 <head>
+<script>if (location.hash === '#spiel') document.documentElement.classList.add('spiel');</script>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>ORB</title>
@@ -374,6 +375,16 @@
   #miniback { display:none; position:fixed; top:8px; right:8px; z-index:40; width:30px; height:30px; border-radius:50%; border:0;
     background:rgba(255,255,255,.12); color:#fff; font-size:15px; cursor:pointer; backdrop-filter:blur(6px); }
   body.mini #miniback { display:block; }
+  /* Spiel-Modus: kleine Kugel + das neueste Hologramm kompakt darüber */
+  html.spiel body.mini #karten { display:flex !important; flex-direction:column; justify-content:flex-start; gap:6px;
+    inset:8px 8px auto 8px; max-height:52vh; overflow:hidden; opacity:.94; }
+  html.spiel body.mini .karte { position:relative !important; left:auto !important; top:auto !important; right:auto !important; bottom:auto !important;
+    width:auto !important; height:auto !important; max-height:52vh; min-width:0; min-height:0; resize:none; transform:none !important; border-radius:18px; }
+  html.spiel body.mini .karte:not(:last-child) { display:none; }
+  html.spiel body.mini .karte .kh { padding:10px 10px 6px 14px; cursor:default; }
+  html.spiel body.mini .karte .kb { padding:4px 14px 12px; gap:8px; font-size:12.5px; }
+  html.spiel body.mini .karte .b-titel { font-size:16px; }
+  html.spiel body.mini #caption { bottom:8px !important; }
   /* Freie Hologramme (holo.ps1): beliebig viele, verschiebbar, Größe per Ecke */
   #karten { position:fixed; inset:0; z-index:6; pointer-events:none; }
   .karte { --hl:rgb(var(--c3)); --hgt:color-mix(in srgb, var(--hl) 11%, transparent); --hgg:color-mix(in srgb, var(--hl) 13%, transparent); --hgk:color-mix(in srgb, var(--hl) 75%, transparent);

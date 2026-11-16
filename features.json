@@ -562,6 +562,11 @@
      "name": "Minecraft-Modus",
      "text": "Bei Minecraft versteckt sich ORB, hört aber weiter auf „Jarvis“.",
      "beispiel": "Minecraft starten"
+    },
+    {
+     "name": "Mini-ORB im Spiel",
+     "text": "Startest du ein Spiel, wird ORB zur kleinen Kugel unten rechts mit Mini-Hologramm, ohne dein Spiel zu stören.",
+     "beispiel": "Jarvis, wo finde ich Diamanten?"
     }
    ]
   },
