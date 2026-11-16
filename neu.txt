@@ -1,1 +1,1 @@
-135|ORB kann dir Bilder und Dateien per Telegram schicken
+136|Telegram zeigt live, woran ORB gerade arbeitet

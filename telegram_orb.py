@@ -83,12 +83,18 @@ def antworten_weiterleiten(token, chat):
     """Jede fertige Antwort von ORB (auch spätere Ergebnisse von Hintergrund-Aufgaben) geht aufs Handy,
     solange Larsen in den letzten 15 Min. per Telegram geschrieben hat – als Text und mit ORBs Stimme."""
     zuletzt = None
+    stat = {"id": None, "text": "", "t": 0.0}
     while True:
         time.sleep(1)
         try:
             st = json.loads(orb("/state"))
         except Exception:
             continue
+        if time.time() - aktiv["t"] < 900:
+            try:
+                status_melden(token, chat, st, stat)
+            except Exception as e:
+                log("Status:", e)
         kennung = (st.get("aid"), st.get("say"))
         if zuletzt is None:
             zuletzt = kennung
@@ -100,6 +106,12 @@ def antworten_weiterleiten(token, chat):
             continue
         text = st["say"]
         try:
+            if stat["id"] and not laufende(st):   # Statusmeldung abschließen, Antwort kommt darunter
+                try:
+                    tg(token, "editMessageText", {"chat_id": chat, "message_id": stat["id"], "text": "✅ Erledigt"})
+                except Exception:
+                    pass
+                stat.update(id=None, text="")
             tg(token, "sendMessage", {"chat_id": chat, "text": text})
             stimme = b""
             for i in range(len(st.get("parts") or [])):   # ORBs Sprech-Stücke (MP3) aneinanderhängen
@@ -111,6 +123,36 @@ def antworten_weiterleiten(token, chat):
                 tg(token, "sendVoice", {"chat_id": chat}, ("voice", "orb.mp3", stimme, "audio/mpeg"), timeout=60)
         except Exception as e:
             log("Antwort senden:", e)
+
+
+def laufende(st):
+    return [a for a in (st.get("aufgaben") or []) if a.get("status") == "laeuft"]
+
+
+def status_melden(token, chat, st, stat):
+    """Was ORB gerade tut (Gedanke/Werkzeug + Hintergrund-Aufgaben mit aktuellem Schritt) als EINE Nachricht,
+    die laufend aktualisiert wird – statt Larsen mit vielen Nachrichten zu fluten."""
+    zeilen = []
+    if st.get("mode") in ("denkt", "auftrag"):
+        was = (st.get("task") or "denkt nach").strip()
+        if st.get("detail"):
+            was += ": " + str(st["detail"]).strip()
+        zeilen.append("⏳ ORB " + was[:200])
+    for a in laufende(st):
+        p = (" (%d %%)" % a["prozent"]) if a.get("prozent") else ""
+        zeilen.append("🔧 %s%s – %s" % (a.get("titel", "Aufgabe"), p, (a.get("schritt") or "läuft")[:160]))
+    text = chr(10).join(zeilen)
+    if not text or text == stat["text"] or time.time() - stat["t"] < 3:
+        return
+    stat.update(text=text, t=time.time())
+    if stat["id"]:
+        try:
+            tg(token, "editMessageText", {"chat_id": chat, "message_id": stat["id"], "text": text})
+            return
+        except Exception:
+            pass
+    r = tg(token, "sendMessage", {"chat_id": chat, "text": text, "disable_notification": "true"})
+    stat["id"] = r.get("result", {}).get("message_id")
 
 
 def sprache_zu_text(token, file_id):
