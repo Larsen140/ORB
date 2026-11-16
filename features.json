@@ -104,6 +104,26 @@
      "name": "Ins Online-Seminar",
      "text": "Öffnet KATI in Opera GX, geht in deinen Kurs, schaltet Mikro und Kamera aus und erbittet die Teilnahme.",
      "beispiel": "Jarvis, mach mich ins Meeting"
+    },
+    {
+     "name": "Stopp & Unterbrechen",
+     "text": "„Stopp“, „hör auf“ oder „Jarvis“ unterbricht ORB sofort, auch mitten im Satz.",
+     "beispiel": "Jarvis, stopp"
+    },
+    {
+     "name": "Bildschirm sehen",
+     "text": "ORB schaut auf deinen Bildschirm und erklärt, was da ist.",
+     "beispiel": "Jarvis, was steht da?"
+    },
+    {
+     "name": "Kurze Antworten",
+     "text": "Spricht nur einen kurzen Satz – Details kommen als Hologramm.",
+     "beispiel": "läuft automatisch"
+    },
+    {
+     "name": "Immer Opera GX",
+     "text": "Webseiten öffnet ORB immer in deinem Opera GX.",
+     "beispiel": "Jarvis, öffne YouTube"
     }
    ]
   },
@@ -201,6 +221,11 @@
      "name": "Gesten-Hilfe",
      "text": "Zeigt alle Gesten auf einen Blick.",
      "beispiel": "Jarvis, Kamera-Hilfe"
+    },
+    {
+     "name": "Handzeichen",
+     "text": "✋ zuhören, ✊ Stopp, 👎 ORB weg, 👍 Ja auf ORBs Frage.",
+     "beispiel": "Hand heben"
     }
    ]
   },
@@ -305,6 +330,11 @@
      "name": "Higgsfield-Clips",
      "text": "Echte KI-Videoclips (kostet Credits) – nur auf ausdrücklichen Wunsch, mit Kostenhinweis.",
      "beispiel": "Jarvis, mach den Hook mit Higgsfield"
+    },
+    {
+     "name": "Trend-Ideen",
+     "text": "Sammelt aktuelle Trends und schlägt passende Video-Ideen vor.",
+     "beispiel": "Jarvis, was läuft gerade auf TikTok?"
     }
    ]
   },
@@ -397,6 +427,26 @@
      "name": "Skins bearbeiten & Pixel-genau",
      "text": "Jede Figur Pixel für Pixel – auch bekannte; vorhandene Skins ändern, Original bleibt.",
      "beispiel": "Jarvis, gib meinem Skin ein Omnitrix"
+    },
+    {
+     "name": "Skin-KI",
+     "text": "Echte, auf Minecraft-Skins trainierte KI – jede Figur, 4 Varianten, ORB prüft und bessert nach.",
+     "beispiel": "Jarvis, mach mir einen Spider-Man-Skin"
+    },
+    {
+     "name": "Skins umfärben",
+     "text": "Farben auf beiden Schichten tauschen, Schatten bleiben.",
+     "beispiel": "Jarvis, mach das Weiße weinrot"
+    },
+    {
+     "name": "3D-Schicht",
+     "text": "Keine flachen Skins: Haare und Kleidung stehen in 3D ab.",
+     "beispiel": "läuft automatisch"
+    },
+    {
+     "name": "Eigene Skins in 3D",
+     "text": "Zeigt Skins aus deinem Ordner als drehbare 3D-Figur.",
+     "beispiel": "Jarvis, zeig mir meinen Skin"
     }
    ]
   },
@@ -486,6 +536,11 @@
      "name": "Einstellungen ändern",
      "text": "Werte der Casino-Spiele anpassen.",
      "beispiel": "Stell das Glücksrad auf mehr Gewinne"
+    },
+    {
+     "name": "Code ändern",
+     "text": "Neue Spiele oder Funktionen für die World auf Zuruf.",
+     "beispiel": "Jarvis, bau in die World ein neues Spiel"
     }
    ]
   },
@@ -507,6 +562,37 @@
      "name": "Minecraft-Modus",
      "text": "Bei Minecraft versteckt sich ORB, hört aber weiter auf „Jarvis“.",
      "beispiel": "Minecraft starten"
+    }
+   ]
+  },
+  {
+   "name": "ORB selbst",
+   "icon": "🛠",
+   "features": [
+    {
+     "name": "Neue Funktionen auf Zuruf",
+     "text": "Wünsche für ORB gehen an den Entwickler – mit eigenem Fortschritts-Hologramm.",
+     "beispiel": "Jarvis, bau dir ein Wetter-Widget"
+    },
+    {
+     "name": "Große Projekte",
+     "text": "Apps, Websites, Spiele baut der Projekt-Entwickler im Hintergrund.",
+     "beispiel": "Jarvis, bau mir eine Website für …"
+    },
+    {
+     "name": "Automatische Updates",
+     "text": "Holt sich neue Versionen selbst von GitHub – nie mitten im Gespräch.",
+     "beispiel": "läuft automatisch"
+    },
+    {
+     "name": "Sicherungen",
+     "text": "Sichert sich und deine Wissensbasis täglich, setzt bei Fehlern zurück.",
+     "beispiel": "läuft automatisch"
+    },
+    {
+     "name": "Was Jarvis kann",
+     "text": "Dieses Widget – durchsuchbar, immer aktuell.",
+     "beispiel": "Funktion suchen …"
     }
    ]
   }
