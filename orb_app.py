@@ -10,6 +10,11 @@ import time
 import urllib.request
 import webbrowser
 
+from ctypes import wintypes as _wt
+# 64-Bit: ohne Typangaben kommt HWND_TOPMOST (-1) falsch an und Windows lehnt SetWindowPos still ab (Mini-Kugel blieb groß)
+ctypes.windll.user32.SetWindowPos.argtypes = [_wt.HWND, _wt.HWND, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_uint]
+ctypes.windll.user32.SetWindowPos.restype = _wt.BOOL
+
 import server
 
 URL = "http://127.0.0.1:%d" % server.PORT
@@ -286,19 +291,42 @@ def spiel_mini_oeffnen():
     _win["opened"] = time.time()
     subprocess.Popen([browser, "--app=" + URL + "/#spiel", "--user-data-dir=" + profile, "--window-size=%d,%d" % (w, h),
                       "--window-position=%d,%d" % (x, y)] + LEAN)
-    for _ in range(80):                     # Fenster abwarten, dann sofort Fokus zurück ans Spiel
+    for _ in range(80):                     # Fenster abwarten
         time.sleep(0.1)
-        hs = orb_windows()
-        if hs:
-            time.sleep(0.4)
-            for hw in orb_windows():
-                if u.IsZoomed(hw):
-                    u.ShowWindow(hw, 4)            # Profil merkt sich „maximiert“ → erst wiederherstellen (ohne Aktivieren)
-                u.SetWindowPos(hw, -1, x, y, w, h, 0x10 | 0x40)   # TOPMOST, nicht aktivieren
-            if spiel_fenster and spiel_fenster not in orb_windows():
-                u.keybd_event(0x12, 0, 0, 0); u.keybd_event(0x12, 0, 2, 0)
-                u.SetForegroundWindow(spiel_fenster)
+        if orb_windows():
             break
+    mini_setzen(8)
+    if spiel_fenster and spiel_fenster not in orb_windows():   # Fokus zurück ans Spiel
+        u.keybd_event(0x12, 0, 0, 0); u.keybd_event(0x12, 0, 2, 0)
+        u.SetForegroundWindow(spiel_fenster)
+
+
+def mini_platz():
+    u = ctypes.windll.user32
+    sw, sh = u.GetSystemMetrics(0), u.GetSystemMetrics(1)
+    w, h = 360, 600
+    return sw - w - 14, sh - h - 56, w, h
+
+
+def mini_setzen(sekunden=3):
+    """ORB-Fenster als Mini-Kugel unten rechts festhalten (immer obenauf, ohne zu aktivieren) – mehrmals, weil Edge
+    nach dem Laden seine gespeicherte Größe wiederherstellt."""
+    u = ctypes.windll.user32
+    x, y, w, h = mini_platz()
+    ende = time.time() + sekunden
+    while time.time() < ende:
+        for hw in orb_windows():
+            if u.IsZoomed(hw):
+                u.ShowWindow(hw, 4)
+            u.SetWindowPos(hw, -1, x, y, w, h, 0x10 | 0x40)
+        time.sleep(0.3)
+
+
+def ist_mini(hw):
+    u = ctypes.windll.user32
+    r = (ctypes.c_long * 4)()
+    u.GetWindowRect(hw, ctypes.byref(r))
+    return r[2] - r[0] < 500 and r[3] - r[1] < 700
 
 
 def spiel_wache():
@@ -320,12 +348,14 @@ def spiel_wache():
                 # Während des Spiels groß geworden (Klatschen, Neustart, Update) und 1 Min. nicht benutzt → zurück zur Mini-Kugel
                 u = ctypes.windll.user32
                 for hw in orb_windows():
-                    r = (ctypes.c_long * 4)()
-                    u.GetWindowRect(hw, ctypes.byref(r))
-                    if u.IsWindowVisible(hw) and r[2] - r[0] > 600:
-                        server.log_close("Gaming-Modus: zurück zur Mini-Kugel")
+                    if not u.IsWindowVisible(hw) or ist_mini(hw):
+                        continue
+                    mini_setzen(2)
+                    if not ist_mini(hw) and time.time() - _win.get("spiel_neu", 0) > 120:   # Vollbild lässt sich nicht verkleinern
+                        _win["spiel_neu"] = time.time()
+                        server.log_close("Gaming-Modus: Vollbild → Mini-Kugel neu geöffnet")
                         spiel_mini_oeffnen()
-                        break
+                    break
             elif spiel and not vorher and window_open() and time.time() - server.LAST_ACTIVE[0] > 20:
                 server.log_close("Gaming-Modus: %s gestartet" % spiel)
                 if spiel == "Minecraft":
