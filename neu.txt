@@ -1,1 +1,1 @@
-140|Protokolle laufen wieder, Fehlersuche für die Stimme
+141|Stimme wieder an: Taste M schaltet sie nicht mehr dauerhaft stumm, Hinweis wenn sie aus ist

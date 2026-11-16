@@ -1397,7 +1397,8 @@ function renderGL(t, cx, cy, R, speaking) {
 let ac = null, analyser, outGain, sfxGain, freq, tdata, amb = null, lastSfx = 0;
 let micAn = null, micData = null, micTime = null, micSrc = null;
 let voiceOn = true;
-try { voiceOn = localStorage.getItem('orbVoice') !== '0'; } catch (e) {}
+// neuer Schlüssel: der alte („orbVoice“) konnte per versehentlichem Tastendruck „M“ dauerhaft auf stumm stehen
+try { voiceOn = localStorage.getItem('orbStimme') !== '0'; localStorage.removeItem('orbVoice'); } catch (e) {}
 function initAudio() {
   if (!ac) {
     ac = new (window.AudioContext || window.webkitAudioContext)({ latencyHint:'interactive' });
@@ -1655,7 +1656,10 @@ async function fetchPart(aid, i, text) {
     try { const r = await fetch(`/tts?aid=${encodeURIComponent(aid)}&i=${i}`); if (r.ok) buf = await prepVoice(await ac.decodeAudioData(await r.arrayBuffer()), text); else fehler = 'Server ' + r.status; }
     catch (e) { fehler = String(e && e.message || e); }
     if (!buf && aid === curAid) hlog('Stimme fehlt (Stück ' + i + '): ' + (fehler || 'leer'));
-  } else if (aid === curAid) hlog('Stimme nicht abgespielt: ' + (voiceOn ? 'Audio ' + (ac ? ac.state : 'fehlt') : 'Stimme ausgeschaltet (Taste M)'));
+  } else if (aid === curAid) {
+    hlog('Stimme nicht abgespielt: ' + (voiceOn ? 'Audio ' + (ac ? ac.state : 'fehlt') : 'Stimme ausgeschaltet'));
+    if (!voiceOn && i === 0) hint('Stimme ist aus – Taste M oder Einstellungen', 3000);
+  }
   if (aid !== curAid || aid === mutedAid) return;
   pending[i] = { buf, text }; scheduleReady();
 }
@@ -4579,7 +4583,11 @@ function drawFx(t, dt, now, cx, cy, R, speaking) {
 $('start').onclick = () => { initAudio(); $('start').remove(); startup(); };
 function autoStart() { if (audioOk() && $('start')) { $('start').remove(); startup(); } }
 try { initAudio(); ac.addEventListener('statechange', autoStart); setTimeout(autoStart, 250); setTimeout(autoStart, 1500); } catch (e) {}
-function setVoice(on) { voiceOn = on; try { localStorage.setItem('orbVoice', on ? '1' : '0'); } catch (e) {} if (!on) stopAudio(); syncSettingsUI(); }
+// dauerhaft nur über den Schalter in den Einstellungen; Taste M schaltet nur bis zum nächsten Neustart (sichtbar per Hinweis)
+function setVoice(on, dauerhaft = true) {
+  voiceOn = on; if (dauerhaft) try { localStorage.setItem('orbStimme', on ? '1' : '0'); } catch (e) {}
+  if (!on) stopAudio(); syncSettingsUI(); hint(on ? 'Stimme an' : 'Stimme aus – Taste M schaltet sie wieder an', 2500);
+}
 function toggleFs() { SFX.click(); document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen().catch(() => {}); }
 $('kb').onclick = () => { SFX.click(); $('txt').focus(); };
 $('gear').onclick = () => toggleSettings();
@@ -4612,7 +4620,7 @@ addEventListener('keydown', e => {
     else if (convo) stopConvo();
   }
   if (k === 'f') toggleFs();
-  if (k === 'm') setVoice(!voiceOn);
+  if (k === 'm') setVoice(!voiceOn, false);
   if (k === 't') { e.preventDefault(); $('txt').focus(); }
   if (k === 'e') toggleSettings();
   if (k === 's') stoppKnopf();
