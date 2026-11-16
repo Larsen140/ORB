@@ -94,6 +94,11 @@
      "name": "Ideen sammeln",
      "text": "Sortiert Ideen in Listen (Video, Trading, ORB …) und erinnert dich später daran.",
      "beispiel": "Jarvis, merk dir: Video über Ferraris im Regen"
+    },
+    {
+     "name": "KI-Stimme lokal",
+     "text": "Sehr echte deutsche Stimmen (Thorsten, Lina) auf deiner Grafikkarte – kostenlos, ohne Limit, auch kommerziell.",
+     "beispiel": "Einstellungen → Stimme → KI-Stimme Thorsten"
     }
    ]
   },

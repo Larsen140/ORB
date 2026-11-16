@@ -137,6 +137,34 @@ def ohr_wache():
         time.sleep(10)
 
 
+STIMME_PY = os.path.join(os.environ.get("LOCALAPPDATA", ""), "ORB", "stimme", "venv", "Scripts", "pythonw.exe")
+
+
+def stimme_wache():
+    """Startet die lokale KI-Stimme (stimme.py), wenn eine lokale Stimme gewählt ist, und hält sie am Laufen."""
+    p = None
+    try:
+        import psutil
+        for q in psutil.process_iter(["name", "cmdline"]):
+            if (q.info["name"] or "").lower() in ("pythonw.exe", "python.exe") and any("stimme.py" in c for c in (q.info["cmdline"] or [])):
+                q.kill()   # Rest eines vorherigen ORB
+    except Exception:
+        pass
+    while True:
+        try:
+            an = str(server.load_cfg().get("stimme", "")).startswith("lokal:") and os.path.exists(STIMME_PY)
+            skript = os.path.join(os.path.dirname(os.path.abspath(server.__file__)), "stimme.py")
+            if an and (p is None or p.poll() is not None) and os.path.exists(skript):
+                p = subprocess.Popen([STIMME_PY, skript], creationflags=0x08000000)
+                server.OHR["stimme_pid"] = p.pid
+            elif not an and p is not None and p.poll() is None:
+                p.kill()
+                p = None
+        except Exception as e:
+            print("Stimme:", e)
+        time.sleep(10)
+
+
 def hide_hidden_soon():
     """Gerade gestartetes Fenster sofort ausblenden (Start im Hintergrund, damit „Jarvis“ trotzdem zuhört)."""
     end = time.time() + 20
@@ -662,6 +690,7 @@ def main():
     threading.Thread(target=server.pc_wache, daemon=True).start()      # warnt bei vollem RAM/Platte, heißer GPU
     threading.Thread(target=server.musik_logger, daemon=True).start()  # Musikgeschmack für den Spotify-DJ
     threading.Thread(target=ohr_wache, daemon=True).start()            # lokales Ohr: „Hey Jarvis“ + Whisper
+    threading.Thread(target=stimme_wache, daemon=True).start()         # lokale KI-Stimme (Chatterbox)
     threading.Thread(target=update_loop, daemon=True).start()
     threading.Thread(target=announce_update, daemon=True).start()
     threading.Thread(target=backup_jarvis, daemon=True).start()

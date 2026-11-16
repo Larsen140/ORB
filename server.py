@@ -49,6 +49,8 @@ TOKEN_FILE = os.path.join(os.environ.get("LOCALAPPDATA", os.path.expanduser("~")
 ERLAUBTE_HOSTS = ("127.0.0.1:%d" % PORT, "localhost:%d" % PORT)
 
 STIMMEN = [
+    ["lokal:thorsten", "KI-Stimme Thorsten (lokal, männlich, sehr echt)"],
+    ["lokal:standard", "KI-Stimme Lina (lokal, weiblich)"],
     ["de-DE-FlorianMultilingualNeural", "Florian (männlich, sehr natürlich)"],
     ["de-DE-SeraphinaMultilingualNeural", "Seraphina (weiblich, sehr natürlich)"],
     ["de-DE-ConradNeural", "Conrad (männlich)"],
@@ -69,7 +71,7 @@ DEFAULT_CFG = {
 }
 # Damit ORB immer dein Claude-Code-Login (Max-Abo) nutzt und nie einen API-Schlüssel
 CLAUDE_ENV_DROP = ("ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "ANTHROPIC_BASE_URL")
-VERSION = "112"
+VERSION = "113"
 ORB_UI = ("Deine Oberfläche (die Larsen gerade sieht): in der Mitte du als flüssige leuchtende Kugel mit Tropfen, "
           "Orbit-Ringen und Sternenhimmel; links eine Uhr und darunter der Gesprächsverlauf mit Eingabefeld; rechts "
           "Karten für System (CPU, RAM, Akku), Wetter mit Stundenvorschau, Aktivität (was du gerade tust) und Vorschläge; "
@@ -542,8 +544,9 @@ def clean_exit(grund):
     """Gewolltes Beenden: protokollieren, Markierung entfernen, Prozess sofort beenden."""
     log_close(grund)
     mark_running(False)
-    if OHR.get("pid"):   # lokales Ohr mitbeenden
-        subprocess.run(["taskkill", "/F", "/PID", str(OHR["pid"])], capture_output=True, creationflags=NO_WINDOW)
+    for k in ("pid", "stimme_pid"):   # lokales Ohr und KI-Stimme mitbeenden
+        if OHR.get(k):
+            subprocess.run(["taskkill", "/F", "/PID", str(OHR[k])], capture_output=True, creationflags=NO_WINDOW)
     for t in list(TASKS.values()):
         if t.get("status") == "laeuft" and t.get("pid"):
             subprocess.run(["taskkill", "/F", "/T", "/PID", str(t["pid"])], capture_output=True, creationflags=NO_WINDOW)
@@ -824,7 +827,46 @@ def _edge_einmal(text, cfg, frist):
         return asyncio.run(asyncio.wait_for(run(), frist))
 
 
+def stimme_vorladen():
+    """Lokale KI-Stimme schon mal in die Grafikkarte laden (beim Aufwachen), damit die erste Antwort nicht wartet."""
+    try:
+        if str(load_cfg().get("stimme", "")).startswith("lokal:"):
+            urllib.request.urlopen(urllib.request.Request("http://127.0.0.1:8767/laden", data=b"{}", method="POST",
+                                                          headers={"X-ORB-Token": TOKEN}), timeout=2)
+    except Exception:
+        pass
+
+
+def synth_lokal(text, cfg):
+    """Lokale KI-Stimme (Chatterbox, stimme.py auf Port 8767). None, wenn sie (noch) nicht läuft."""
+    try:
+        st = json.loads(urllib.request.urlopen("http://127.0.0.1:8767/status", timeout=1.5).read())
+        if not st.get("geladen"):   # Modell lädt noch: diesmal Microsoft-Stimme, im Hintergrund vorladen
+            stimme_vorladen()
+            return None
+        stimme = str(cfg.get("stimme", "")).split(":", 1)[1] or "thorsten"
+        req = urllib.request.Request("http://127.0.0.1:8767/tts", data=json.dumps(
+            {"text": text, "stimme": stimme, "emotion": float(cfg.get("emotion", 0.55))}).encode(),
+            headers={"Content-Type": "application/json", "X-ORB-Token": TOKEN}, method="POST")
+        with urllib.request.urlopen(req, timeout=30) as r:
+            data = r.read()
+        return data if len(data) > 1000 else None
+    except Exception as e:
+        print("Lokale Stimme:", e)
+        return None
+
+
 def synth(text, cfg=None):
+    cfg = cfg or load_cfg()
+    if str(cfg.get("stimme", "")).startswith("lokal:"):
+        data = synth_lokal(text, cfg)
+        if data:
+            return data
+        cfg = dict(cfg, stimme="de-DE-FlorianMultilingualNeural")   # Ersatz, bis die KI-Stimme bereit ist
+    return synth_edge(text, cfg)
+
+
+def synth_edge(text, cfg=None):
     """Microsoft-Neural-Stimme mit „gestaffelten“ Versuchen: Ist nach ~2,5 s noch nichts da (oder scheitert ein Versuch),
     startet sofort ein zweiter parallel – der schnellere gewinnt. So entstehen keine Lücken zwischen den Sätzen,
     wenn der Dienst kurz hängt. Windows-Stimme nur, wenn alle Versuche scheitern."""
@@ -2799,10 +2841,12 @@ class Handler(BaseHTTPRequestHandler):
         elif u.path == "/kontakte":  # für Claude: iCloud-Kontakte (nur gesuchte Einträge)
             self.send(200, kontakte_aktion(b))
         elif u.path == "/greet":
+            threading.Thread(target=stimme_vorladen, daemon=True).start()
             threading.Thread(target=lambda: write_answer(greeting(), heard="", holo=holo_for("Wetter abrufen", "")), daemon=True).start()
             threading.Thread(target=BRAIN.start, daemon=True).start()  # Gehirn schon mal aufwecken
             self.send(200, {"ok": True})
         elif u.path == "/warm":
+            threading.Thread(target=stimme_vorladen, daemon=True).start()
             threading.Thread(target=BRAIN.start, daemon=True).start()
             self.send(200, {"ok": True})
         elif u.path == "/hoerlog":
