@@ -116,6 +116,50 @@ class Whisper:
         return " ".join(s.text.strip() for s in segs).strip()
 
 
+def text_dienst(wh):
+    """Kleiner lokaler Dienst für die Telegram-Brücke: POST http://127.0.0.1:8768/text (Audio-Datei, z. B. OGG) → {"text"}.
+    Nutzt dasselbe geladene Whisper – kein zweites Modell auf der Grafikkarte."""
+    from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+    import tempfile
+
+    class H(BaseHTTPRequestHandler):
+        def log_message(self, *a):
+            pass
+
+        def do_POST(self):
+            if self.path != "/text" or self.headers.get("X-ORB-Token") != token():
+                self.send_response(403)
+                self.end_headers()
+                return
+            daten = self.rfile.read(int(self.headers.get("Content-Length", 0)))
+            fd, pfad = tempfile.mkstemp(suffix=".ogg")
+            with os.fdopen(fd, "wb") as f:
+                f.write(daten)
+            try:
+                from faster_whisper import decode_audio
+                txt = wh.text(decode_audio(pfad, sampling_rate=SR))
+                log("Telegram-Sprachnachricht:", txt)
+                antwort, code = {"text": txt}, 200
+            except Exception as e:
+                antwort, code = {"text": "", "fehler": str(e)[:200]}, 500
+            finally:
+                try:
+                    os.remove(pfad)
+                except Exception:
+                    pass
+            roh = json.dumps(antwort, ensure_ascii=False).encode()
+            self.send_response(code)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Length", str(len(roh)))
+            self.end_headers()
+            self.wfile.write(roh)
+
+    try:
+        ThreadingHTTPServer(("127.0.0.1", 8768), H).serve_forever()
+    except Exception as e:
+        log("Text-Dienst:", e)
+
+
 def main():
     from openwakeword.model import Model
     import openwakeword.utils
@@ -125,6 +169,7 @@ def main():
         log("Wake-Modell-Download:", e)
     ww = Model(wakeword_models=["hey_jarvis"], inference_framework="onnx")
     wh = Whisper()
+    threading.Thread(target=text_dienst, args=(wh,), daemon=True).start()
     q = queue.Queue(maxsize=200)
     modus = {"t": 0.0, "mit": False, "an": True}
 

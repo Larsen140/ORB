@@ -124,6 +124,16 @@
      "name": "Immer Opera GX",
      "text": "Webseiten öffnet ORB immer in deinem Opera GX.",
      "beispiel": "Jarvis, öffne YouTube"
+    },
+    {
+     "name": "ORB per Telegram",
+     "text": "Schreib oder sprich dem Bot „Orb“ von unterwegs – ORB erledigt es am PC und antwortet mit Text und Stimme.",
+     "beispiel": "/bild schickt dir deinen Bildschirm"
+    },
+    {
+     "name": "Bildschirm-Helfer",
+     "text": "ORB erklärt dir sofort, was gerade auf deinem Bildschirm zu sehen ist.",
+     "beispiel": "Jarvis, was ist das hier?"
     }
    ]
   },

@@ -1,1 +1,1 @@
-132|Systemcheck: Ohr verpasst keine Befehle mehr, Stimme stabiler, Kugel schont im Spiel die Grafikkarte
+133|ORB per Telegram (Bot Orb), Bildschirm-Helfer, Live-Bild zeigt jetzt den ganzen Bildschirm

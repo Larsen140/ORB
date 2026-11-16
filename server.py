@@ -71,7 +71,7 @@ DEFAULT_CFG = {
 }
 # Damit ORB immer dein Claude-Code-Login (Max-Abo) nutzt und nie einen API-Schlüssel
 CLAUDE_ENV_DROP = ("ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "ANTHROPIC_BASE_URL")
-VERSION = "132"
+VERSION = "133"
 ORB_UI = ("Deine Oberfläche (die Larsen gerade sieht): in der Mitte du als flüssige leuchtende Kugel mit Tropfen, "
           "Orbit-Ringen und Sternenhimmel; links eine Uhr und darunter der Gesprächsverlauf mit Eingabefeld; rechts "
           "Karten für System (CPU, RAM, Akku), Wetter mit Stundenvorschau, Aktivität (was du gerade tust) und Vorschläge; "
@@ -2436,7 +2436,26 @@ def _bildschirm_png(breite_max=1600):
     import zlib
     from ctypes import wintypes
     u, g = ctypes.windll.user32, ctypes.windll.gdi32
-    sw, sh = u.GetSystemMetrics(0), u.GetSystemMetrics(1)   # ORB ist nicht DPI-bewusst: logische Größe (Aufnahme passt dazu)
+    # Nur dieser Thread DPI-bewusst: sonst liefert Windows bei 150 % Skalierung nur einen Ausschnitt (oben links)
+    alt = None
+    try:
+        u.SetThreadDpiAwarenessContext.restype = ctypes.c_void_p
+        alt = u.SetThreadDpiAwarenessContext(ctypes.c_void_p(-4))   # PER_MONITOR_AWARE_V2
+    except Exception:
+        pass
+    try:
+        return _bildschirm_png_roh(u, g, breite_max)
+    finally:
+        if alt:
+            u.SetThreadDpiAwarenessContext(ctypes.c_void_p(alt))
+
+
+def _bildschirm_png_roh(u, g, breite_max):
+    import ctypes
+    import struct
+    import zlib
+    from ctypes import wintypes
+    sw, sh = u.GetSystemMetrics(0), u.GetSystemMetrics(1)   # echte Pixel (Thread ist DPI-bewusst)
     f = min(1.0, breite_max / sw)
     w, h = int(sw * f), int(sh * f)
     hdc = u.GetDC(0)
@@ -2474,9 +2493,7 @@ def _bildschirm_png(breite_max=1600):
     with open(tmp, "wb") as fh:
         fh.write(png)
     os.replace(tmp, LIVE_BILD)
-    hdc2 = u.GetDC(0)
-    echt_w = g.GetDeviceCaps(hdc2, 118) or sw   # DESKTOPHORZRES: echte Pixelbreite (bei 150 % Skalierung größer)
-    u.ReleaseDC(0, hdc2)
+    echt_w = sw
     LIVE.update(t=time.time(), groesse=(w, h), massstab=echt_w / w)
     with open(os.path.join(os.path.dirname(LIVE_BILD), "massstab.txt"), "w") as fh:
         fh.write("%.4f" % (echt_w / w))   # für steuern.ps1 (Klick-Koordinaten in echten Pixeln)

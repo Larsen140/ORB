@@ -210,6 +210,26 @@ def stimme_wache():
         time.sleep(10)
 
 
+def telegram_start():
+    """Telegram-Brücke (telegram_orb.py neben server.py) im ORB-Prozess laufen lassen – nur Standardbibliothek."""
+    try:
+        import importlib.util
+        pfad = os.path.join(os.path.dirname(os.path.abspath(server.__file__)), "telegram_orb.py")
+        spec = importlib.util.spec_from_file_location("telegram_orb", pfad)
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        os.environ.setdefault("ORB_PORT", str(server.PORT))
+        mod.PORT, mod.ORB = server.PORT, "http://127.0.0.1:%d" % server.PORT
+        while True:
+            try:
+                mod.main()
+            except Exception as e:
+                mod.log("Absturz, Neustart in 10 s:", e)
+                time.sleep(10)
+    except Exception as e:
+        print("Telegram:", e)
+
+
 def orb_unsichtbar_fuer_aufnahme():
     """Mit „ORB sieht meinen Bildschirm“: ORBs eigenes Fenster aus Bildschirmaufnahmen ausblenden
     (WDA_EXCLUDEFROMCAPTURE) – so sieht ORB, was UNTER ihm liegt, statt sich selbst."""
@@ -834,6 +854,7 @@ def main():
     threading.Thread(target=ohr_wache, daemon=True).start()            # lokales Ohr: „Hey Jarvis“ + Whisper
     threading.Thread(target=stimme_wache, daemon=True).start()         # lokale KI-Stimme (Chatterbox)
     threading.Thread(target=server.live_bildschirm, daemon=True).start()  # Bildschirm in Echtzeit
+    threading.Thread(target=telegram_start, daemon=True).start()          # ORB per Telegram vom Handy
     threading.Thread(target=orb_unsichtbar_fuer_aufnahme, daemon=True).start()
     threading.Thread(target=update_loop, daemon=True).start()
     threading.Thread(target=announce_update, daemon=True).start()
