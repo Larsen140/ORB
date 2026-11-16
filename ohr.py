@@ -176,7 +176,9 @@ def main():
                     try:
                         t0 = time.time()
                         txt = wh.text(audio)
-                        if txt and len(txt) > 1 and not txt.lower().startswith(("untertitel", "vielen dank fürs zuschauen")):
+                        unsinn = ("untertitel", "vielen dank fürs zuschauen", "sous-titr", "amara", "copyright", "swr ", "zdf",
+                                  "bis zum nächsten mal", "danke fürs zuschauen", "musik", "amen.")
+                        if txt and len(txt) > 1 and not any(txt.lower().startswith(u) or txt.lower() == u for u in unsinn):
                             log("Text (%.1f s):" % (time.time() - t0), txt)
                             orb("/ohr", {"typ": "text", "text": txt, "dauer": round(dauer, 1)})
                     except Exception as e:

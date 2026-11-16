@@ -2240,17 +2240,30 @@ function ohrStand(o) {
   if (ohrLast < 0) { ohrLast = ev.reduce((m, e) => Math.max(m, e.id), 0); return; }   // beim Laden nichts Altes nachspielen
   for (const e of ev) if (e.id > ohrLast) { ohrLast = e.id; try { ohrEreignis(e); } catch (err) {} }
 }
+let ohrZuletzt = { t:'', zeit:0 };
 function ohrEreignis(e) {
-  if (e.typ === 'wake') return onWake('Jarvis');
-  const t = (e.text || '').trim(); if (!t) return;
-  if (istEcho(t)) return;   // ORBs eigener Satz (Whisper liefert ihn oft erst nach der Ansage)
-  if (nachSprache()) {   // ORB spricht (oder eben noch): nur „Stopp“ oder „Jarvis“ zählt (Rest ist meist Echo)
-    if (STOP_RE.test(t.replace(/[.!?,]+$/g, ''))) { stopAudio(); caption(''); if (S.busy) fetch('/stop', { method:'POST' }).catch(() => {}); return convo ? stopConvo() : hint('Okay', 1200); }
-    if (NAME_RE().test(t)) return interrupt();
+  if (e.typ === 'wake') {   // „Hey Jarvis“: aufwachen und zuhören
+    if (S.sleep) wake('');
+    convo = true; convoLastSpeech = performance.now(); followUntil = performance.now() + FOLLOW_MS; askGap = 0;
+    duckMusik(true); setStumm(false); SFX.listenOn(); ripple(.6); hint('Ich höre …', 3000);
     return;
   }
-  if (convo) { liveMsg(t); return handleConvo(t); }
-  onWake(t);
+  const t = (e.text || '').trim(); if (!t) return;
+  if (listening) return;   // Sprechtaste gedrückt: die eigene Erkennung der Taste gilt – sonst käme der Satz doppelt
+  const gleich = t.toLowerCase().replace(/[^a-zäöüß0-9 ]/g, '');
+  if (gleich === ohrZuletzt.t && performance.now() - ohrZuletzt.zeit < 5000) return;   // doppelt gemeldet
+  ohrZuletzt = { t:gleich, zeit:performance.now() };
+  const named = NAME_RE().test(t);
+  if (speakingNow()) {   // ORB spricht: nur „Stopp“ oder „Jarvis“ zählt (Rest ist meist Echo)
+    if (STOP_RE.test(t.replace(/[.!?,]+$/g, ''))) { stopAudio(); caption(''); if (S.busy) fetch('/stop', { method:'POST' }).catch(() => {}); return convo ? stopConvo() : hint('Okay', 1200); }
+    if (named) interrupt();
+    else return;
+  }
+  if (!convo && !named && !followOpen()) return;   // ohne „Jarvis“ und ohne laufendes Gespräch: Hintergrund ignorieren
+  if (S.sleep) wake('');
+  if (!convo) { convo = true; followUntil = performance.now() + FOLLOW_MS; }
+  convoLastSpeech = performance.now();
+  handleConvo(t, { named });
 }
 let waechterT = 0;
 function zuhoerWaechter() {
