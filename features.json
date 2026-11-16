@@ -134,6 +134,11 @@
      "name": "Bildschirm-Helfer",
      "text": "ORB erklärt dir sofort, was gerade auf deinem Bildschirm zu sehen ist.",
      "beispiel": "Jarvis, was ist das hier?"
+    },
+    {
+     "name": "Nur deine Stimme",
+     "text": "ORB lernt deine Stimme und ignoriert Freunde im Discord, Fernseher oder Besuch.",
+     "beispiel": "Jarvis, lerne meine Stimme neu"
     }
    ]
   },

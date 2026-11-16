@@ -1,1 +1,1 @@
-133|ORB per Telegram (Bot Orb), Bildschirm-Helfer, Live-Bild zeigt jetzt den ganzen Bildschirm
+134|ORB erkennt deine Stimme und ignoriert andere, Telegram-Sprachnachrichten

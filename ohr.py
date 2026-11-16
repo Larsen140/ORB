@@ -116,6 +116,108 @@ class Whisper:
         return " ".join(s.text.strip() for s in segs).strip()
 
 
+class Sprecher:
+    """Erkennt Larsens Stimme (WeSpeaker ResNet34, ONNX, lokal). Lernt das Profil selbst aus den ersten Sätzen mit „Jarvis“
+    und passt es danach langsam an. Fremde Stimmen (Discord, Fernseher, Besuch) werden verworfen."""
+    MODELL = os.path.join(BASIS, "ohr", "sprecher.onnx")
+    PROFIL = os.path.join(BASIS, "ohr", "stimmprofil.json")
+    SCHWELLE = 0.42          # Test: gleicher Sprecher ~0,75, fremde 0,2–0,36 (Werte stehen im ohr.log zum Nachjustieren)
+    LERN_SAETZE = 6
+
+    def __init__(self):
+        self.s = None
+        self.profil, self.n, self.sammel = None, 0, []
+        try:
+            with open(self.PROFIL, encoding="utf-8") as f:
+                d = json.load(f)
+            self.profil, self.n = np.array(d["v"], dtype=np.float32), d.get("n", 0)
+        except Exception:
+            pass
+
+    def bereit(self):
+        if self.s is None and os.path.exists(self.MODELL):
+            import onnxruntime as ort
+            self.s = ort.InferenceSession(self.MODELL, providers=["CPUExecutionProvider"])
+            n = np.arange(400)
+            self.fenster = (0.5 - 0.5 * np.cos(2 * np.pi * n / 399)) ** 0.85
+            mel = lambda f: 1127 * np.log(1 + f / 700.0)
+            lo, hi = mel(20), mel(8000)
+            punkte = lo + (hi - lo) * np.arange(82) / 81
+            fm = mel(np.arange(257) * 16000 / 512)
+            self.bank = np.zeros((80, 257), dtype=np.float32)
+            for i in range(80):
+                l, c, r = punkte[i], punkte[i + 1], punkte[i + 2]
+                self.bank[i] = np.clip(np.minimum((fm - l) / (c - l), (r - fm) / (r - c)), 0, None)
+        return self.s is not None
+
+    def merkmale(self, audio):
+        x = audio.astype(np.float64) * 32768
+        if len(x) < 400:
+            x = np.pad(x, (0, 400 - len(x)))
+        anz = 1 + (len(x) - 400) // 160
+        idx = np.arange(400)[None, :] + 160 * np.arange(anz)[:, None]
+        fr = x[idx]
+        fr = fr - fr.mean(axis=1, keepdims=True)
+        fr = np.concatenate([fr[:, :1] - 0.97 * fr[:, :1], fr[:, 1:] - 0.97 * fr[:, :-1]], axis=1) * self.fenster
+        spek = np.abs(np.fft.rfft(fr, 512)) ** 2
+        f = np.log(np.maximum(spek @ self.bank.T, 1.19e-7)).astype(np.float32)
+        return f - f.mean(axis=0, keepdims=True)
+
+    def vektor(self, audio):
+        e = self.s.run(None, {"feats": self.merkmale(audio)[None]})[0][0]
+        return e / (np.linalg.norm(e) + 1e-9)
+
+    def speichern(self):
+        with open(self.PROFIL, "w", encoding="utf-8") as f:
+            json.dump({"v": [float(v) for v in self.profil], "n": self.n}, f)
+
+    def pruefen(self, audio, txt):
+        """True = durchlassen. Ohne Profil: alles durchlassen und aus Sätzen mit „Jarvis“ lernen."""
+        try:
+            if len(audio) < 16000 * 0.8 or not self.bereit():
+                return True
+            v = self.vektor(audio)
+            if self.profil is None:
+                if re.search(r"(?i)jarvis", txt) and len(audio) >= 16000 * 1.2:
+                    self.sammel.append(v)
+                    log("Stimmprofil lernen: %d/%d" % (len(self.sammel), self.LERN_SAETZE))
+                    if len(self.sammel) >= self.LERN_SAETZE:
+                        p = np.mean(self.sammel, axis=0)
+                        self.profil, self.n = p / np.linalg.norm(p), len(self.sammel)
+                        self.speichern()
+                        log("Stimmprofil fertig – ab jetzt nur noch Larsens Stimme")
+                return True
+            wert = float(v @ self.profil)
+            if wert < self.SCHWELLE:
+                log("Fremde Stimme verworfen (%.2f): %s" % (wert, txt))
+                return False
+            log("Stimme ok (%.2f)" % wert)
+            if wert > 0.55:   # sicher Larsen → Profil langsam nachführen (Mikro, Erkältung, Tageszeit)
+                p = 0.95 * self.profil + 0.05 * v
+                self.profil, self.n = p / np.linalg.norm(p), self.n + 1
+                if self.n % 10 == 0:
+                    self.speichern()
+            return True
+        except Exception as e:
+            log("Stimmprüfung:", e)
+            return True
+
+
+def audio_laden(pfad):
+    """Beliebige Audiodatei (OGG/Opus von Telegram, MP3 …) → 16 kHz mono float32 (eigener Decoder: faster_whispers
+    decode_audio passt nicht zu PyAV 19)."""
+    import av
+    teile = []
+    with av.open(pfad) as c:
+        rs = av.AudioResampler(format="s16", layout="mono", rate=SR)
+        for fr in c.decode(audio=0):
+            for r in rs.resample(fr):
+                teile.append(r.to_ndarray().reshape(-1))
+        for r in rs.resample(None):
+            teile.append(r.to_ndarray().reshape(-1))
+    return (np.concatenate(teile).astype(np.float32) / 32768.0) if teile else np.zeros(0, np.float32)
+
+
 def text_dienst(wh):
     """Kleiner lokaler Dienst für die Telegram-Brücke: POST http://127.0.0.1:8768/text (Audio-Datei, z. B. OGG) → {"text"}.
     Nutzt dasselbe geladene Whisper – kein zweites Modell auf der Grafikkarte."""
@@ -136,8 +238,7 @@ def text_dienst(wh):
             with os.fdopen(fd, "wb") as f:
                 f.write(daten)
             try:
-                from faster_whisper import decode_audio
-                txt = wh.text(decode_audio(pfad, sampling_rate=SR))
+                txt = wh.text(audio_laden(pfad))
                 log("Telegram-Sprachnachricht:", txt)
                 antwort, code = {"text": txt}, 200
             except Exception as e:
@@ -170,6 +271,7 @@ def main():
     ww = Model(wakeword_models=["hey_jarvis"], inference_framework="onnx")
     wh = Whisper()
     threading.Thread(target=text_dienst, args=(wh,), daemon=True).start()
+    sp = Sprecher()
     q = queue.Queue(maxsize=200)
     modus = {"t": 0.0, "mit": False, "an": True}
 
@@ -216,7 +318,7 @@ def main():
             continue
         if time.time() - modus["t"] > 1.0:
             m = orb("/ohr/modus") or {}
-            modus.update(t=time.time(), mit=bool(m.get("mitschreiben")), an=m.get("an", True))
+            modus.update(t=time.time(), mit=bool(m.get("mitschreiben")), an=m.get("an", True), stimm=m.get("stimmcheck", True))
             if modus["mit"]:
                 if wh.m is None:   # ORB ist wach → Whisper SOFORT vorladen, nicht erst beim ersten Satz (sonst 3–7 s Verzögerung)
                     threading.Thread(target=wh.laden, daemon=True).start()
@@ -261,7 +363,8 @@ def main():
                         klein = txt.lower().strip(" .!?…,*[]()")
                         if txt and len(txt) > 1 and klein not in ganz and not any(klein.startswith(u) for u in anfang):
                             log("Text (%.1f s):" % (time.time() - t0), txt)
-                            senden(txt, dauer)
+                            if not modus.get("stimm", True) or sp.pruefen(audio, txt):
+                                senden(txt, dauer)
                     except Exception as e:
                         log("Whisper-Fehler:", e)
                 puffer = []
