@@ -20,6 +20,10 @@ Freies Pixel-Malen (jede Figur, jedes Logo, jedes Gesicht): "pixel":[{"teil":"ko
   left/right 4×12, top/bottom 8×4; Arme/Beine front/back/left/right 4×12 (slim-Arme 3×12), top/bottom 4×4.
 Vorhandenen Skin bearbeiten: "basis":"<Dateiname im Skin-Ordner ohne .png oder voller Pfad>" – dann wird nur gemalt, was im Rezept
   steht (details/pixel und angegebene Teile), der Rest bleibt wie im Original. "schatten": false = exakte Farben ohne Schattierung.
+Umfärben (beide Schichten, Schattierung bleibt): "umfaerben":[{"von":"#ffffff"|"weiss"|"schwarz"|"grau","nach":"#7a1f2b",
+  "toleranz":60, "teile":["koerper","arm_r","arm_l"] (optional, sonst alle)}].
+Beim Bearbeiten mit "basis" werden details/pixel AUTOMATISCH auch auf die Overlay-Schicht übertragen, wo dort etwas liegt
+  (sonst würde die alte Overlay-Farbe darüber sichtbar bleiben). "nur_basis": true schaltet das ab.
 Koordinaten in "details" sind lokal je Seite (x nach rechts, y nach unten; Kopf 8×8, Körper-Front 8×12, Arme/Beine-Front 4×12).
 """
 import base64
@@ -124,6 +128,95 @@ def basis_laden(name):
     return img.resize((64, 64), Image.NEAREST) if img.size != (64, 64) else img
 
 
+def overlay_mitziehen(sk, vorher):
+    """Was auf der Basis-Schicht geändert wurde, auch auf der Overlay-Schicht ändern – aber nur dort, wo das Overlay
+    sichtbare Pixel hat (sonst bliebe die alte Overlay-Farbe über der neuen Basis sichtbar)."""
+    for teil in TEILE:
+        for seite in ("top", "bottom", "right", "front", "left", "back"):
+            bx, by, bw, bh = sk.flaechen(teil, "basis")[seite]
+            ox, oy, ow, oh = sk.flaechen(teil, "overlay")[seite]
+            for y in range(min(bh, oh)):
+                for x in range(min(bw, ow)):
+                    neu, alt = sk.px[bx + x, by + y], vorher[bx + x, by + y]
+                    if neu != alt and sk.px[ox + x, oy + y][3] > 0:
+                        sk.px[ox + x, oy + y] = neu
+
+
+def _hell(c):
+    return 0.299 * c[0] + 0.587 * c[1] + 0.114 * c[2]
+
+
+def umfaerben(sk, ops):
+    """Farbe ersetzen auf BEIDEN Schichten; Helligkeitsverlauf (Schattierung) bleibt erhalten."""
+    import colorsys
+    for o in ops or []:
+        von, nach, tol = str(o.get("von", "#ffffff")).lower(), rgb(o.get("nach", "#7a1f2b")), float(o.get("toleranz", 60))
+        teile = o.get("teile") or list(TEILE)
+
+        def passt(c):
+            r, g, b = c[:3]
+            h, l, sat = colorsys.rgb_to_hls(r / 255, g / 255, b / 255)
+            if von in ("weiss", "weiß", "white"):
+                return l > 0.62 and sat < 0.28
+            if von in ("schwarz", "black"):
+                return l < 0.22
+            if von in ("grau", "grey", "gray"):
+                return 0.2 <= l <= 0.75 and sat < 0.15
+            z = rgb(von)
+            return ((r - z[0]) ** 2 + (g - z[1]) ** 2 + (b - z[2]) ** 2) ** 0.5 <= tol
+
+        ziel_l = _hell(nach) or 1
+        for teil in teile:
+            for ebene in ("basis", "overlay"):
+                for seite, (fx, fy, fw, fh) in sk.flaechen(teil, ebene).items():
+                    hell = [_hell(sk.px[fx + x, fy + y]) for y in range(fh) for x in range(fw)
+                            if sk.px[fx + x, fy + y][3] > 0 and passt(sk.px[fx + x, fy + y])]
+                    if not hell:
+                        continue
+                    mittel = sum(hell) / len(hell)
+                    for y in range(fh):
+                        for x in range(fw):
+                            c = sk.px[fx + x, fy + y]
+                            if c[3] > 0 and passt(c):
+                                f = (_hell(c) / mittel) if mittel else 1   # Schattierung relativ beibehalten
+                                sk.px[fx + x, fy + y] = mischen(nach, f) + (c[3],)
+
+
+def tiefe(sk, staerke=1.0):
+    """Keine flachen Skins: Kleidung, Haare und Schuhe zusätzlich auf die Overlay-Schicht legen (abstehend in 3D),
+    Haut und Gesicht bleiben frei. Vorhandenes Overlay bleibt unangetastet."""
+    import colorsys
+    fx, fy, fw, fh = sk.flaechen("kopf", "basis")["front"]
+    proben = [sk.px[fx + x, fy + y] for y in (5, 6) for x in (1, 2, 5, 6) if sk.px[fx + x, fy + y][3] > 0]
+    haut = tuple(sum(c[i] for c in proben) // len(proben) for i in range(3)) if proben else (200, 150, 120)
+
+    def ist_haut(c):
+        return ((c[0] - haut[0]) ** 2 + (c[1] - haut[1]) ** 2 + (c[2] - haut[2]) ** 2) ** 0.5 < 48
+
+    rnd = random.Random(7)
+    for teil in TEILE:
+        for seite in ("top", "bottom", "right", "front", "left", "back"):
+            bx, by, bw, bh = sk.flaechen(teil, "basis")[seite]
+            ox, oy, ow, oh = sk.flaechen(teil, "overlay")[seite]
+            for y in range(min(bh, oh)):
+                for x in range(min(bw, ow)):
+                    if sk.px[ox + x, oy + y][3] > 0:
+                        continue   # Overlay schon da
+                    c = sk.px[bx + x, by + y]
+                    if c[3] == 0 or ist_haut(c):
+                        continue
+                    if teil == "kopf":
+                        # am Kopf nur Haare/Kopfbedeckung: oben, hinten, Seiten oben, vorne nur die obersten 2 Reihen
+                        if seite == "front" and y > 1:
+                            continue
+                        if seite in ("left", "right") and y > 4:
+                            continue
+                        if seite == "bottom":
+                            continue
+                    f = (1.06 if seite == "top" else 0.94) * (1 + rnd.uniform(-0.04, 0.04) * staerke)
+                    sk.px[ox + x, oy + y] = mischen(c[:3], f) + (255,)
+
+
 def pixel_malen(sk, ops):
     for o in ops or []:
         try:
@@ -149,6 +242,8 @@ def bauen(r):
     if r.get("basis"):   # vorhandenen Skin bearbeiten: nur das Angegebene ändern
         sk.img = basis_laden(r["basis"])
         sk.px = sk.img.load()
+        vorher = sk.img.copy().load()
+        umfaerben(sk, r.get("umfaerben"))
         for d in r.get("details") or []:
             try:
                 sk.rechteck(d["teil"], d.get("seite", "front"), int(d.get("x", 0)), int(d.get("y", 0)), int(d.get("w", 1)),
@@ -156,6 +251,10 @@ def bauen(r):
             except Exception:
                 pass
         pixel_malen(sk, r.get("pixel"))
+        if not r.get("nur_basis"):
+            overlay_mitziehen(sk, vorher)
+        if not r.get("flach"):
+            tiefe(sk)
         if r.get("schatten", False):
             sk.schattieren(r.get("name", "skin"))
         return sk.img
@@ -296,6 +395,9 @@ def bauen(r):
         except Exception:
             pass
     pixel_malen(sk, r.get("pixel"))
+    umfaerben(sk, r.get("umfaerben"))
+    if not r.get("flach"):
+        tiefe(sk)
     if r.get("schatten", True):
         sk.schattieren(r.get("name", "skin"))
     return sk.img
@@ -412,6 +514,14 @@ def main():
         ziel = os.path.join(tempfile.gettempdir(), "orb_skin_vergleich.png")
         bild.save(ziel)
         print(json.dumps({"ok": True, "bild": ziel, "reihenfolge": namen}, ensure_ascii=False))
+    elif cmd == "tiefe":   # vorhandenen (z. B. KI-)Skins die 3D-Schicht geben – überschreibt die Datei
+        for n in sys.argv[2:]:
+            sk = Skin()
+            sk.img = basis_laden(n)
+            sk.px = sk.img.load()
+            tiefe(sk)
+            sk.img.save(os.path.join(ORDNER, os.path.splitext(os.path.basename(n))[0] + ".png"))
+        print(json.dumps({"ok": True, "skins": sys.argv[2:]}, ensure_ascii=False))
     elif cmd == "liste":
         print(json.dumps(sorted(f[:-4] for f in os.listdir(ORDNER) if f.endswith(".png") and "_vorschau" not in f), ensure_ascii=False))
 
