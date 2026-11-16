@@ -1017,8 +1017,6 @@
     <div class="row col"><div class="lbl">Effekt-Lautstärke<span class="v" id="v_sfxl"></span></div><input type="range" id="s_sfxl" min="0" max="200" step="5"></div>
     <div class="row">Ambient-Brummen<input type="checkbox" class="sw" id="s_amb"></div>
   </div></div>
-  <div class="grp"><h4>Geschlossene Hologramme</h4><div class="card" id="hlist"></div>
-  <p class="note">Hologramme unten mit ✕ oder per Wischen schließen – sie bleiben zu, bis du sie hier wieder einschaltest.</p></div>
   <div class="grp"><h4>Widgets anzeigen</h4><div class="card" id="wlist"></div>
   <p class="note">„Aktivität“ erscheint von selbst, solange ORB arbeitet. Verschieben: Widget am Titel greifen.</p></div>
   <div class="grp"><h4>Updates</h4><div class="card">
@@ -3933,10 +3931,10 @@ function renderDevMini(box, devs) {
   }
   for (const k of Object.keys(devMini.rows)) if (!da.has(k)) { devMini.rows[k].remove(); delete devMini.rows[k]; }
 }
-/* geschlossene Hologramme bleiben zu (auch nach Neustart) – in den Einstellungen wieder einschaltbar */
+/* geschlossene Hologramme bleiben zu (auch nach Neustart) */
 let holoGeschlossen = {};
 try { holoGeschlossen = JSON.parse(localStorage.getItem('orbHoloZu') || '{}') || {}; } catch (e) {}
-function holoSpeichern() { try { localStorage.setItem('orbHoloZu', JSON.stringify(holoGeschlossen)); } catch (e) {} renderHoloListe(); }
+function holoSpeichern() { try { localStorage.setItem('orbHoloZu', JSON.stringify(holoGeschlossen)); } catch (e) {} }
 function holoZu(id, el) {
   holoGeschlossen[id] = el._titel || 'Hologramm'; holoSpeichern(); SFX.close();
   el.classList.add('weg'); setTimeout(() => { if (holoGeschlossen[id]) el.style.display = 'none'; el.classList.remove('weg', 'wisch'); el.style.transform = ''; }, 450);
@@ -3956,21 +3954,6 @@ function wischbar(el, zu) {
   };
   el.addEventListener('pointerup', ende); el.addEventListener('pointercancel', ende);
 }
-function renderHoloListe() {
-  const box = $('hlist'); if (!box) return;
-  const ids = Object.keys(holoGeschlossen);
-  box.innerHTML = ids.length ? ids.map(id => `<div class="row"></div>`).join('') : '<div class="row" style="opacity:.6">Keine – alle Hologramme sichtbar</div>';
-  if (!ids.length) return;
-  box.querySelectorAll('.row').forEach((r, i) => {
-    const id = ids[i], inp = document.createElement('input');
-    r.textContent = holoGeschlossen[id]; inp.type = 'checkbox'; inp.className = 'sw'; inp.checked = false;
-    inp.onchange = () => { if (!inp.checked) return; delete holoGeschlossen[id]; SFX.on();
-      const el = taskEls[id]; if (el) { el.style.display = ''; el._weg = false; el.classList.remove('weg'); }
-      setTimeout(holoSpeichern, 350); };
-    r.appendChild(inp);
-  });
-}
-renderHoloListe();
 const tasksRunning = () => Object.values(taskEls).some(el => el._status === 'laeuft');
 
 function onState(st, first) {

@@ -1,1 +1,1 @@
-138|Klatschen im Hintergrund funktioniert wieder (Telegram hatte es blockiert)
+139|Bereich 'Geschlossene Hologramme' aus den Einstellungen entfernt
