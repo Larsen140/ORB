@@ -1419,8 +1419,9 @@ function initAudio() {
 }
 function applyAudio() {
   if (!ac) return;
-  outGain.gain.value = Math.min(1, (+cfg.lautstaerke) / 100);   // über 100 % verstärkt prepVoice sauber vorab
-  sfxGain.gain.value = cfg.sfx ? (+cfg.sfxlaut) / 100 * 3.5 : 0;   // Effekte waren viel zu leise
+  const still = S.tarn ? 0 : 1;   // Tarnmodus: weder Stimme noch Klänge
+  outGain.gain.value = still * Math.min(1, (+cfg.lautstaerke) / 100);   // über 100 % verstärkt prepVoice sauber vorab
+  sfxGain.gain.value = still * (cfg.sfx ? (+cfg.sfxlaut) / 100 * 3.5 : 0);   // Effekte waren viel zu leise
   setAmbient(cfg.ambient && cfg.sfx);
 }
 const audioOk = () => ac && ac.state === 'running';
@@ -2720,6 +2721,7 @@ async function poll() {
     const st = await resp.json(); lastOk = performance.now(); S.busy = !!st.busy; renderTasks(st.aufgaben);
     if (st.karten_v !== undefined && st.karten_v !== kartenV) { kartenV = st.karten_v; ladeKarten(); } if (st.bild) bildHolo(st.bild); if (st.gold !== undefined) goldHolo(st.gold); if (st.kamera_foto !== undefined) kamFoto(st.kamera_foto); if (st.kam_n !== undefined) kamInhalt(st.kam_n); if (st.web) webHolo(st.web);
     S.spiel = st.spiel || '';
+    if (!!st.tarn !== !!S.tarn) { S.tarn = !!st.tarn; applyAudio(); hlog('Tarnmodus ' + (S.tarn ? 'an' : 'aus')); }
     ohrStand(st.ohr);   // im Spiel: Klatschen/Schnipsen aus (Schüsse, Explosionen, Blöcke)
     if (!!st.anruf !== !!S.call) { S.call = !!st.anruf; if (S.call) { stopWake(); killConvoRec(); killBarge(); hint('Meeting oder Spiel erkannt – ich höre nicht zu', 3500); } else if (cfg.steuerung === 'wort') startWake(); }
     // neue ORB-Version läuft → Seite neu laden (sonst sieht man Änderungen erst nach Fenster-Neustart)

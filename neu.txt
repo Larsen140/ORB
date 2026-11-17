@@ -1,1 +1,1 @@
-141|Stimme wieder an: Taste M schaltet sie nicht mehr dauerhaft stumm, Hinweis wenn sie aus ist
+142|Neuer Tarnmodus: PC wirkt aus, alles läuft weiter (Sprache und Telegram)

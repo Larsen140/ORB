@@ -274,6 +274,8 @@ def window_process_running():
 
 
 def show(wake=False, hidden=False):
+    if server.tarnmodus.aktiv():
+        return   # Tarnmodus: Klatschen & Co. holen das Fenster nicht hervor
     if wake:
         server.CALL_FREI[0] = True   # per Klatschen geholt → auch während eines Meetings zuhören
     if window_open() or window_process_running():
@@ -857,6 +859,7 @@ def main():
                 pass
     except Exception:
         pass
+    server.tarnmodus.aufraeumen()   # Benachrichtigungen wieder an, falls ORB mitten im Tarnmodus beendet wurde
     server.ON_SHOW[0] = show
     server.ON_HIDE[0] = hide_window
     server.ON_MINI[0] = mini

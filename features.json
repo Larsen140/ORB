@@ -86,6 +86,11 @@
      "beispiel": "einfach Meeting starten"
     },
     {
+     "name": "Tarnmodus",
+     "text": "PC wirkt aus: Bildschirm schwarz, Monitore und Razer-Licht aus, ORB stumm, Benachrichtigungen still – Meetings, Downloads und Telegram laufen weiter. Taste oder Maus am PC beendet ihn.",
+     "beispiel": "Jarvis, Tarnmodus an"
+    },
+    {
      "name": "Gedächtnis zeigen",
      "text": "Zeigt als Hologramm, was ORB über dich weiß – und korrigiert es auf Zuruf.",
      "beispiel": "Jarvis, was weißt du über mich?"

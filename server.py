@@ -26,16 +26,17 @@ CONFIG = os.path.join(HOME, "config.json")
 PAGE = os.path.join(RES, "index.html")
 
 
-def _lade_icloud():
-    """icloud.py liegt neben server.py – ausdrücklich von dort laden (der App-Ordner steht nicht im Suchpfad)."""
+def _lade_icloud(name="icloud"):
+    """icloud.py & Co. liegen neben server.py – ausdrücklich von dort laden (der App-Ordner steht nicht im Suchpfad)."""
     import importlib.util
-    spec = importlib.util.spec_from_file_location("icloud", os.path.join(RES, "icloud.py"))
+    spec = importlib.util.spec_from_file_location(name, os.path.join(RES, name + ".py"))
     mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(mod)
     return mod
 
 
 icloud = _lade_icloud()  # iCloud-Kalender (CalDAV)
+tarnmodus = _lade_icloud("tarnmodus")  # PC wirkt aus, alles läuft weiter
 TTS_PS = os.path.join(RES, "tts.ps1")
 MIKRO_PS = os.path.join(RES, "mikro.ps1")
 PORT = int(os.environ.get("ORB_PORT", "8766"))  # ORB_PORT nur für Tests (update.ps1 prüft auf 8799)
@@ -72,7 +73,7 @@ DEFAULT_CFG = {
 }
 # Damit ORB immer dein Claude-Code-Login (Max-Abo) nutzt und nie einen API-Schlüssel
 CLAUDE_ENV_DROP = ("ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "ANTHROPIC_BASE_URL")
-VERSION = "141"
+VERSION = "142"
 ORB_UI = ("Deine Oberfläche (die Larsen gerade sieht): in der Mitte du als flüssige leuchtende Kugel mit Tropfen, "
           "Orbit-Ringen und Sternenhimmel; links eine Uhr und darunter der Gesprächsverlauf mit Eingabefeld; rechts "
           "Karten für System (CPU, RAM, Akku), Wetter mit Stundenvorschau, Aktivität (was du gerade tust) und Vorschläge; "
@@ -712,8 +713,8 @@ def skin_still(an=None):
 
 def write_state(**kw):
     """Zustand schreiben – mit Lock (mehrere Threads) und Wiederholung, falls Windows die Datei kurz sperrt."""
-    if not kw.pop("laut", False) and kw.get("parts") and skin_still():
-        kw["parts"] = []   # Skin-Modus: Text nur anzeigen, nicht vorlesen
+    if not kw.pop("laut", False) and kw.get("parts") and (skin_still() or tarnmodus.aktiv()):
+        kw["parts"] = []   # Skin- oder Tarnmodus: Text nur anzeigen (und per Telegram), nicht vorlesen
     with _state_lock:
         st = read_state()
         st.update(kw)
@@ -1446,7 +1447,64 @@ class Brain:
 BRAIN = Brain()
 
 
+# ---------- Tarnmodus: PC wirkt aus, Meetings/Downloads/ORB/Telegram laufen weiter (tarnmodus.py) ----------
+TARN_RE = re.compile(r"\btarn[\s-]*modus\b", re.I)
+TARN_AUS = re.compile(r"\b(aus\w*|beend\w*|stopp?\w*|deaktiv\w*|ende|verlass\w*)\b", re.I)
+TARN_AN = re.compile(r"\b(an|ein\w*|aktiv\w*|start\w*|geh\w*|mach\w*|schalt\w*|wechsel\w*)\b", re.I)
+TARN_VORHER = {"sichtbar": False}
+
+
+def tarn_befehl(text):
+    """„Tarnmodus an/aus“ (Sprache oder Telegram) → True/False, sonst None. Fragen über den Tarnmodus gehen an Claude."""
+    t = re.sub(r"^\[[^\]]*\]\s*", "", text.strip())   # Telegram-Hinweis vorne weg
+    t = re.sub(r"^(hey\s+)?(jarvis|orb)[,\s]+", "", t, flags=re.I)
+    if not TARN_RE.search(t) or len(t) > 60 or "?" in t or re.search(r"\b(was|wie|warum|wieso|erklär)", t, re.I):
+        return None
+    rest = TARN_RE.sub(" ", t)
+    if TARN_AUS.search(rest):
+        return False
+    if TARN_AN.search(rest) or not rest.strip(" ,.!"):
+        return True
+    return None
+
+
+def tarn_ende(grund):
+    """Läuft im Tarnmodus-Thread, wenn er endet (Befehl oder Larsen am PC)."""
+    print("Tarnmodus aus:", grund)
+    if TARN_VORHER["sichtbar"] and ON_SHOW[0]:
+        try:
+            ON_SHOW[0]()
+        except Exception as e:
+            print("Tarnmodus Fenster:", e)
+    text = ("Tarnmodus beendet – jemand hat am PC Maus oder Tastatur benutzt." if grund == "pc"
+            else "Tarnmodus ist aus, alles wieder wie vorher.")
+    write_state(mode="idle", tarn=False, say=text, parts=[], aid=new_aid(), final=True, holo=None)
+
+
+def tarn_schalten(an, heard=""):
+    if an:
+        if tarnmodus.aktiv():
+            write_answer("Der Tarnmodus läuft schon.", heard=heard)
+            return
+        TARN_VORHER["sichtbar"] = time.time() - LAST_WACH[0] < 3   # Fenster war sichtbar → danach wieder zeigen
+        write_state(mode="idle", tarn=True, heard=heard, say="Tarnmodus an. Der PC wirkt aus, alles läuft weiter.",
+                    parts=[], aid=new_aid(), final=True, holo=None)
+        if ON_HIDE[0]:
+            try:
+                ON_HIDE[0](keep=True)   # nur ausblenden: die Seite hört weiter auf „Tarnmodus aus“
+            except Exception as e:
+                print("Tarnmodus Fenster:", e)
+        tarnmodus.starten(tarn_ende)
+        print("Tarnmodus an")
+    elif not tarnmodus.beenden():
+        write_answer("Der Tarnmodus ist gar nicht an.", heard=heard)
+
+
 def ask(text):
+    tb = tarn_befehl(text)
+    if tb is not None:
+        tarn_schalten(tb, text)
+        return True
     if skin_still() and SKIN_FERTIG.search(text):   # Skin-Arbeit beendet: wieder normal sprechen
         skin_still(False)
         write_answer("Alles klar, ich rede wieder.", heard=text, laut=True)
@@ -2332,6 +2390,10 @@ def chroma_loop():
                     cache["news"] = []
                 cache["t"] = time.time()
             cfg = cache["cfg"]
+            if tarnmodus.aktiv():   # Tarnmodus: alle Razer-Geräte schwarz (statt Synapse-Licht) – PC wirkt aus
+                ch.setzen((0, 0, 0))
+                time.sleep(1)
+                continue
             wach = time.time() - LAST_WACH[0] < 3
             if not cfg.get("razer", True) or not wach or spiel_laeuft():
                 if ch.uri:
@@ -2812,6 +2874,7 @@ class Handler(BaseHTTPRequestHandler):
             st["spiel"] = spiel_laeuft()
             # Meeting oder Spiel: nicht zuhören – außer Minecraft: da hört ORB weiter auf „Jarvis“ (Befehle im Spiel)
             st["anruf"] = call_aktiv() or bool(st["spiel"] and st["spiel"] != "Minecraft")   # während Meet/Teams/Zoom nicht zuhören
+            st["tarn"] = tarnmodus.aktiv()   # Tarnmodus: Oberfläche ganz stumm
             st["version"] = VERSION   # Fenster lädt sich neu, wenn eine neue Version läuft
             for i, p in enumerate(st.get("parts") or []):   # Stimme für alle Stücke vorbereiten
                 ensure((st.get("aid"), i), p)
