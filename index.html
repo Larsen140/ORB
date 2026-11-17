@@ -2723,7 +2723,8 @@ async function poll() {
     S.spiel = st.spiel || '';
     if (!!st.tarn !== !!S.tarn) { S.tarn = !!st.tarn; applyAudio(); hlog('Tarnmodus ' + (S.tarn ? 'an' : 'aus')); }
     ohrStand(st.ohr);   // im Spiel: Klatschen/Schnipsen aus (Schüsse, Explosionen, Blöcke)
-    if (!!st.anruf !== !!S.call) { S.call = !!st.anruf; if (S.call) { stopWake(); killConvoRec(); killBarge(); hint('Meeting oder Spiel erkannt – ich höre nicht zu', 3500); } else if (cfg.steuerung === 'wort') startWake(); }
+    S.pause = !!st.pause;
+    if (!!st.anruf !== !!S.call) { S.call = !!st.anruf; if (S.call) { stopWake(); killConvoRec(); killBarge(); hint(S.pause ? 'Pausemodus – ich reagiere nicht auf Stimmen (aufheben: /weiter tippen)' : 'Meeting oder Spiel erkannt – ich höre nicht zu', 3500); } else if (cfg.steuerung === 'wort') startWake(); }
     // neue ORB-Version läuft → Seite neu laden (sonst sieht man Änderungen erst nach Fenster-Neustart)
     if (st.version) { if (!poll._v) poll._v = st.version; else if (st.version !== poll._v) { location.replace(S.sleep ? '/#schlaf' : '/#wake'); location.reload(); return; } }
     if (st.seq !== S.seq && (S.seq === -1 || st.seq > S.seq || st.seq < S.seq - 1000)) { const first = S.seq === -1; S.seq = st.seq; onState(st, first); }

@@ -73,7 +73,7 @@ DEFAULT_CFG = {
 }
 # Damit ORB immer dein Claude-Code-Login (Max-Abo) nutzt und nie einen API-Schlüssel
 CLAUDE_ENV_DROP = ("ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "ANTHROPIC_BASE_URL")
-VERSION = "142"
+VERSION = "143"
 ORB_UI = ("Deine Oberfläche (die Larsen gerade sieht): in der Mitte du als flüssige leuchtende Kugel mit Tropfen, "
           "Orbit-Ringen und Sternenhimmel; links eine Uhr und darunter der Gesprächsverlauf mit Eingabefeld; rechts "
           "Karten für System (CPU, RAM, Akku), Wetter mit Stundenvorschau, Aktivität (was du gerade tust) und Vorschläge; "
@@ -1500,7 +1500,96 @@ def tarn_schalten(an, heard=""):
         write_answer("Der Tarnmodus ist gar nicht an.", heard=heard)
 
 
+# ---------- Komplett ausschalten & Pausemodus (feste Befehle – das Gesprächs-Gehirn darf ORB nicht beenden) ----------
+AUS_RE = re.compile(r"^/(aus|beenden)\b|\b(schalt\w*|mach\w*|fahr\w*)\s+(dich|orb|jarvis)\s+(jetzt\s+)?(komplett|ganz|vollständig)\s+(aus|runter|ab)\b"
+                    r"|\b(beende|schließe?)\s+dich\s+(jetzt\s+)?(komplett|ganz|vollständig)\b"
+                    r"|^(orb|jarvis)?\s*(komplett|ganz|vollständig)\s+(ausschalten|beenden|aus)\W*$", re.I)
+PAUSE_RE = re.compile(r"\b(pause[n-]?modus|stumm[\s-]*modus|zuhör[\s-]*pause)\b", re.I)
+PAUSE = {"an": False}
+
+
+def befehl_text(text):
+    t = re.sub(r"^\[[^\]]*\]\s*", "", text.strip())   # Telegram-Hinweis vorne weg
+    return re.sub(r"^(hey\s+)?(jarvis|orb)[,\s]+", "", t, flags=re.I).strip()
+
+
+def aus_befehl(text):
+    t = befehl_text(text)
+    return len(t) <= 60 and "?" not in t and bool(AUS_RE.search(t))
+
+
+def pause_befehl(text):
+    """„/pause“, „/weiter“, „Pausemodus an/aus“, „hör nicht zu“ / „hör wieder zu“ → True/False, sonst None."""
+    t = befehl_text(text)
+    if len(t) > 60 or "?" in t:
+        return None
+    if re.match(r"^/pause\b", t, re.I) or re.search(r"\bhör\w*\s+(mir\s+)?(jetzt\s+)?nicht\s+(mehr\s+)?zu\b", t, re.I):
+        return True
+    if re.match(r"^/weiter\b", t, re.I) or re.search(r"\bhör\w*\s+(mir\s+)?(jetzt\s+)?wieder\s+zu\b", t, re.I):
+        return False
+    if not PAUSE_RE.search(t) or re.search(r"\b(was|wie|warum|wieso|erklär)", t, re.I):
+        return None
+    rest = PAUSE_RE.sub(" ", t)
+    if TARN_AUS.search(rest):
+        return False
+    if TARN_AN.search(rest) or not rest.strip(" ,.!"):
+        return True
+    return None
+
+
+def telegram_nachricht(text):
+    """Kurze Nachricht direkt aufs Handy (unabhängig davon, ob Larsen gerade per Telegram schreibt)."""
+    try:
+        with open(os.path.join(os.environ.get("LOCALAPPDATA", ""), "ORB", "telegram.json"), encoding="utf-8") as f:
+            c = json.load(f)
+        if c.get("token") and c.get("chat_id"):
+            daten = urllib.parse.urlencode({"chat_id": c["chat_id"], "text": text}).encode()
+            urllib.request.urlopen("https://api.telegram.org/bot%s/sendMessage" % c["token"], data=daten, timeout=8).read()
+            return True
+    except Exception as e:
+        print("Telegram-Nachricht:", e)
+    return False
+
+
+def orb_aus(heard=""):
+    """ORB komplett beenden (inkl. Ohr, Stimme, Telegram) – vorher Bestätigung per Telegram."""
+    per_telegram = heard.startswith("[Per Telegram")
+    print("Komplett aus auf Befehl:", heard[:80])
+    BRAIN.kill()
+    telegram_nachricht("ORB schaltet sich jetzt komplett aus. Wieder an: ORB.exe am PC starten (oder beim nächsten PC-Start).")
+    if per_telegram:   # nicht über die Weiterleitung schicken – die Bestätigung ist schon da
+        write_state(mode="idle", heard=heard, say="ORB schaltet sich aus.", parts=[], aid="", final=False)
+    else:
+        write_answer("Okay, ich schalte mich komplett aus. Bis später.", heard=heard, laut=True)
+
+    def ende():
+        time.sleep(1.5 if per_telegram else 6)   # Ansage noch ausreden lassen
+        try:
+            tarnmodus.aufraeumen()
+        except Exception:
+            pass
+        clean_exit("Beendet: Befehl „komplett aus“" + (" (Telegram)" if per_telegram else ""))
+    threading.Thread(target=ende, daemon=True).start()
+
+
+def pause_schalten(an, heard=""):
+    if an == PAUSE["an"]:
+        write_answer("Der Pausemodus ist schon " + ("an." if an else "aus."), heard=heard)
+        return
+    PAUSE["an"] = an
+    print("Pausemodus", "an" if an else "aus")
+    write_answer("Pausemodus an. Ich reagiere nicht mehr auf Stimmen, per Telegram oder Tippen bin ich weiter da. "
+                 "Beenden mit /weiter." if an else "Pausemodus aus, ich höre wieder zu.", heard=heard)
+
+
 def ask(text):
+    if aus_befehl(text):
+        orb_aus(text)
+        return True
+    pb = pause_befehl(text)
+    if pb is not None:
+        pause_schalten(pb, text)
+        return True
     tb = tarn_befehl(text)
     if tb is not None:
         tarn_schalten(tb, text)
@@ -2875,6 +2964,8 @@ class Handler(BaseHTTPRequestHandler):
             # Meeting oder Spiel: nicht zuhören – außer Minecraft: da hört ORB weiter auf „Jarvis“ (Befehle im Spiel)
             st["anruf"] = call_aktiv() or bool(st["spiel"] and st["spiel"] != "Minecraft")   # während Meet/Teams/Zoom nicht zuhören
             st["tarn"] = tarnmodus.aktiv()   # Tarnmodus: Oberfläche ganz stumm
+            st["pause"] = PAUSE["an"]   # Pausemodus: Oberfläche hört nicht zu, Telegram/Tippen gehen weiter
+            st["anruf"] = st["anruf"] or PAUSE["an"]
             st["version"] = VERSION   # Fenster lädt sich neu, wenn eine neue Version läuft
             for i, p in enumerate(st.get("parts") or []):   # Stimme für alle Stücke vorbereiten
                 ensure((st.get("aid"), i), p)
@@ -3024,6 +3115,9 @@ class Handler(BaseHTTPRequestHandler):
             if not b.get("getippt") and ist_echo(text):   # ORBs eigene Stimme über das Mikro – nie als Frage weitergeben
                 print("Echo verworfen:", text[:80])
                 return self.send(200, {"ok": False, "echo": True})
+            if PAUSE["an"] and not b.get("getippt"):   # Pausemodus: Stimmen (z. B. Meeting-Ton) nie annehmen
+                print("Pausemodus, Sprache ignoriert:", text[:80])
+                return self.send(200, {"ok": False, "pause": True})
             r = ask(text)
             self.send(200 if r else 409, {"ok": True, "parallel": r == "parallel", "lokal": r == "lokal"})
         elif u.path == "/stop":

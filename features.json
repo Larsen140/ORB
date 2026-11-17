@@ -91,6 +91,16 @@
      "beispiel": "Jarvis, Tarnmodus an"
     },
     {
+     "name": "Pausemodus",
+     "text": "ORB reagiert nicht auf Stimmen (z. B. Meeting-Ton), Telegram und Tippen funktionieren weiter. Aufheben mit /weiter oder „Pausemodus aus“ (getippt).",
+     "beispiel": "Jarvis, Pausemodus an"
+    },
+    {
+     "name": "Komplett ausschalten",
+     "text": "ORB beendet sich selbst ganz (auch Ohr, Stimme und Telegram) und schickt vorher eine Bestätigung aufs Handy. Per Telegram: /aus.",
+     "beispiel": "Jarvis, schalte dich komplett aus"
+    },
+    {
      "name": "Gedächtnis zeigen",
      "text": "Zeigt als Hologramm, was ORB über dich weiß – und korrigiert es auf Zuruf.",
      "beispiel": "Jarvis, was weißt du über mich?"
