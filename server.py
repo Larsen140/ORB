@@ -77,7 +77,7 @@ DEFAULT_CFG = {
 }
 # Damit ORB immer dein Claude-Code-Login (Max-Abo) nutzt und nie einen API-Schlüssel
 CLAUDE_ENV_DROP = ("ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "ANTHROPIC_BASE_URL")
-VERSION = "153"
+VERSION = "154"
 ORB_UI = ("Deine Oberfläche (die Larsen gerade sieht): in der Mitte du als flüssige leuchtende Kugel mit Tropfen, "
           "Orbit-Ringen und Sternenhimmel; links eine Uhr und darunter der Gesprächsverlauf mit Eingabefeld; rechts "
           "Karten für System (CPU, RAM, Akku), Wetter mit Stundenvorschau, Aktivität (was du gerade tust) und Vorschläge; "
@@ -1755,9 +1755,7 @@ def spotify_now():
     u32, k32 = ctypes.windll.user32, ctypes.windll.kernel32
     titles = []
 
-    def cb(hwnd, _):
-        if not u32.IsWindowVisible(hwnd):
-            return True
+    def cb(hwnd, _):   # auch versteckte Fenster: Spotify minimiert/im Infobereich behält seinen Titel „Künstler - Titel“
         pid = wintypes.DWORD()
         u32.GetWindowThreadProcessId(hwnd, ctypes.byref(pid))
         h = k32.OpenProcess(0x1000, False, pid.value)
@@ -1775,9 +1773,11 @@ def spotify_now():
         return True
 
     u32.EnumWindows(ctypes.WINFUNCTYPE(ctypes.c_bool, wintypes.HWND, wintypes.LPARAM)(cb), 0)
+    titles = [x for x in titles if x not in ("Default IME", "MSCTFIME UI", "GDI+ Window", "G", "Chrome Legacy Window")
+              and not x.startswith(("GDI+", "Spotify Widevine", "CicMarshalWnd"))]
     if not titles:
         return {"laeuft": False}
-    t = next((x for x in titles if " - " in x), titles[0])
+    t = next((x for x in titles if " - " in x), next((x for x in titles if x.startswith("Spotify")), titles[0]))
     if " - " not in t:
         return {"laeuft": True, "spielt": False}
     kuenstler, titel = t.split(" - ", 1)

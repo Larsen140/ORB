@@ -1,1 +1,1 @@
-153|Einfache Einrichtung der Tastatur-Farbe per Doppelklick
+154|Musik-Kachel erkennt Spotify auch minimiert im Hintergrund
