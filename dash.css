@@ -328,3 +328,12 @@ html[data-thema="nacht"] .d-segment button.an, html[data-thema="nacht"] .d-pill.
 .d-kachel .bad.up, .d-stat .bad.up { color:#11936a; background:rgba(22,180,120,.13); }
 .d-kachel .bad.dn, .d-stat .bad.dn { color:#d13b2e; background:rgba(220,60,45,.12); }
 #d-themen { grid-template-columns:repeat(4, 1fr); }
+
+/* Einstellungen: tiefschwarz und gut lesbar (über dem hellen Glas) */
+body.dash #set { background:#0b0b0d !important; backdrop-filter:none !important; -webkit-backdrop-filter:none !important; color:#f4f4f5 !important;
+  border:1px solid rgba(255,255,255,.08); box-shadow:0 30px 80px -20px rgba(0,0,0,.7); }
+body.dash #set::before, body.dash #set::after { display:none !important; }
+body.dash #set .card { background:#17171a !important; border:1px solid rgba(255,255,255,.06); }
+body.dash #set h4, body.dash #set .note, body.dash #set .v { color:rgba(244,244,245,.6) !important; }
+body.dash #set .row, body.dash #set .lbl, body.dash #set .sh span { color:#f4f4f5 !important; }
+body.dash #set select, body.dash #set input[type="text"], body.dash #set input:not([type]) { background:#222226 !important; color:#fff !important; border-color:rgba(255,255,255,.1) !important; }

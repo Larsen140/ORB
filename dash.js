@@ -364,6 +364,7 @@
   });
 
   if (qp.get('seite')) geh(qp.get('seite'));
+  if (qp.get('set')) setTimeout(() => $d('gear') && $d('gear').click(), 1500);
   zeit(); woche(); ladeTermine(); ladeGold(); ladeSys(); ladeWetter(); ladeMusik();
   setInterval(zeit, 30000); setInterval(ladeTermine, 30000); setInterval(ladeGold, 20000);
   setInterval(ladeSys, 3000); setInterval(ladeWetter, 600000); setInterval(ladeMusik, 4000);

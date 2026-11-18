@@ -154,6 +154,11 @@
      "name": "Nur deine Stimme",
      "text": "ORB lernt deine Stimme und ignoriert Freunde im Discord, Fernseher oder Besuch.",
      "beispiel": "Jarvis, lerne meine Stimme neu"
+    },
+    {
+     "name": "Streng nur „Jarvis“",
+     "text": "ORB reagiert nur, wenn du „Jarvis“ sagst oder klatschst – keine Folgefragen ohne Namen (abschaltbar in den Einstellungen).",
+     "beispiel": "Jarvis, wie spät ist es?"
     }
    ]
   },
