@@ -411,6 +411,16 @@
      "name": "Mein TradingView",
      "text": "Öffnet deinen eigenen TradingView-Chart (dein Konto, deine Layouts) in Opera GX.",
      "beispiel": "Jarvis, öffne mein TradingView"
+    },
+    {
+     "name": "Trading-Journal",
+     "text": "Eigener Tab: Währung, Long/Short, Emotion, +/−/BE und Lot in Sekunden eintragen – mit Gewinnkurve, Trefferquote und Emotions-Auswertung.",
+     "beispiel": "Jarvis, trag ins Journal: Gold Long plus 45, 0,5 Lot"
+    },
+    {
+     "name": "TradingView im Dashboard",
+     "text": "Dein echtes TradingView-Konto liegt randlos in der Chart-Karte der Trading-Seite – voll bedienbar.",
+     "beispiel": "Trading → Mein Konto"
     }
    ]
   },
@@ -658,6 +668,11 @@
      "name": "Was Jarvis kann",
      "text": "Dieses Widget – durchsuchbar, immer aktuell.",
      "beispiel": "Funktion suchen …"
+    },
+    {
+     "name": "Notizen",
+     "text": "Notizen-Tab mit Farben, Anheften, Suche und Auto-Speichern – ORB kennt alle Notizen.",
+     "beispiel": "Jarvis, notier dir: Freitag keine Trades"
     }
    ]
   }

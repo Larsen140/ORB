@@ -77,7 +77,7 @@ DEFAULT_CFG = {
 }
 # Damit ORB immer dein Claude-Code-Login (Max-Abo) nutzt und nie einen API-Schlüssel
 CLAUDE_ENV_DROP = ("ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "ANTHROPIC_BASE_URL")
-VERSION = "154"
+VERSION = "155"
 ORB_UI = ("Deine Oberfläche (die Larsen gerade sieht): in der Mitte du als flüssige leuchtende Kugel mit Tropfen, "
           "Orbit-Ringen und Sternenhimmel; links eine Uhr und darunter der Gesprächsverlauf mit Eingabefeld; rechts "
           "Karten für System (CPU, RAM, Akku), Wetter mit Stundenvorschau, Aktivität (was du gerade tust) und Vorschläge; "
@@ -2733,6 +2733,190 @@ def tastatur_farbe(farbe):
     return False
 
 
+# ---------- Trading-Journal (schnell: Währung, Emotion, +/-, Lotgröße) ----------
+JOURNAL = os.path.join(os.path.expanduser("~"), "Documents", "Jarvis", "trading", "journal.json")
+
+
+def journal_laden():
+    try:
+        with open(JOURNAL, encoding="utf-8") as f:
+            return json.load(f)
+    except Exception:
+        return []
+
+
+def journal_speichern(liste):
+    os.makedirs(os.path.dirname(JOURNAL), exist_ok=True)
+    tmp = JOURNAL + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as f:
+        json.dump(liste, f, ensure_ascii=False, indent=1)
+    os.replace(tmp, JOURNAL)
+
+
+def journal_eintrag(b):
+    """Neuer Trade: {waehrung, emotion, ergebnis (Zahl, + oder -), lot}. Alles optional außer Ergebnis."""
+    try:
+        ergebnis = float(str(b.get("ergebnis", "")).replace(",", ".").replace(" ", ""))
+    except ValueError:
+        return None
+    try:
+        lot = float(str(b.get("lot") or 0).replace(",", "."))
+    except ValueError:
+        lot = 0.0
+    e = {"id": "%x" % int(time.time() * 1000), "zeit": time.strftime("%Y-%m-%d %H:%M"),
+         "waehrung": re.sub(r"[^A-Z0-9/.]", "", str(b.get("waehrung") or "XAUUSD").upper())[:12] or "XAUUSD",
+         "emotion": str(b.get("emotion") or "")[:16], "ergebnis": round(ergebnis, 2), "lot": round(lot, 2),
+         "richtung": "short" if str(b.get("richtung", "")).lower().startswith("s") else "long",
+         "be": bool(b.get("be")) or ergebnis == 0}
+    liste = journal_laden()
+    liste.append(e)
+    journal_speichern(liste)
+    return e
+
+
+def journal_statistik(liste):
+    erg = [x.get("ergebnis", 0) for x in liste]
+    heute = time.strftime("%Y-%m-%d")
+    return {"anzahl": len(erg), "summe": round(sum(erg), 2), "trefferquote": round(sum(1 for x in erg if x > 0) / len(erg) * 100) if erg else 0,
+            "heute": round(sum(x.get("ergebnis", 0) for x in liste if str(x.get("zeit", "")).startswith(heute)), 2)}
+
+
+# ---------- TradingView-Konto im Dashboard: eigenes Fenster, randlos in die Chart-Karte gelegt ----------
+TV = {"hwnd": 0, "an": False, "rect": None, "proc": None, "t": 0.0}
+TV_PROFIL = os.path.join(os.environ.get("LOCALAPPDATA", ""), "ORB", "tradingview")
+
+
+def _tv_fenster():
+    """HWND des TradingView-Fensters (Edge-App mit eigenem Profil)."""
+    import ctypes
+    from ctypes import wintypes
+    u = ctypes.windll.user32
+    if TV["hwnd"] and u.IsWindow(TV["hwnd"]):
+        return TV["hwnd"]
+    try:
+        import psutil
+        pids = {p.pid for p in psutil.process_iter(["name", "cmdline"])
+                if (p.info["name"] or "").lower() == "msedge.exe" and any("ORB\\tradingview" in (c or "") for c in p.info["cmdline"] or [])}
+    except Exception:
+        return 0
+    gefunden = []
+
+    @ctypes.WINFUNCTYPE(wintypes.BOOL, wintypes.HWND, wintypes.LPARAM)
+    def cb(h, _):
+        pid = wintypes.DWORD()
+        u.GetWindowThreadProcessId(h, ctypes.byref(pid))
+        if pid.value in pids and u.GetWindowTextLengthW(h) and u.GetParent(h) == 0:
+            r = (ctypes.c_long * 4)()
+            u.GetWindowRect(h, ctypes.byref(r))
+            if r[2] - r[0] > 200:
+                gefunden.append(h)
+        return True
+    u.EnumWindows(cb, 0)
+    TV["hwnd"] = gefunden[0] if gefunden else 0
+    return TV["hwnd"]
+
+
+def tv_dock(an, rect=None, symbol="VANTAGE:XAUUSD"):
+    """an=True + rect {x,y,w,h} (Bildschirm-Punkte): Fenster dort randlos zeigen (ggf. starten). an=False: ausblenden."""
+    import ctypes
+    from ctypes import wintypes
+    u = ctypes.windll.user32
+    u.SetWindowPos.argtypes = [wintypes.HWND, wintypes.HWND, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_uint]
+    TV["an"] = bool(an)
+    h = _tv_fenster()
+    if not an:
+        if h:
+            u.ShowWindow(h, 0)
+        return True
+    x, y, w, hh = (int(rect[k]) for k in ("x", "y", "w", "h"))
+    if not h:
+        if time.time() - TV["t"] < 8:
+            return True   # startet gerade
+        TV["t"] = time.time()
+        edge = next((e for e in (r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe",
+                                 r"C:\Program Files\Microsoft\Edge\Application\msedge.exe") if os.path.exists(e)), None)
+        if not edge:
+            return False
+        sym = re.sub(r"[^A-Z0-9:._!-]", "", symbol.upper())[:40] or "VANTAGE:XAUUSD"
+        TV["proc"] = subprocess.Popen([edge, "--app=https://www.tradingview.com/chart/?symbol=" + urllib.parse.quote(sym),
+                                       "--user-data-dir=" + TV_PROFIL, "--no-first-run", "--window-position=%d,%d" % (x, y),
+                                       "--window-size=%d,%d" % (w, hh)])
+        threading.Thread(target=lambda: (time.sleep(2.5), tv_dock(TV["an"], TV["rect"] or rect, symbol)), daemon=True).start()
+        TV["rect"] = rect
+        return True
+    TV["rect"] = rect
+    GWL_STYLE, GWLP_HWNDPARENT = -16, -8
+    st = u.GetWindowLongW(h, GWL_STYLE)
+    neu = st & ~(0x00C00000 | 0x00040000)   # ohne Titelleiste und Ziehrahmen
+    if neu != st:
+        u.SetWindowLongW(h, GWL_STYLE, neu)
+    try:   # dem ORB-Fenster unterordnen: liegt immer darüber, verschwindet mit ihm
+        orb = [w_ for w_ in _orb_hwnds() if w_ != h]
+        if orb:
+            ctypes.windll.user32.SetWindowLongPtrW(wintypes.HWND(h), GWLP_HWNDPARENT, ctypes.c_void_p(orb[0]))
+    except Exception:
+        pass
+    u.ShowWindow(h, 4)   # zeigen, ohne zu aktivieren
+    u.SetWindowPos(h, 0, x, y, w, hh, 0x0010 | 0x0020 | 0x0040)   # NOACTIVATE | FRAMECHANGED | SHOWWINDOW
+    return True
+
+
+def _orb_hwnds():
+    import ctypes
+    from ctypes import wintypes
+    u = ctypes.windll.user32
+    out = []
+
+    @ctypes.WINFUNCTYPE(wintypes.BOOL, wintypes.HWND, wintypes.LPARAM)
+    def cb(h, _):
+        b = ctypes.create_unicode_buffer(16)
+        u.GetWindowTextW(h, b, 16)
+        if b.value == "ORB" and u.IsWindowVisible(h):
+            out.append(h)
+        return True
+    u.EnumWindows(cb, 0)
+    return out
+
+
+# ---------- Notizen (Dashboard-Tab; liegen in der Wissensbasis, damit ORB sie kennt) ----------
+NOTIZEN = os.path.join(os.path.expanduser("~"), "Documents", "Jarvis", "notizen.json")
+
+
+def notizen_laden():
+    try:
+        with open(NOTIZEN, encoding="utf-8") as f:
+            return json.load(f)
+    except Exception:
+        return []
+
+
+def notizen_aendern(b):
+    """{text, titel?, farbe?, id?} speichern (neu oder ändern) · {loeschen: id} · {anheften: id}."""
+    liste = notizen_laden()
+    if b.get("loeschen"):
+        liste = [n for n in liste if n.get("id") != str(b["loeschen"])]
+    elif b.get("anheften"):
+        for n in liste:
+            if n.get("id") == str(b["anheften"]):
+                n["angeheftet"] = not n.get("angeheftet")
+    else:
+        text = str(b.get("text") or "")[:20000]
+        titel = str(b.get("titel") or "").strip()[:120] or (text.strip().split("\n")[0][:60] if text.strip() else "Neue Notiz")
+        nid = str(b.get("id") or "")
+        n = next((x for x in liste if x.get("id") == nid), None) if nid else None
+        if n is None:
+            n = {"id": "%x" % int(time.time() * 1000), "erstellt": time.strftime("%Y-%m-%d %H:%M")}
+            liste.append(n)
+        n.update(titel=titel, text=text, farbe=str(b.get("farbe") or n.get("farbe") or "")[:12], geaendert=time.strftime("%Y-%m-%d %H:%M"))
+        nid = n["id"]
+    os.makedirs(os.path.dirname(NOTIZEN), exist_ok=True)
+    tmp = NOTIZEN + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as f:
+        json.dump(liste, f, ensure_ascii=False, indent=1)
+    os.replace(tmp, NOTIZEN)
+    return {"ok": True, "id": nid if not b.get("loeschen") else None}
+
+
 def say_when_free(text):
     """Ansage, sobald ORB nicht gerade selbst antwortet (max. 2 Min. warten)."""
     def run():
@@ -3146,6 +3330,11 @@ class Handler(BaseHTTPRequestHandler):
                 self.send(200, weather_data() or {})
             except Exception:
                 self.send(200, {})
+        elif u.path == "/notizen":
+            self.send(200, {"notizen": notizen_laden()})
+        elif u.path == "/journal":
+            liste = journal_laden()
+            self.send(200, {"eintraege": liste[-200:], "statistik": journal_statistik(liste)})
         elif u.path == "/gold":
             try:
                 self.send(200, dict(gold_tag(), preis=gold_preis(), zeit=GOLD["zeit"]))
@@ -3335,6 +3524,17 @@ class Handler(BaseHTTPRequestHandler):
             OHR["n"] += 1
             OHR["ev"].append({"id": OHR["n"], "typ": typ, "text": text, "t": time.time()})
             self.send(200, {"ok": True})
+        elif u.path == "/journal":   # Trading-Journal: neuer Eintrag {waehrung, emotion, ergebnis, lot} oder {loeschen: id}
+            if b.get("loeschen"):
+                journal_speichern([x for x in journal_laden() if x.get("id") != str(b["loeschen"])])
+                self.send(200, {"ok": True})
+            else:
+                e = journal_eintrag(b)
+                self.send(200 if e else 400, {"ok": bool(e), "eintrag": e})
+        elif u.path == "/notizen":   # Notizen-Tab: speichern / löschen / anheften
+            self.send(200, notizen_aendern(b))
+        elif u.path == "/tv_dock":   # Dashboard: TradingView-Konto in der Chart-Karte zeigen/ausblenden
+            self.send(200, {"ok": tv_dock(bool(b.get("an")), b.get("rect"), str(b.get("symbol") or "VANTAGE:XAUUSD"))})
         elif u.path == "/tastatur":   # Dashboard-Farbthema → Acer-Nitro-Tastatur (über die Admin-Aufgabe „ORB Tastatur“)
             self.send(200, {"ok": tastatur_farbe(str(b.get("farbe", "")))})
         elif u.path == "/tradingview":   # Dashboard: „Mein TradingView“ – Chart in Larsens Opera GX (sein Konto, seine Layouts)
