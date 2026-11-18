@@ -106,19 +106,9 @@
      "beispiel": "Jarvis, was weißt du über mich?"
     },
     {
-     "name": "Ideen sammeln",
-     "text": "Sortiert Ideen in Listen (Video, Trading, ORB …) und erinnert dich später daran.",
-     "beispiel": "Jarvis, merk dir: Video über Ferraris im Regen"
-    },
-    {
      "name": "KI-Stimme lokal",
      "text": "Sehr echte deutsche Stimmen (Thorsten, Lina) auf deiner Grafikkarte – kostenlos, ohne Limit, auch kommerziell.",
      "beispiel": "Einstellungen → Stimme → KI-Stimme Thorsten"
-    },
-    {
-     "name": "Ins Online-Seminar",
-     "text": "Öffnet KATI in Opera GX, geht in deinen Kurs, schaltet Mikro und Kamera aus und erbittet die Teilnahme.",
-     "beispiel": "Jarvis, mach mich ins Meeting"
     },
     {
      "name": "Stopp & Unterbrechen",
@@ -187,21 +177,6 @@
      "beispiel": "Knopf „Echte Farben“"
     },
     {
-     "name": "Kamera-Ansicht",
-     "text": "Live-Webcam als Hologramm-Fenster mit Widgets und 3D-Objekten darin.",
-     "beispiel": "Jarvis, Kamera an"
-    },
-    {
-     "name": "Kamera-Standbild",
-     "text": "Claude schaut auf Wunsch einmal durch die laufende Kamera.",
-     "beispiel": "Was halte ich gerade in der Hand?"
-    },
-    {
-     "name": "Sphäre in der Hand",
-     "text": "Eine Sphäre schwebt über deiner Handfläche.",
-     "beispiel": "Jarvis, Sphäre in meine Hand"
-    },
-    {
      "name": "Grafikstufe „Kino“",
      "text": "Bloom, Lichtstrahlen, Tiefenschärfe und filmische Farben.",
      "beispiel": "Einstellungen → Grafik → Kino"
@@ -210,16 +185,6 @@
      "name": "Was ist neu?",
      "text": "Nach jedem Update ein kleines Hologramm mit den Neuerungen.",
      "beispiel": "kommt von selbst"
-    },
-    {
-     "name": "Freie Hologramme",
-     "text": "Beliebig viele, mit Text, Listen, Zahlen, Tabellen, Bildern, Videos und Webseiten; verschiebbar und skalierbar.",
-     "beispiel": "Jarvis, zeig mir eine Übersicht als Hologramm"
-    },
-    {
-     "name": "Video-Hologramm",
-     "text": "Spielt Videos (z. B. fertige TikToks) direkt als Hologramm ab.",
-     "beispiel": "Jarvis, zeig mir das neue Video"
     },
     {
      "name": "Aufgaben-Hologramme",
@@ -251,16 +216,6 @@
      "name": "Zeichnen in der Luft",
      "text": "Mit dem Finger Linien in den Raum malen.",
      "beispiel": "In der Kamera-Ansicht zeichnen"
-    },
-    {
-     "name": "Spotify per Geste",
-     "text": "Musik ohne Tastatur steuern.",
-     "beispiel": "Wischen für nächsten Song"
-    },
-    {
-     "name": "Gesten-Hilfe",
-     "text": "Zeigt alle Gesten auf einen Blick.",
-     "beispiel": "Jarvis, Kamera-Hilfe"
     },
     {
      "name": "Handzeichen",
@@ -342,11 +297,6 @@
    "icon": "🎬",
    "features": [
     {
-     "name": "Fertiges TikTok-Video",
-     "text": "Aus einem Thema ein 60–90-s-Video mit Stimme, Untertiteln, Musik und Titelbild.",
-     "beispiel": "Mach ein TikTok über Gold"
-    },
-    {
      "name": "Vorlagen",
      "text": "Jarvis, Gold, Autos oder KI-Bilder.",
      "beispiel": "Mach ein Jarvis-Video über die Kamera-Gesten"
@@ -355,26 +305,6 @@
      "name": "Formate",
      "text": "Top-5, Quiz mit Countdown, Mythos vs. Fakt, Story, Wusstest du, Vorher/Nachher, Tutorial.",
      "beispiel": "Jarvis, mach ein Quiz-Video über Gold"
-    },
-    {
-     "name": "Serien",
-     "text": "Mehrere Videos am Stück plus Posting-Plan.",
-     "beispiel": "Jarvis, mach 5 Top-5-Videos über Sportwagen"
-    },
-    {
-     "name": "Qualitätskontrolle",
-     "text": "Prüft jedes Video automatisch (Länge, Auflösung, Einzelbilder).",
-     "beispiel": "läuft automatisch"
-    },
-    {
-     "name": "Higgsfield-Clips",
-     "text": "Echte KI-Videoclips (kostet Credits) – nur auf ausdrücklichen Wunsch, mit Kostenhinweis.",
-     "beispiel": "Jarvis, mach den Hook mit Higgsfield"
-    },
-    {
-     "name": "Trend-Ideen",
-     "text": "Sammelt aktuelle Trends und schlägt passende Video-Ideen vor.",
-     "beispiel": "Jarvis, was läuft gerade auf TikTok?"
     }
    ]
   },
@@ -444,11 +374,6 @@
      "beispiel": "Jarvis, wie crafte ich einen Beobachter?"
     },
     {
-     "name": "Bau-Ideen mit Vorschau",
-     "text": "ORB entwirft 3 Bauten aus Blöcken, zeigt sie in einer Sekunde als Vorschau und baut deinen Favoriten genau so.",
-     "beispiel": "Jarvis, ich brauch eine Idee für ein Haus am See"
-    },
-    {
      "name": "Eigener Server",
      "text": "Jede Version, mit Fabric für Mods, Whitelist und automatische Backups.",
      "beispiel": "Jarvis, starte den Minecraft-Server"
@@ -457,51 +382,6 @@
      "name": "Jede Version & Mods",
      "text": "Funktioniert mit 1.8.9 bis 26.x, Fabric, Forge und LabyMod.",
      "beispiel": "einfach spielen"
-    },
-    {
-     "name": "Skin-Designer",
-     "text": "Echte Skin-KI (auf Minecraft-Skins trainiert, lokal): jede Figur in ~20 s pro Skin, drehbare 3D-Vorschau.",
-     "beispiel": "Jarvis, mach mir einen Skin: Ritter in roter Rüstung"
-    },
-    {
-     "name": "Skin-Varianten",
-     "text": "3 Skins zur Auswahl nebeneinander in 3D.",
-     "beispiel": "Jarvis, 3 Skin-Ideen für einen Hacker"
-    },
-    {
-     "name": "Skins in den Launcher",
-     "text": "Legt den gewählten Skin direkt in die Skin-Bibliothek des Launchers.",
-     "beispiel": "Jarvis, Nummer 2 in den Launcher"
-    },
-    {
-     "name": "Pixel-Art-Bauer",
-     "text": "Baut Bilder und Logos aus Blöcken in deine Welt – mit Vorschau.",
-     "beispiel": "Jarvis, bau mein Logo als Pixel-Art"
-    },
-    {
-     "name": "Skins bearbeiten & Pixel-genau",
-     "text": "Jede Figur Pixel für Pixel – auch bekannte; vorhandene Skins ändern, Original bleibt.",
-     "beispiel": "Jarvis, gib meinem Skin ein Omnitrix"
-    },
-    {
-     "name": "Skin-KI",
-     "text": "Echte, auf Minecraft-Skins trainierte KI – jede Figur, 4 Varianten, ORB prüft und bessert nach.",
-     "beispiel": "Jarvis, mach mir einen Spider-Man-Skin"
-    },
-    {
-     "name": "Skins umfärben",
-     "text": "Farben auf beiden Schichten tauschen, Schatten bleiben.",
-     "beispiel": "Jarvis, mach das Weiße weinrot"
-    },
-    {
-     "name": "3D-Schicht",
-     "text": "Keine flachen Skins: Haare und Kleidung stehen in 3D ab.",
-     "beispiel": "läuft automatisch"
-    },
-    {
-     "name": "Eigene Skins in 3D",
-     "text": "Zeigt Skins aus deinem Ordner als drehbare 3D-Figur.",
-     "beispiel": "Jarvis, zeig mir meinen Skin"
     }
    ]
   },
@@ -609,16 +489,6 @@
      "beispiel": "startet von selbst"
     },
     {
-     "name": "Keine Fehlalarme",
-     "text": "Reagiert im Spiel nicht auf Knalle; in Minecraft hört er weiter auf „Jarvis“.",
-     "beispiel": "Jarvis, …"
-    },
-    {
-     "name": "Minecraft-Modus",
-     "text": "Bei Minecraft versteckt sich ORB, hört aber weiter auf „Jarvis“.",
-     "beispiel": "Minecraft starten"
-    },
-    {
      "name": "Mini-ORB im Spiel",
      "text": "Startest du ein Spiel, wird ORB zur kleinen Kugel unten rechts mit Mini-Hologramm, ohne dein Spiel zu stören.",
      "beispiel": "Jarvis, wo finde ich Diamanten?"
@@ -636,7 +506,7 @@
    "features": [
     {
      "name": "Glas-Dashboard",
-     "text": "ORBs Oberfläche im Milchglas-Look: Begrüßung, Kugel im Tagesring, Kalender, Gold, Agenten, System und Musik – mit Seiten für Trading, Agenten und Gespräch.",
+     "text": "ORBs Oberfläche im Milchglas-Look: Begrüßung, Kugel im Tagesring, Kalender mit Wetter- und Notiz-Widget, Uhr, Agenten, System, Musik und Schnellaktionen – dazu Seiten für Trading, Journal, Notizen, Agenten und Gespräch.",
      "beispiel": "Seitenleiste links: Übersicht, Trading, Agenten, Gespräch"
     },
     {

@@ -39,8 +39,8 @@ SR, BLOCK = 16000, 1280                    # 80 ms – Blockgröße von openWake
 MODELL = os.environ.get("ORB_WHISPER", "large-v3-turbo")
 LOG = os.path.join(BASIS, "ohr.log")
 # Wörter, die Larsen oft sagt – Whisper erkennt sie damit zuverlässiger (z. B. „Minecraft“ statt „Microfass“)
-PROMPT = ("Jarvis, ORB. Stopp. Minecraft, Skin, Overlay, Meeting, Seminar, Opera, TikTok, Video, Gold, Trading, Chart, "
-          "Hologramm, Spotify, Entwickler, Update, Larsens World, Casino, Ultimatrix, Omnitrix, Vantage, ForexFactory.")
+PROMPT = ("Jarvis, ORB. Stopp. Meeting, Seminar, Opera, Gold, Trading, Chart, Journal, Notiz, Long, Short, Break-even, Lot, "
+          "Hologramm, Spotify, Entwickler, Update, Larsens World, Casino, Vantage, ForexFactory, TradingView.")
 HAENGT = re.compile(r"(?i)(\b(und|oder|aber|weil|dass|wenn|ob|also|äh|ähm|ich|du|mir|mich|mein|meine|meinen|der|die|das|den|dem|"
                     r"ein|eine|einen|zu|mit|für|von|im|in|auf|bitte|noch|mal)\W*$)|^\W*jarvis\W*$")
 

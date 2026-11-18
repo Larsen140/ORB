@@ -68,7 +68,7 @@ DEFAULT_CFG = {
     "stimme": "de-DE-ChristophNeural", "tempo": "+6%", "hoehe": "-2Hz", "jarvis_effekt": True, "lautstaerke": 160, "laut_v": 2,
     "farbe": "rot", "effekte": "mittel", "untertitel": True,
     "sfx": True, "sfxlaut": 60, "ambient": False,
-    "steuerung": "wort", "wakeword": "Jarvis", "schnipsen": True, "trading_start": True, "gaming_modus": True, "stimmung": True, "razer": True, "gesten": True, "ohr": True, "unterbrechen": True, "sprechen_unterbrechen": True, "nur_jarvis": True, "musik_schutz": True, "ducking": True,
+    "steuerung": "wort", "wakeword": "Jarvis", "schnipsen": True, "trading_start": True, "gaming_modus": True, "stimmung": True, "razer": True, "gesten": False, "ohr": True, "unterbrechen": True, "sprechen_unterbrechen": True, "nur_jarvis": True, "musik_schutz": True, "ducking": True,
     "tts_anbieter": "edge",
     "klatschen": True, "dauerzuhoeren": True, "empfindlichkeit": 6, "schnips_empf": 6, "mikro": "TONOR", "kalib": {}, "satzpause": 2.0, "begruessung": True, "ort": "", "name": "",
     "schlafen": 5, "vollbild": True, "spiel_mini": True, "nur_meine_stimme": True, "streng_jarvis": True, "tastatur_farbe": True, "autostart": True, "schlaf_schliessen": True, "bildschirm": False,
@@ -77,7 +77,7 @@ DEFAULT_CFG = {
 }
 # Damit ORB immer dein Claude-Code-Login (Max-Abo) nutzt und nie einen API-Schlüssel
 CLAUDE_ENV_DROP = ("ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "ANTHROPIC_BASE_URL")
-VERSION = "159"
+VERSION = "160"
 ORB_UI = ("Deine Oberfläche (die Larsen gerade sieht): in der Mitte du als flüssige leuchtende Kugel mit Tropfen, "
           "Orbit-Ringen und Sternenhimmel; links eine Uhr und darunter der Gesprächsverlauf mit Eingabefeld; rechts "
           "Karten für System (CPU, RAM, Akku), Wetter mit Stundenvorschau, Aktivität (was du gerade tust) und Vorschläge; "
@@ -2057,12 +2057,7 @@ BG_REGELN = ("Du erledigst für ORB, Larsens Sprachassistenten, eine Aufgabe im 
              "zum Orientieren, dann handeln. Melde Fortschritt nach jedem Teilschritt per aufgabe.ps1 (Larsen sieht dein Hologramm). "
              "Unabhängige Schritte (mehrere Suchen, Downloads, Dateien) parallel erledigen. QUALITÄT: Ergebnis am Ende selbst prüfen "
              "(Bildschirm: %LOCALAPPDATA%\\ORB\\screen\\live.png ansehen, Dateien öffnen, Befehle testen) und Fehler sofort beheben, "
-             "bevor du fertig meldest. MINECRAFT-BAUEN: 1) Entwurf als Blöcke-JSON schreiben (Format in Jarvis/CLAUDE.md, Punkt Bau-Ideen; "
-             "schön: Fundament mit Rand, Wände mit Säulen aus anderem Material, Fensterreihen, gestuftes überstehendes Dach, Beleuchtung, "
-             "Pflanzen/Wege drumherum, 2–3 Materialien pro Bau), 2) `bauvorschau.py zeigen <json>` und das Vorschaubild mit Read ANSEHEN "
-             "– sieht es langweilig/kaputt aus, verbessern und neu zeigen, 3) Teleport an einen Zuschauerpunkt + Chat-Nachricht, Abriss "
-             "mit einem großen /fill … air, dann `bauvorschau.py bauen 1` (baut genau die Vorschau). Erster Block nach spätestens 2 Min. "
-             "Redstone/Technik (Sortierer usw.) erst NACH dem Rohbau bauen und im Spiel testen.")
+             "bevor du fertig meldest.")
 
 
 def umlaute(v):

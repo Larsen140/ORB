@@ -74,13 +74,13 @@
             <div class="werte">
               <div><b id="d-w1">0</b><span>Termine heute</span></div>
               <div><b id="d-w2">0</b><span>Agenten aktiv</span></div>
-              <div><b id="d-w3">–</b><span>Gold heute</span></div>
+              <div><b id="d-w3">–</b><span>Draußen</span></div>
             </div>
           </div>
           <div id="d-ring">
             <svg class="bogen" viewBox="0 0 100 100"><circle class="spur" cx="50" cy="50" r="46"/><circle class="wert" id="d-bogen" cx="50" cy="50" r="46" stroke-dasharray="289" stroke-dashoffset="289"/></svg>
             <div class="kugelplatz" id="d-kugel"></div>
-            <span class="blase" style="left:-4%;top:12%" data-geh="trading" title="Gold">📈</span>
+            <span class="blase" style="left:-4%;top:12%" data-geh="notizen" title="Notizen">📝</span>
             <span class="blase" style="left:-12%;top:52%;animation-delay:-1.2s" data-geh="agenten" title="Agenten">🤖</span>
             <span class="blase" style="left:8%;top:86%;animation-delay:-2.4s" id="d-bl-musik" title="Musik">🎵</span>
             <span class="blase" style="left:82%;top:-6%;animation-delay:-3.1s" data-geh="chat" title="Gespräch">💬</span>
@@ -92,13 +92,17 @@
             <button class="d-rund" title="Termin sagen: „Termin morgen um 15 Uhr …“">${svg('kal')}</button></div>
           <div id="d-woche"></div>
           <div id="d-termine"><div class="leer">Lädt …</div></div>
+          <div class="dw-reihe">
+            <div class="dw" id="dw-wetter"><div class="dw-k"><span id="dw-w-i">⛅</span>Wetter</div><b id="dw-w-t">–</b><small id="dw-w-x">lädt …</small></div>
+            <div class="dw" id="dw-notiz" data-geh="notizen"><div class="dw-k"><span>📌</span>Notiz</div><b id="dw-n-t">Keine Notiz</b><small id="dw-n-x">Sag „Jarvis, notier dir …“</small></div>
+          </div>
           <div id="d-antwort"></div>
           <form class="gespr" id="d-form" onsubmit="return false"><input id="d-eingabe" placeholder="Nachricht an ORB …" autocomplete="off"><button title="Senden">↑</button></form>
         </div>
         <div id="d-kacheln">
-          <div class="d-karte d-kachel akzent d-rein" data-geh="trading" style="animation-delay:.54s"><div class="d-h"><span class="ik">$</span><span class="los bad" id="d-gold-d">–</span></div>
-            <div class="zahl" id="d-gold">–</div><div class="fuss"><div><div class="lbl">Gold · XAU/USD</div><div class="unt">Vantage · live</div></div>
-            <svg class="spark" viewBox="0 0 100 26" preserveAspectRatio="none"><path id="d-spark" d=""/></svg></div></div>
+          <div class="d-karte d-kachel akzent d-rein" style="animation-delay:.54s"><div class="d-h"><span class="ik">◷</span><span class="los bad" id="dk-kw">KW –</span></div>
+            <div class="zahl" id="dk-uhr">--:--</div><div class="fuss"><div><div class="lbl" id="dk-datum">–</div><div class="unt" id="dk-rest">–</div></div>
+            <div class="dk-sek"><i id="dk-sekbar"></i></div></div></div>
           <div class="d-karte d-kachel d-rein" data-geh="agenten" style="animation-delay:.6s"><div class="d-h"><span class="ik">${svg('agenten')}</span><span class="los bad up" id="d-ag-b">live</span></div>
             <div class="zahl" id="d-ag">0</div><div class="fuss"><div><div class="lbl">Agenten aktiv</div><div class="unt" id="d-ag-l">gerade frei</div></div>
             <svg class="spark" viewBox="0 0 100 26" preserveAspectRatio="none"><path id="d-spark-ag" d=""/></svg></div></div>
@@ -110,12 +114,12 @@
             <div class="eqbars"><i></i><i></i><i></i><i></i><i></i></div></div></div>
         </div>
         <div id="d-aktionen">
-          ${[['📊', 'Gold-Analyse', 'Harmonics-Check', 'Analysiere Gold nach meiner Harmonics-Strategie'],
+          ${[['✉️', 'Mails', 'Neues checken', 'Hab ich neue wichtige Mails?'],
              ['🗓', 'Mein Tag', 'Termine & Plan', 'Was steht heute an?'],
-             ['🎬', 'TikTok-Idee', '3 Vorschläge', 'Gib mir drei TikTok-Video-Ideen für heute'],
+             ['⏰', 'Erinnerung', 'gleich festlegen', 'Erinnere mich in 30 Minuten an '],
              ['🩺', 'PC-Check', 'Doktor fragen', 'Mach einen PC-Check'],
              ['🎵', 'Musik', 'Spotify-DJ', 'Spiel Musik passend zur Stimmung'],
-             ['🧱', 'Bau-Idee', 'Minecraft', 'Zeig mir drei Bau-Ideen für Minecraft']]
+             ['📝', 'Notiz', 'schnell festhalten', 'Mach eine Notiz: ']]
             .map(([i, t, u, cmd], n) => `<button class="d-aktion d-rein" data-cmd="${escH(cmd)}" style="animation-delay:${.78 + n * .04}s"><span class="ik">${i}</span><span><b>${t}</b><small>${u}</small></span></button>`).join('')}
         </div>
       </div>
@@ -346,18 +350,18 @@
   async function ladeGold() {
     try {
       const j = await (await fetch('/gold', { cache:'no-store' })).json(); if (typeof j.preis !== 'number') return;
-      zaehlen($d('d-gold'), j.preis, usd);
+      if ($d('d-gold')) zaehlen($d('d-gold'), j.preis, usd);
       goldVerlauf.push(j.preis); if (goldVerlauf.length > 40) goldVerlauf.shift();
       try { const tag = new Date().toDateString(), g = JSON.parse(ls('orb_gold') || '{}');   // eigener Tagesverlauf, falls die Quelle keine Tageswerte liefert
         if (g.tag !== tag) { g.tag = tag; g.start = j.preis; g.hoch = j.preis; g.tief = j.preis; }
         g.hoch = Math.max(g.hoch, j.preis); g.tief = Math.min(g.tief, j.preis); ls('orb_gold', JSON.stringify(g));
         j.heute_hoch = j.heute_hoch || g.hoch; j.heute_tief = j.heute_tief || g.tief; j.tag_start = g.start; } catch (e) {}
       const ref = j.vortag_schluss || j.tag_start || goldVerlauf[0], pr = typeof j.veraenderung === 'number' ? j.veraenderung : ref ? (j.preis - ref) / ref * 100 : 0;
-      const b = $d('d-gold-d'); b.textContent = (pr >= 0 ? '▲ +' : '▼ ') + pr.toFixed(2) + ' %'; b.className = 'los bad ' + (pr >= 0 ? 'up' : 'dn');
-      $d('d-w3').textContent = (pr >= 0 ? '+' : '') + pr.toFixed(1) + ' %';
+      const b = $d('d-gold-d'); if (b) { b.textContent = (pr >= 0 ? '▲ +' : '▼ ') + pr.toFixed(2) + ' %'; b.className = 'los bad ' + (pr >= 0 ? 'up' : 'dn'); }
+
       const v = [j.vortag_tief, j.vortag_hoch, j.vortag_schluss, j.heute_tief, j.heute_hoch, ...goldVerlauf].filter(x => typeof x === 'number');
       const lo = Math.min(...v), hi = Math.max(...v), r = hi - lo || 1, pts = v.map((x, i) => `${(i / (v.length - 1 || 1) * 100).toFixed(1)},${(24 - (x - lo) / r * 22).toFixed(1)}`);
-      $d('d-spark').setAttribute('d', 'M' + pts.join(' L'));
+      if ($d('d-spark')) $d('d-spark').setAttribute('d', 'M' + pts.join(' L'));
       const z = (k, w) => w == null ? '' : `<div class="d-agent"><div class="s" style="margin:0">${k}</div><div class="k" style="font-size:18px">${w}</div></div>`;
       const st = (ik, k, w, pill, pk) => `<div class="d-karte d-stat"><div class="d-h"><span class="ik">${ik}</span>${k}</div><div class="zahl">${w}</div>${pill ? `<span class="bad ${pk}">${pill}</span>` : ''}</div>`;
       const spanne = j.heute_hoch && j.heute_tief ? j.heute_hoch - j.heute_tief : null;
@@ -376,7 +380,7 @@
       if (s.ram != null) $d('d-ram').textContent = 'RAM ' + Math.round(s.ram) + ' %'; } catch (e) {}
   }
   async function ladeWetter() {
-    try { const w = await (await fetch('/weather')).json(); if (w && w.temp != null) $d('d-wx').textContent = Math.round(w.temp) + '° ' + (w.text || w.beschreibung || ''); } catch (e) {}
+    try { const w = await (await fetch('/weather')).json(); if (w && w.temp != null) $d('d-wx').textContent = Math.round(w.temp) + '° ' + (w.desc || w.text || w.beschreibung || ''); } catch (e) {}
   }
   async function ladeMusik() {
     try { const s = await (await fetch('/spotify', { cache:'no-store' })).json();
@@ -528,6 +532,20 @@
     $d('dj-wl').innerHTML = [...new Set(['XAUUSD', 'EURUSD', 'GBPUSD', 'USDJPY', 'NAS100', 'US30', 'BTCUSD', ...djDaten.map(x => x.waehrung)])].map(w => `<option value="${w}">`).join('');
   }
   ladeJournal(); setInterval(ladeJournal, 15000);
+  // Mini-Widgets in der Kalender-Karte
+  async function wetterWidget() {
+    try { const w = await (await fetch('/weather')).json(); if (!w || w.temp == null) return;
+      const txt = String(w.desc || w.text || w.beschreibung || ''), t = txt.toLowerCase();
+      $d('dw-w-i').textContent = /gewitter/.test(t) ? '⛈' : /schnee/.test(t) ? '❄️' : /regen|schauer|niesel/.test(t) ? '🌧' : /nebel/.test(t) ? '🌫' : /bewölkt|wolkig|bedeckt/.test(t) ? '☁️' : /klar|sonn|heiter/.test(t) ? (new Date().getHours() > 18 || new Date().getHours() < 7 ? '🌙' : '☀️') : '⛅';
+      $d('dw-w-t').textContent = Math.round(w.temp) + '°'; $d('d-w3').textContent = Math.round(w.temp) + '°'; $d('dw-w-x').textContent = txt + (w.city ? ' · ' + w.city : ''); } catch (e) {}
+  }
+  wetterWidget(); setInterval(wetterWidget, 600000);
+  function widgetsAktualisieren() {
+    const n = [...dnListe].sort((a, b) => (b.angeheftet ? 1 : 0) - (a.angeheftet ? 1 : 0) || String(b.geaendert).localeCompare(String(a.geaendert)))[0];
+    $d('dw-n-t').textContent = n ? n.titel : 'Keine Notiz';
+    $d('dw-n-x').textContent = n ? n.text.replace(/\s+/g, ' ').slice(0, 70) : 'Sag „Jarvis, notier dir …“';
+  }
+  setInterval(widgetsAktualisieren, 3000);
 
   // ---------- Notizen ----------
   let dnListe = [], dnAktiv = null, dnFarbe = '', dnTimer = 0, dnOffen = false;
@@ -570,6 +588,24 @@
     $d('dn-titel').value = ''; $d('dn-text').value = ''; $d('dn-status').textContent = 'Gelöscht'; ladeNotizen(); };
   ladeNotizen(); setInterval(() => { if (seite === 'notizen' && document.activeElement !== $d('dn-text') && document.activeElement !== $d('dn-titel')) ladeNotizen(); }, 10000);
 
+  // Webcam ist entfernt: Kamera-Ansicht und Gesten nie mehr starten
+  try { kameraAn = () => {}; } catch (e) {}
+  try { gestenStart = () => {}; if (typeof gestenStop === 'function') gestenStop(); } catch (e) {}
+  ['s_gesten'].forEach(id => { const el = $d(id); if (el) el.closest('.row').classList.add('d-weg'); });
+
+  d.querySelectorAll('.dw[data-geh]').forEach(b => b.addEventListener('click', () => geh(b.dataset.geh)));
+  function uhrKachel() {
+    const n = new Date(), hh = String(n.getHours()).padStart(2, '0'), mm = String(n.getMinutes()).padStart(2, '0');
+    const u = $d('dk-uhr'); if (!u) return; if (u.textContent !== hh + ':' + mm) u.textContent = hh + ':' + mm;
+    const d0 = new Date(Date.UTC(n.getFullYear(), n.getMonth(), n.getDate())), tag = d0.getUTCDay() || 7; d0.setUTCDate(d0.getUTCDate() + 4 - tag);
+    const kw = Math.ceil(((d0 - new Date(Date.UTC(d0.getUTCFullYear(), 0, 1))) / 864e5 + 1) / 7);
+    $d('dk-kw').textContent = 'KW ' + kw;
+    $d('dk-datum').textContent = n.toLocaleDateString('de-DE', { weekday:'short', day:'numeric', month:'short' });
+    const rest = 24 * 60 - (n.getHours() * 60 + n.getMinutes());
+    $d('dk-rest').textContent = `noch ${Math.floor(rest / 60)} h ${rest % 60} min heute`;
+    $d('dk-sekbar').style.width = (n.getSeconds() / 59 * 100) + '%';
+  }
+  uhrKachel(); setInterval(uhrKachel, 1000);
   zeit(); woche(); ladeTermine(); ladeGold(); ladeSys(); ladeWetter(); ladeMusik();
   setInterval(zeit, 30000); setInterval(ladeTermine, 30000); setInterval(ladeGold, 20000);
   setInterval(ladeSys, 3000); setInterval(ladeWetter, 600000); setInterval(ladeMusik, 4000);

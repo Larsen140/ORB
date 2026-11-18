@@ -484,3 +484,20 @@ html[data-modus="dunkel"] .dn-karte { border-color:rgba(255,255,255,.07); border
 .d-seite[data-s="trading"] #d-goldinfo .d-agent { padding:10px 14px; }
 .d-seite[data-s="trading"] #d-goldinfo .d-agent .k { font-size:16px !important; }
 .d-chart { overflow:hidden; background:#0f0f12 !important; }
+
+/* Mini-Widgets in der Kalender-Karte */
+.dw-reihe { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+.dw { position:relative; display:flex; flex-direction:column; gap:3px; padding:12px 14px; border-radius:18px; background:var(--d-glass2); border:1px solid var(--d-line);
+  cursor:pointer; overflow:hidden; min-width:0; transition:transform .45s var(--d-spring), box-shadow .3s; animation:d-rein .7s .5s var(--d-ease) backwards; }
+.dw:hover { transform:translateY(-2px); box-shadow:0 12px 24px -16px rgba(0,0,0,.45); }
+.dw-k { display:flex; align-items:center; gap:6px; font-size:11px; font-weight:700; letter-spacing:.04em; text-transform:uppercase; color:var(--d-sub); }
+.dw b { font-size:19px; font-weight:600; letter-spacing:-.02em; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.dw b.up { color:#14a46e; } .dw b.dn { color:#de4636; }
+.dw small { font-size:11.5px; color:var(--d-sub); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+#dw-notiz b { font-size:15px; }
+#dw-w-t { font-size:24px; }
+
+/* Uhr-Kachel */
+#dk-uhr { font-variant-numeric:tabular-nums; font-size:clamp(28px, 2.6vw, 38px); }
+.dk-sek { width:42%; height:6px; border-radius:6px; background:rgba(255,255,255,.25); overflow:hidden; align-self:flex-end; margin-bottom:6px; }
+.dk-sek i { display:block; height:100%; width:0; border-radius:6px; background:#fff; box-shadow:0 0 8px rgba(255,255,255,.8); transition:width .9s linear; }
