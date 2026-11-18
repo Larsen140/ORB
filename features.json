@@ -605,6 +605,16 @@
    "icon": "🛠",
    "features": [
     {
+     "name": "Glas-Dashboard",
+     "text": "Neue Oberfläche im Milchglas-Look: Begrüßung, Kugel im Tagesring, Kalender, Gold, Agenten, System und Musik – mit Seiten für Trading, Agenten und Gespräch.",
+     "beispiel": "Seitenleiste links: Übersicht, Trading, Agenten, Gespräch"
+    },
+    {
+     "name": "Farbthemen",
+     "text": "Sechs Looks zur Wahl: Koralle, Sand, Salbei, Ozean, Lavendel und Nacht – über den Farbknopf oben rechts.",
+     "beispiel": "Farbknopf → Ozean"
+    },
+    {
      "name": "Neue Funktionen auf Zuruf",
      "text": "Wünsche für ORB gehen an den Entwickler – mit eigenem Fortschritts-Hologramm.",
      "beispiel": "Jarvis, bau dir ein Wetter-Widget"

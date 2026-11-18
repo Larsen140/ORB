@@ -73,7 +73,7 @@ DEFAULT_CFG = {
 }
 # Damit ORB immer dein Claude-Code-Login (Max-Abo) nutzt und nie einen API-Schlüssel
 CLAUDE_ENV_DROP = ("ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "ANTHROPIC_BASE_URL")
-VERSION = "143"
+VERSION = "144"
 ORB_UI = ("Deine Oberfläche (die Larsen gerade sieht): in der Mitte du als flüssige leuchtende Kugel mit Tropfen, "
           "Orbit-Ringen und Sternenhimmel; links eine Uhr und darunter der Gesprächsverlauf mit Eingabefeld; rechts "
           "Karten für System (CPU, RAM, Akku), Wetter mit Stundenvorschau, Aktivität (was du gerade tust) und Vorschläge; "
@@ -2922,7 +2922,7 @@ class Handler(BaseHTTPRequestHandler):
     def do_GET(self):
         u = urlparse(self.path)
         if not self.erlaubt(braucht_token=u.path not in ("/", "/index.html", "/version", "/skin3d")
-                            and not u.path.startswith("/skinbild/")):
+                            and not u.path.startswith("/skinbild/") and not u.path.startswith("/dash/")):
             return
         q = {k: v[0] for k, v in parse_qs(u.query).items()}
         if u.path in ("/", "/index.html"):
@@ -3049,6 +3049,15 @@ class Handler(BaseHTTPRequestHandler):
                      "v.animation=new skinview3d.WalkingAnimation();v.animation.speed=.6;v.zoom=.85;"
                      "v.background=0x0b0f1c;onresize=()=>v.setSize(innerWidth,innerHeight)</script>").replace("{N}", n)   # kein %-Format: CSS enthält „100%“
             self.send(200, seite.encode(), "text/html; charset=utf-8")
+        elif u.path.startswith("/dash/"):   # Glas-Dashboard: Stil, Skript, Hintergrund (nur Dateien aus dem dash-Ordner)
+            n = os.path.basename(urllib.parse.unquote(u.path[len("/dash/"):]))
+            typ = {"css": "text/css; charset=utf-8", "js": "text/javascript; charset=utf-8", "jpg": "image/jpeg", "png": "image/png",
+                   "webp": "image/webp"}.get(n.rsplit(".", 1)[-1].lower())
+            pfad = os.path.join(os.path.dirname(os.path.abspath(__file__)), "dash", n)
+            if not typ or not re.fullmatch(r"[A-Za-z0-9_.-]+", n) or not os.path.isfile(pfad):
+                return self.send(404, b"", "text/plain")
+            with open(pfad, "rb") as f:
+                self.send(200, f.read(), typ)
         elif u.path.startswith("/skinbild/"):   # nur PNGs aus dem Skin-Ordner
             n = re.sub(r"[^A-Za-z0-9_-]", "", urllib.parse.unquote(u.path[len("/skinbild/"):]).rsplit(".", 1)[0])[:60]
             pfad = os.path.join(os.path.expanduser("~"), "Pictures", "Minecraft-Skins", n + ".png")
