@@ -73,7 +73,7 @@ DEFAULT_CFG = {
 }
 # Damit ORB immer dein Claude-Code-Login (Max-Abo) nutzt und nie einen API-Schlüssel
 CLAUDE_ENV_DROP = ("ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "ANTHROPIC_BASE_URL")
-VERSION = "144"
+VERSION = "145"
 ORB_UI = ("Deine Oberfläche (die Larsen gerade sieht): in der Mitte du als flüssige leuchtende Kugel mit Tropfen, "
           "Orbit-Ringen und Sternenhimmel; links eine Uhr und darunter der Gesprächsverlauf mit Eingabefeld; rechts "
           "Karten für System (CPU, RAM, Akku), Wetter mit Stundenvorschau, Aktivität (was du gerade tust) und Vorschläge; "
@@ -3053,8 +3053,8 @@ class Handler(BaseHTTPRequestHandler):
             n = os.path.basename(urllib.parse.unquote(u.path[len("/dash/"):]))
             typ = {"css": "text/css; charset=utf-8", "js": "text/javascript; charset=utf-8", "jpg": "image/jpeg", "png": "image/png",
                    "webp": "image/webp"}.get(n.rsplit(".", 1)[-1].lower())
-            pfad = os.path.join(os.path.dirname(os.path.abspath(__file__)), "dash", n)
-            if not typ or not re.fullmatch(r"[A-Za-z0-9_.-]+", n) or not os.path.isfile(pfad):
+            pfad = os.path.join(os.path.dirname(os.path.abspath(__file__)), n)   # liegen im Hauptordner (Updater kopiert keine Unterordner)
+            if not typ or not re.fullmatch(r"dash[A-Za-z0-9_.-]*", n) or not os.path.isfile(pfad):
                 return self.send(404, b"", "text/plain")
             with open(pfad, "rb") as f:
                 self.send(200, f.read(), typ)
