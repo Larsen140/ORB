@@ -1,1 +1,1 @@
-145|Neues Glas-Dashboard mit sechs Farbthemen, die Kugel sitzt im Tagesring
+146|Altes Design entfernt, ORB nutzt nur noch das Glas-Dashboard

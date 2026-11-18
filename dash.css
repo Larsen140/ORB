@@ -219,6 +219,3 @@ body.dash.mini #gl { mix-blend-mode:normal; }
 #d-chatplatz #msgs, #d-chatplatz .leer, #d-chatplatz [class*="leer"] { color:var(--d-sub) !important; }
 #d-chatplatz #txt::placeholder { color:var(--d-sub); }
 #d-chatplatz h5 { color:var(--d-acc1); }
-#d-zurueck { position:fixed; left:18px; top:18px; z-index:30; height:36px; padding:0 14px; border-radius:999px; border:1px solid rgba(255,255,255,.25);
-  background:rgba(255,255,255,.12); color:#fff; font:600 12.5px 'Segoe UI',sans-serif; cursor:pointer; backdrop-filter:blur(14px); }
-body.dash #d-zurueck { display:none; }

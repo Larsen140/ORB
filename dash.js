@@ -43,7 +43,6 @@
       <button id="d-mic">${svg('mic')}<span class="tip">Sprechen (Leertaste halten)</span></button>
       <button id="d-stop">${svg('stop')}<span class="tip">Stopp</span></button>
       <button id="d-set">${svg('gear')}<span class="tip">Einstellungen</span></button>
-      <button id="d-klassik">${svg('klassik')}<span class="tip">Klassische Ansicht</span></button>
     </div>
   </nav>
   <header id="d-top" class="dg d-rein" style="animation-delay:.12s">
@@ -125,14 +124,10 @@
   }
   const qp = new URLSearchParams(location.search);   // Test: /?thema=nacht&seite=trading
   themaSetzen(qp.get('thema') || ls('orb_thema') || 'koralle');
-  designSetzen(ls('orb_design') !== 'klassisch');
+  designSetzen(true);   // altes Design gibt es nicht mehr
   $d('d-farbe').onclick = e => { e.stopPropagation(); $d('d-themen').classList.toggle('an'); };
   document.querySelectorAll('#d-themen button').forEach(b => b.onclick = () => themaSetzen(b.dataset.t));
   addEventListener('click', e => { if (!e.target.closest('#d-themen')) $d('d-themen').classList.remove('an'); });
-  $d('d-klassik').onclick = () => designSetzen(false);
-  const zur = document.createElement('button'); zur.id = 'd-zurueck'; zur.textContent = '✦ Glas-Design'; zur.onclick = () => designSetzen(true);
-  document.body.appendChild(zur);
-  window.orbDesign = designSetzen;   // klassisch → zurück: orbDesign(true)
 
   // ---------- Seiten ----------
   let seite = 'home';
