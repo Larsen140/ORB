@@ -1,1 +1,1 @@
-157|Trading-Seite aufgeräumt: TradingView ohne Titelleiste, größerer Chart
+158|TradingView-Konto sauber und rahmenlos im Dashboard, Live-Chart entfernt

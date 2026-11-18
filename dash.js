@@ -122,7 +122,7 @@
     </section>
     <section class="d-seite" data-s="trading">
       <div class="d-kopf"><div><h1>Trading</h1><div class="unter">Gold · XAU/USD bei <b>Vantage</b> · Harmonics-Strategie</div></div>
-        <div class="knoepfe"><div class="d-segment" id="d-quelle"><button data-q="konto" class="an">Mein Konto</button><button data-q="live">Live-Chart</button></div><div class="d-segment" id="d-tf">${[['15', '15 Min'], ['60', '1 Std'], ['240', '4 Std'], ['D', 'Tag']].map(([x, n], i) => `<button data-tf="${x}" class="${i === 0 ? 'an' : ''}">${n}</button>`).join('')}</div>
+        <div class="knoepfe"><div class="d-segment" id="d-tf">${[['15', '15 Min'], ['60', '1 Std'], ['240', '4 Std'], ['D', 'Tag']].map(([x, n], i) => `<button data-tf="${x}" class="${i === 0 ? 'an' : ''}">${n}</button>`).join('')}</div>
           <button class="d-pill dunkel" id="d-tv">${svg('chart')}Mein TradingView</button></div></div>
       <div class="d-statreihe" id="d-tstats"></div>
       <div class="d-zweispaltig"><div class="d-karte d-chart" id="d-chart"></div>
@@ -233,7 +233,7 @@
     if (s === 'chat') setTimeout(() => { const m = $d('msgs'); if (m) m.scrollTop = m.scrollHeight; }, 50);
   }
   // TradingView-Konto: echtes Fenster randlos über der Chart-Karte (Einbetten blockiert TradingView bei eingeloggten Charts)
-  let tvQuelle = ls('orb_tvquelle') || 'konto', tvSicht = false, tvLetzt = '';
+  let tvQuelle = 'konto', tvSicht = false, tvLetzt = '';   // nur noch dein Konto (Live-Chart entfernt)
   function tvLage() {
     const sicht = document.body.classList.contains('dash') && !document.body.classList.contains('mini') && seite === 'trading' && tvQuelle === 'konto' && !document.hidden
       && !($d('set') && $d('set').classList.contains('on'));
@@ -248,7 +248,7 @@
   function quelleSetzen(q) {
     tvQuelle = q; ls('orb_tvquelle', q);
     document.querySelectorAll('#d-quelle button').forEach(b => b.classList.toggle('an', b.dataset.q === q));
-    $d('d-tf').style.display = q === 'live' ? '' : 'none';
+    $d('d-tf').style.display = 'none';
     if (q === 'live') chartLaden((document.querySelector('#d-tf .an') || {}).dataset?.tf || '15');
     else $d('d-chart').innerHTML = '<div class="tv-platz"><b>Dein TradingView lädt …</b><span>Beim ersten Mal hier einmal anmelden – danach bleibst du eingeloggt.</span></div>';
     tvLetzt = ''; tvLage();

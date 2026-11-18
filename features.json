@@ -419,8 +419,8 @@
     },
     {
      "name": "TradingView im Dashboard",
-     "text": "Dein echtes TradingView-Konto liegt randlos in der Chart-Karte der Trading-Seite – voll bedienbar.",
-     "beispiel": "Trading → Mein Konto"
+     "text": "Dein echtes TradingView-Konto liegt rahmenlos in der Chart-Karte der Trading-Seite – voll bedienbar, Login bleibt gespeichert.",
+     "beispiel": "Seitenleiste → Trading"
     }
    ]
   },
