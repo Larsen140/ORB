@@ -191,7 +191,7 @@
     document.documentElement.dataset.thema = t; ls('orb_thema', t);
     const kugel = { koralle:'rot', sand:'cyan', salbei:'gruen', ozean:'blau', lavendel:'lila', gold:'gold', rose:'rot' }[t];
     const taste = { koralle:'ff4a2e', sand:'00c8a0', salbei:'2fc060', ozean:'1e6bff', lavendel:'7a3cff', gold:'ffa800', rose:'ff2a6d' }[t];   // kräftig, wirkt als LED besser
-    if (taste) fetch('/tastatur', { method:'POST', headers:{ 'Content-Type':'application/json' }, body:JSON.stringify({ farbe:taste }) }).catch(() => {});
+    window._dTaste = taste;   // Tastatur nur bei echtem Klick umfärben (siehe unten)
     try { if (kugel && typeof farbeGleiten === 'function') farbeGleiten(kugel); } catch (e) {}   // Kugel färbt sich passend zum Thema
     document.querySelectorAll('[data-t]').forEach(b => b.classList.toggle('an', b.dataset.t === t));
   }
@@ -202,7 +202,9 @@
   designSetzen(true);   // altes Design gibt es nicht mehr
   $d('d-farbe').onclick = e => { e.stopPropagation(); $d('d-themen').classList.toggle('an'); };
   document.addEventListener('click', e => { const t = e.target.closest('[data-t]'), m = e.target.closest('[data-m]');
-    if (t) themaSetzen(t.dataset.t); if (m) { e.stopPropagation(); modusSetzen(m.dataset.m); } }, true);
+    if (t) { themaSetzen(t.dataset.t);
+      if (window._dTaste) fetch('/tastatur', { method:'POST', headers:{ 'Content-Type':'application/json' }, body:JSON.stringify({ farbe:window._dTaste }) }).catch(() => {}); }
+    if (m) { e.stopPropagation(); modusSetzen(m.dataset.m); } }, true);
   // Einstellungen aufräumen: alte Farbwahl & Widget-Optionen ausblenden, Hell/Dunkel + Farbthema einsetzen
   (function einstellungen() {
     const sw = $d('swatches'), row = sw && sw.closest('.row');

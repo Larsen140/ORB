@@ -13,7 +13,9 @@ function Log($t) { Add-Content -LiteralPath $log -Value ((Get-Date -Format 'yyyy
 if ($Einrichten) {
     try {
         $skript = $MyInvocation.MyCommand.Path
-        $a = New-ScheduledTaskAction -Execute 'powershell.exe' -Argument "-NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -File `"$skript`" -Auftrag"
+        # über wscript + VBS starten: so blitzt kein PowerShell-Fenster auf
+        $vbs = Join-Path (Split-Path $skript) 'tastatur.vbs'
+        $a = New-ScheduledTaskAction -Execute 'wscript.exe' -Argument "`"$vbs`""
         $p = New-ScheduledTaskPrincipal -UserId ([Security.Principal.WindowsIdentity]::GetCurrent().Name) -LogonType Interactive -RunLevel Highest
         $s = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -ExecutionTimeLimit (New-TimeSpan -Seconds 30)
         Register-ScheduledTask -TaskName 'ORB Tastatur' -Action $a -Principal $p -Settings $s -Force | Out-Null
