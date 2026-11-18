@@ -71,13 +71,13 @@ DEFAULT_CFG = {
     "steuerung": "wort", "wakeword": "Jarvis", "schnipsen": True, "trading_start": True, "gaming_modus": True, "stimmung": True, "razer": True, "gesten": True, "ohr": True, "unterbrechen": True, "sprechen_unterbrechen": True, "nur_jarvis": True, "musik_schutz": True, "ducking": True,
     "tts_anbieter": "edge",
     "klatschen": True, "dauerzuhoeren": True, "empfindlichkeit": 6, "schnips_empf": 6, "mikro": "TONOR", "kalib": {}, "satzpause": 2.0, "begruessung": True, "ort": "", "name": "",
-    "schlafen": 5, "vollbild": True, "spiel_mini": True, "nur_meine_stimme": True, "streng_jarvis": True, "autostart": True, "schlaf_schliessen": True, "bildschirm": False,
+    "schlafen": 5, "vollbild": True, "spiel_mini": True, "nur_meine_stimme": True, "streng_jarvis": True, "tastatur_farbe": True, "autostart": True, "schlaf_schliessen": True, "bildschirm": False,
     "modell": "claude-opus-5-5", "laenge": "kurz", "rechte": "auto", "tempo_claude": "low",
     "ordner": os.path.join(os.path.expanduser("~"), "Documents", "Jarvis"), "sitzung": "",
 }
 # Damit ORB immer dein Claude-Code-Login (Max-Abo) nutzt und nie einen API-Schlüssel
 CLAUDE_ENV_DROP = ("ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "ANTHROPIC_BASE_URL")
-VERSION = "151"
+VERSION = "152"
 ORB_UI = ("Deine Oberfläche (die Larsen gerade sieht): in der Mitte du als flüssige leuchtende Kugel mit Tropfen, "
           "Orbit-Ringen und Sternenhimmel; links eine Uhr und darunter der Gesprächsverlauf mit Eingabefeld; rechts "
           "Karten für System (CPU, RAM, Akku), Wetter mit Stundenvorschau, Aktivität (was du gerade tust) und Vorschläge; "
@@ -2710,6 +2710,29 @@ def live_bildschirm():
             time.sleep(5)
 
 
+_TASTATUR = {"farbe": "", "t": 0.0}
+
+
+def tastatur_farbe(farbe):
+    """Acer-Nitro-Tastatur einfärben: Farbe in eine Datei schreiben und die geplante Aufgabe „ORB Tastatur“ starten
+    (läuft mit Admin-Rechten, die Acer-Schnittstelle verlangt das). Ohne eingerichtete Aufgabe passiert nichts."""
+    farbe = farbe.strip().lstrip("#").lower()
+    if not re.fullmatch(r"[0-9a-f]{6}", farbe) or not load_cfg().get("tastatur_farbe", True):
+        return False
+    if farbe == _TASTATUR["farbe"] and time.time() - _TASTATUR["t"] < 600:
+        return True
+    try:
+        with open(os.path.join(os.environ.get("LOCALAPPDATA", ""), "ORB", "tastatur_farbe.txt"), "w") as f:
+            f.write(farbe)
+        r = subprocess.run(["schtasks", "/run", "/tn", "ORB Tastatur"], capture_output=True, timeout=10, creationflags=NO_WINDOW)
+        if r.returncode == 0:
+            _TASTATUR.update(farbe=farbe, t=time.time())
+            return True
+    except Exception as e:
+        print("Tastatur:", e)
+    return False
+
+
 def say_when_free(text):
     """Ansage, sobald ORB nicht gerade selbst antwortet (max. 2 Min. warten)."""
     def run():
@@ -3312,6 +3335,8 @@ class Handler(BaseHTTPRequestHandler):
             OHR["n"] += 1
             OHR["ev"].append({"id": OHR["n"], "typ": typ, "text": text, "t": time.time()})
             self.send(200, {"ok": True})
+        elif u.path == "/tastatur":   # Dashboard-Farbthema → Acer-Nitro-Tastatur (über die Admin-Aufgabe „ORB Tastatur“)
+            self.send(200, {"ok": tastatur_farbe(str(b.get("farbe", "")))})
         elif u.path == "/tradingview":   # Dashboard: „Mein TradingView“ – Chart in Larsens Opera GX (sein Konto, seine Layouts)
             sym = re.sub(r"[^A-Z0-9:._!-]", "", str(b.get("symbol") or "VANTAGE:XAUUSD").upper())[:40]
             opera = os.path.join(os.environ.get("LOCALAPPDATA", ""), "Programs", "Opera GX", "opera.exe")

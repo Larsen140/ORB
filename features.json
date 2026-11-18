@@ -612,6 +612,11 @@
      "name": "Mini-ORB im Spiel",
      "text": "Startest du ein Spiel, wird ORB zur kleinen Kugel unten rechts mit Mini-Hologramm, ohne dein Spiel zu stören.",
      "beispiel": "Jarvis, wo finde ich Diamanten?"
+    },
+    {
+     "name": "Tastatur in ORBs Farbe",
+     "text": "Die Acer-Nitro-Tastatur leuchtet automatisch in deinem gewählten Farbthema.",
+     "beispiel": "Farbthema Ozean → Tastatur blau"
     }
    ]
   },
