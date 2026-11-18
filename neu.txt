@@ -1,1 +1,1 @@
-158|TradingView-Konto sauber und rahmenlos im Dashboard, Live-Chart entfernt
+159|Chart schließt beim Tab-Wechsel sofort, weniger Speicher und Grafiklast

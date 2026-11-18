@@ -35,9 +35,10 @@ def orb_fenster():
 def steuern(win):
     skala = (u.GetDpiForSystem() or 96) / 96.0
     alt, sichtbar, besitzer = None, False, None
+    versteckt_seit = time.time()
     hwnd = None
     while True:
-        time.sleep(0.12)
+        time.sleep(0.05)
         try:
             with open(LAGE, encoding="utf-8") as f:
                 L = json.load(f)
@@ -70,6 +71,10 @@ def steuern(win):
         elif sichtbar:
             win.hide()
             sichtbar = False
+            versteckt_seit = time.time()
+        if not sichtbar and time.time() - versteckt_seit > 180:   # 3 Min. nicht gebraucht → beenden, gibt ~700 MB frei
+            win.destroy()
+            return
 
 
 if __name__ == "__main__":

@@ -226,6 +226,7 @@
   // ---------- Seiten ----------
   function geh(s) {
     seite = s;
+    if (s !== 'trading' && typeof tvLage === 'function') { tvLetzt = ''; tvLage(); }   // Chart sofort weg, nicht erst bei der nächsten Abfrage
     document.querySelectorAll('#d-rail [data-s]').forEach(b => b.classList.toggle('an', b.dataset.s === s));
     document.querySelectorAll('.d-seite').forEach(x => x.classList.toggle('an', x.dataset.s === s));
     if (s === 'trading' && !$d('d-chart').firstChild) quelleSetzen(tvQuelle);

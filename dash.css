@@ -23,7 +23,7 @@ html[data-modus="dunkel"] { --d-ink:#f5f1ee; --d-sub:rgba(245,241,238,.58); --d-
 body.dash #left, body.dash #right, body.dash #dock, body.dash #island { display:none !important; }
 #dbg, #dash { display:none; }
 body.dash #dbg { display:block; position:fixed; inset:-40px; z-index:0; background:#cdb8a5 url('/dash/dash_hintergrund.jpg') center/cover no-repeat;
-  filter:blur(6px) var(--d-bgfilter) var(--d-bgmod, brightness(1)); transform:translate(var(--d-px,0), var(--d-py,0)) scale(1.04); transition:transform 1.2s var(--d-ease), filter .9s var(--d-ease); }
+  filter:var(--d-bgfilter) var(--d-bgmod, brightness(1));   /* Unschärfe ist ins Bild eingerechnet (spart Grafikleistung) */ transform:translate(var(--d-px,0), var(--d-py,0)) scale(1.04); transition:transform 1.2s var(--d-ease), filter .9s var(--d-ease); }
 body.dash #dbg::after { content:''; position:absolute; inset:0; background:radial-gradient(120% 80% at 50% 0%, transparent, rgba(40,22,12,.18)); }
 body.dash #gl { z-index:3; mix-blend-mode:screen; pointer-events:none; }
 body.dash #fx { z-index:4; mix-blend-mode:screen; }
