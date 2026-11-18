@@ -2155,16 +2155,15 @@ function registerClap(t) {
     if (gap > 220 && gap < 1000 && gleich) { claps = []; clapPk = []; onDoubleClap(); }
   }
 }
-function onDoubleClap() {
-  wachBis = performance.now() + 7000;
+function onDoubleClap() {   // Klatschen holt ORB nur nach vorne – zuhören erst nach „Jarvis“ (streng)
   if (speakingNow()) stopAudio();   // Klatschen unterbricht ORB und er hört zu
   SFX.clap(); setStumm(false);
   verborgen = false; fetch('/show', { method:'POST' }).catch(() => {});   // Klatschen holt ORB immer in den Vordergrund
   if (S.sleep) return wake();
-  if (cfg.dauerzuhoeren) { if (!convo) startConvo(); }
+  if (cfg.dauerzuhoeren || cfg.streng_jarvis !== false) { if (!convo) startConvo(); }
   else if (!S.busy && !listening) listenOnce();
 }
-const startListening = () => cfg.dauerzuhoeren ? startConvo() : listenOnce();
+const startListening = () => cfg.dauerzuhoeren || cfg.streng_jarvis !== false ? startConvo() : listenOnce();   // streng: nur mit „Jarvis“ (Mikro-Knopf hört weiter ohne)
 
 /* ---------- Schlafen & Aufwachen ---------- */
 function goSleep(silent, grund = 'unbekannt') {
