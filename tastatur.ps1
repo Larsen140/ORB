@@ -11,12 +11,19 @@ $log = Join-Path $basis 'tastatur.log'
 function Log($t) { Add-Content -LiteralPath $log -Value ((Get-Date -Format 'yyyy-MM-dd HH:mm:ss') + '  ' + $t) -Encoding UTF8 }
 
 if ($Einrichten) {
-    $skript = $MyInvocation.MyCommand.Path
-    $a = New-ScheduledTaskAction -Execute 'powershell.exe' -Argument "-NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -File `"$skript`" -Auftrag"
-    $p = New-ScheduledTaskPrincipal -UserId $env:USERNAME -LogonType Interactive -RunLevel Highest
-    $s = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -ExecutionTimeLimit (New-TimeSpan -Seconds 30)
-    Register-ScheduledTask -TaskName 'ORB Tastatur' -Action $a -Principal $p -Settings $s -Force | Out-Null
-    Log 'Geplante Aufgabe „ORB Tastatur“ eingerichtet'
+    try {
+        $skript = $MyInvocation.MyCommand.Path
+        $a = New-ScheduledTaskAction -Execute 'powershell.exe' -Argument "-NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -File `"$skript`" -Auftrag"
+        $p = New-ScheduledTaskPrincipal -UserId ([Security.Principal.WindowsIdentity]::GetCurrent().Name) -LogonType Interactive -RunLevel Highest
+        $s = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -ExecutionTimeLimit (New-TimeSpan -Seconds 30)
+        Register-ScheduledTask -TaskName 'ORB Tastatur' -Action $a -Principal $p -Settings $s -Force | Out-Null
+        Log 'Geplante Aufgabe „ORB Tastatur“ eingerichtet'
+        Write-Host "`n  Fertig! ORB kann deine Tastatur jetzt einfärben.`n" -ForegroundColor Green
+    } catch {
+        Log "Einrichten fehlgeschlagen: $_"
+        Write-Host "`n  Fehler: $_`n" -ForegroundColor Red
+    }
+    Start-Sleep 6
     exit 0
 }
 
