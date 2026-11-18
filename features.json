@@ -159,6 +159,11 @@
      "name": "Streng nur „Jarvis“",
      "text": "ORB reagiert nur, wenn du „Jarvis“ sagst oder klatschst – keine Folgefragen ohne Namen (abschaltbar in den Einstellungen).",
      "beispiel": "Jarvis, wie spät ist es?"
+    },
+    {
+     "name": "Männliche Jarvis-Stimme",
+     "text": "Christoph als Standard (oder Brian, William, Jonas, Jan) mit dezentem Jarvis-Effekt: tiefer, mit KI-Schimmer.",
+     "beispiel": "Einstellungen → Stimme → Sprecher"
     }
    ]
   },
@@ -621,7 +626,7 @@
     },
     {
      "name": "Farbthemen",
-     "text": "Acht Looks: Koralle, Sand, Salbei, Ozean, Lavendel, Gold, Rosé und Nacht – die Kugel färbt sich mit.",
+     "text": "Hell oder Dunkel, dazu sieben Farbthemen (Koralle, Sand, Salbei, Ozean, Lavendel, Gold, Rosé) – die Kugel färbt sich mit.",
      "beispiel": "Farbknopf → Ozean"
     },
     {

@@ -11,7 +11,7 @@
     ['koralle', 'Koralle', 'linear-gradient(135deg,#ee5440,#ff7f66,#ffb38c)'], ['sand', 'Sand', 'linear-gradient(135deg,#e6dfd6,#2bb79c)'],
     ['salbei', 'Salbei', 'linear-gradient(135deg,#3f7d5c,#5fa57a,#b4dcae)'], ['ozean', 'Ozean', 'linear-gradient(135deg,#1d5fe0,#2f8bff,#7fd3ff)'],
     ['lavendel', 'Lavendel', 'linear-gradient(135deg,#6d3ef0,#9b6bff,#e0b4ff)'], ['gold', 'Gold', 'linear-gradient(135deg,#b9781a,#e0a63a,#f7d98a)'],
-    ['rose', 'Rosé', 'linear-gradient(135deg,#d93a6f,#f2668f,#ffb3c7)'], ['nacht', 'Nacht', 'linear-gradient(135deg,#181413,#ff5236)'],
+    ['rose', 'Rosé', 'linear-gradient(135deg,#d93a6f,#f2668f,#ffb3c7)'],
   ];
   const IC = {
     home:'<path d="M12 3 2 11.5h3V20h5.5v-5.5h3V20H19v-8.5h3z"/>',
@@ -54,7 +54,7 @@
     <form class="mitte" id="d-frag" onsubmit="return false"><i class="punkt"></i><input placeholder="Frag ORB etwas … z. B. „Wie steht Gold?“" autocomplete="off"><span id="d-status">Bereit</span></form>
     <div class="rechts"><button class="d-rund" id="d-farbe" title="Farbthema">${svg('farbe')}</button></div>
   </header>
-  <div id="d-themen" class="dg">${THEMEN.map(([k, n, g]) => `<button data-t="${k}"><i style="background:${g}"></i>${n}</button>`).join('')}</div>
+  <div id="d-themen" class="dg"><div class="d-modus"><button data-m="hell">☀ Hell</button><button data-m="dunkel">☾ Dunkel</button></div>${THEMEN.map(([k, n, g]) => `<button data-t="${k}"><i style="background:${g}"></i>${n}</button>`).join('')}</div>
   <main id="d-main" class="dg d-rein" style="animation-delay:.18s">
     <section class="d-seite an" data-s="home">
       <div class="d-kopf d-rein" style="animation-delay:.3s">
@@ -142,21 +142,45 @@
     if (chat) { if (an) $d('d-chatplatz').appendChild(chat); else chatHeim.insertBefore(chat, chatNach); }
     try { LAY = layout(); } catch (e) {}
   }
+  function modusSetzen(m) {
+    document.documentElement.dataset.modus = m; ls('orb_modus', m);
+    document.querySelectorAll('.d-modus button').forEach(b => b.classList.toggle('an', b.dataset.m === m));
+    if (seite === 'trading' && typeof chartLaden === 'function') chartLaden((document.querySelector('#d-tf .an') || {}).dataset?.tf || '15');
+  }
   function themaSetzen(t) {
+    if (t === 'nacht') { t = 'koralle'; modusSetzen('dunkel'); }   // altes „Nacht“-Thema
     document.documentElement.dataset.thema = t; ls('orb_thema', t);
-    const kugel = { koralle:'rot', sand:'cyan', salbei:'gruen', ozean:'blau', lavendel:'lila', gold:'gold', rose:'rot', nacht:'rot' }[t];
+    const kugel = { koralle:'rot', sand:'cyan', salbei:'gruen', ozean:'blau', lavendel:'lila', gold:'gold', rose:'rot' }[t];
     try { if (kugel && typeof farbeGleiten === 'function') farbeGleiten(kugel); } catch (e) {}   // Kugel färbt sich passend zum Thema
-    document.querySelectorAll('#d-themen button').forEach(b => b.classList.toggle('an', b.dataset.t === t));
+    document.querySelectorAll('[data-t]').forEach(b => b.classList.toggle('an', b.dataset.t === t));
   }
   const qp = new URLSearchParams(location.search);   // Test: /?thema=nacht&seite=trading
+  let seite = 'home';
+  modusSetzen(qp.get('modus') || ls('orb_modus') || 'hell');
   themaSetzen(qp.get('thema') || ls('orb_thema') || 'koralle');
   designSetzen(true);   // altes Design gibt es nicht mehr
   $d('d-farbe').onclick = e => { e.stopPropagation(); $d('d-themen').classList.toggle('an'); };
-  document.querySelectorAll('#d-themen button').forEach(b => b.onclick = () => themaSetzen(b.dataset.t));
+  document.addEventListener('click', e => { const t = e.target.closest('[data-t]'), m = e.target.closest('[data-m]');
+    if (t) themaSetzen(t.dataset.t); if (m) { e.stopPropagation(); modusSetzen(m.dataset.m); } }, true);
+  // Einstellungen aufräumen: alte Farbwahl & Widget-Optionen ausblenden, Hell/Dunkel + Farbthema einsetzen
+  (function einstellungen() {
+    const sw = $d('swatches'), row = sw && sw.closest('.row');
+    if (row) {
+      row.classList.add('d-weg');
+      const neu = document.createElement('div'); neu.className = 'row col';
+      neu.innerHTML = `Darstellung<div class="d-modus"><button data-m="hell">☀ Hell</button><button data-m="dunkel">☾ Dunkel</button></div>
+        <div style="margin-top:12px">Farbthema</div><div class="d-farbpunkte">${THEMEN.map(([k, n, g]) => `<button data-t="${k}" title="${n}" style="background:${g}"></button>`).join('')}</div>`;
+      row.parentNode.insertBefore(neu, row);
+    }
+    const rl = $d('resetLayout'); if (rl) rl.closest('.row').classList.add('d-weg');
+    const wl = $d('wlist'); if (wl) wl.closest('.grp').classList.add('d-weg');
+    const un = $d('s_unter'); if (un) un.closest('.row').classList.add('d-weg');   // Antwort steht in der Hauptkarte
+    const mu = $d('s_musik'); if (mu) mu.closest('.row').firstChild.textContent = 'Bei Musik: Klatschen nur bei deutlichem Knall';
+    modusSetzen(document.documentElement.dataset.modus || 'hell'); themaSetzen(document.documentElement.dataset.thema || 'koralle');
+  })();
   addEventListener('click', e => { if (!e.target.closest('#d-themen')) $d('d-themen').classList.remove('an'); });
 
   // ---------- Seiten ----------
-  let seite = 'home';
   function geh(s) {
     seite = s;
     document.querySelectorAll('#d-rail [data-s]').forEach(b => b.classList.toggle('an', b.dataset.s === s));
@@ -165,7 +189,7 @@
     if (s === 'chat') setTimeout(() => { const m = $d('msgs'); if (m) m.scrollTop = m.scrollHeight; }, 50);
   }
   function chartLaden(tf) {
-    const dunkel = document.documentElement.dataset.thema === 'nacht' ? 'dark' : 'light';
+    const dunkel = document.documentElement.dataset.modus === 'dunkel' ? 'dark' : 'light';
     $d('d-chart').innerHTML = `<iframe src="https://s.tradingview.com/widgetembed/?symbol=VANTAGE%3AXAUUSD&interval=${tf}&theme=${dunkel}&style=1&locale=de_DE&hide_side_toolbar=0&allow_symbol_change=1&saveimage=0&studies=%5B%5D" loading="lazy"></iframe>`;
   }
   document.querySelectorAll('#d-tf button').forEach(b => b.onclick = () => {
@@ -316,6 +340,7 @@
   }
 
   // ---------- ORBs Zustand spiegeln (Status, Hauptkarte, letzte Antwort) ----------
+  const antwortText = m => m.textContent.replace(/\s*\d{1,2}:\d{2}\s*$/, '').trim();   // Uhrzeit der Nachricht nicht mitlesen
   let txtAlt = '';
   setInterval(() => {
     if (!document.body.classList.contains('dash')) return;
@@ -328,13 +353,13 @@
     let titel = 'Dein Tag läuft <em>rund</em>', chip = 'ORB ist bereit', txt = 'Sag „Jarvis“ oder klatsch zweimal – ich bin da.';
     if (hoert) { titel = 'Ich <em>höre</em> dir zu'; chip = 'Hört zu'; txt = 'Sprich einfach – ich schreibe mit.'; }
     else if (modus === 'denkt' || modus === 'auftrag') { titel = 'Ich bin <em>dran</em>'; chip = 'Arbeitet'; txt = (task && task !== 'Bereit' ? task + (det ? ' – ' + det : '') : 'Einen Moment …'); }
-    else if (modus === 'spricht') { titel = 'Hier ist deine <em>Antwort</em>'; chip = 'Spricht'; const m = [...document.querySelectorAll('#msgs .msg.orb')].pop(); if (m) txt = m.textContent.slice(0, 160); }
+    else if (modus === 'spricht') { titel = 'Hier ist deine <em>Antwort</em>'; chip = 'Spricht'; const m = [...document.querySelectorAll('#msgs .msg.orb')].pop(); if (m) txt = antwortText(m).slice(0, 160); }
     else if (lauf) { titel = `${lauf} ${lauf === 1 ? 'Agent ist' : 'Agenten sind'} <em>fleißig</em>`; chip = `${lauf} im Hintergrund`; txt = agenten.filter(a => a.status === 'laeuft').map(a => a.titel + ': ' + (a.schritt || 'läuft')).join(' · ').slice(0, 170); }
     else if (typeof S !== 'undefined' && S.sleep) { titel = 'Ich <em>ruhe</em> mich aus'; chip = 'Schläft'; txt = 'Klatsch zweimal, dann bin ich sofort wieder da.'; }
     if ($d('d-titel').innerHTML !== titel) { const h = $d('d-titel'); h.style.animation = 'none'; h.offsetHeight; h.style.animation = 'd-rein .6s var(--d-ease)'; h.innerHTML = titel; }
     $d('d-chip').textContent = chip;
     if (txt !== txtAlt) { txtAlt = txt; $d('d-txt').textContent = txt; }
-    const m = [...document.querySelectorAll('#msgs .msg.orb')].pop(); $d('d-antwort').textContent = m ? m.textContent.slice(0, 220) : '';
+    const m = [...document.querySelectorAll('#msgs .msg.orb')].pop(); $d('d-antwort').textContent = m ? antwortText(m).slice(0, 220) : '';
   }, 400);
 
   // ---------- Kugel in den Ring setzen (gleitet mit, wenn die Seite wechselt) ----------

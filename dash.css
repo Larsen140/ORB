@@ -16,14 +16,14 @@ html[data-thema="ozean"]    { --d-acc1:#1d5fe0; --d-acc2:#2f8bff; --d-acc3:#7fd3
 html[data-thema="lavendel"] { --d-acc1:#6d3ef0; --d-acc2:#9b6bff; --d-acc3:#e0b4ff; --d-ink:#211a33; --d-glass:rgba(248,244,255,.4); --d-bgfilter:hue-rotate(230deg) saturate(.55) brightness(1.05); }
 html[data-thema="gold"]     { --d-acc1:#b9781a; --d-acc2:#e0a63a; --d-acc3:#f7d98a; --d-ink:#2b2214; --d-glass:rgba(255,250,238,.4); --d-bgfilter:sepia(.25) saturate(.9) brightness(1.03); }
 html[data-thema="rose"]     { --d-acc1:#d93a6f; --d-acc2:#f2668f; --d-acc3:#ffb3c7; --d-ink:#2d1820; --d-glass:rgba(255,244,247,.4); --d-bgfilter:hue-rotate(-25deg) saturate(.75) brightness(1.03); }
-html[data-thema="nacht"]    { --d-acc1:#ff5236; --d-acc2:#ff7a52; --d-acc3:#ffb46b; --d-ink:#f6efe9; --d-sub:rgba(246,239,233,.58); --d-line:rgba(255,255,255,.08);
-  --d-glass:rgba(24,20,19,.46); --d-glass2:rgba(34,29,27,.66); --d-glass3:rgba(48,42,38,.82); --d-dark:#f4ede7; --d-bgfilter:brightness(.34) saturate(.85); }
+html[data-modus="dunkel"] { --d-ink:#f5f1ee; --d-sub:rgba(245,241,238,.58); --d-line:rgba(255,255,255,.08);
+  --d-glass:rgba(16,14,14,.55); --d-glass2:rgba(26,23,22,.72); --d-glass3:rgba(40,36,34,.86); --d-dark:#f4ede7; --d-bgmod:brightness(.3) saturate(.9); }
 
 /* ---------- Grundgerüst ---------- */
 body.dash #left, body.dash #right, body.dash #dock, body.dash #island { display:none !important; }
 #dbg, #dash { display:none; }
 body.dash #dbg { display:block; position:fixed; inset:-40px; z-index:0; background:#cdb8a5 url('/dash/dash_hintergrund.jpg') center/cover no-repeat;
-  filter:blur(6px) var(--d-bgfilter); transform:translate(var(--d-px,0), var(--d-py,0)) scale(1.04); transition:transform 1.2s var(--d-ease), filter .9s var(--d-ease); }
+  filter:blur(6px) var(--d-bgfilter) var(--d-bgmod, brightness(1)); transform:translate(var(--d-px,0), var(--d-py,0)) scale(1.04); transition:transform 1.2s var(--d-ease), filter .9s var(--d-ease); }
 body.dash #dbg::after { content:''; position:absolute; inset:0; background:radial-gradient(120% 80% at 50% 0%, transparent, rgba(40,22,12,.18)); }
 body.dash #gl { z-index:3; mix-blend-mode:screen; pointer-events:none; }
 body.dash #fx { z-index:4; mix-blend-mode:screen; }
@@ -33,7 +33,7 @@ body.dash #karten, body.dash #tasks, body.dash #holo, body.dash #set, body.dash 
 
 .dg { background:var(--d-glass); backdrop-filter:blur(28px) saturate(160%); -webkit-backdrop-filter:blur(28px) saturate(160%);
   border:1px solid rgba(255,255,255,.45); box-shadow:var(--d-shadow), inset 0 1px 0 rgba(255,255,255,.55); }
-html[data-thema="nacht"] .dg { border-color:rgba(255,255,255,.1); box-shadow:var(--d-shadow), inset 0 1px 0 rgba(255,255,255,.08); }
+html[data-modus="dunkel"] .dg { border-color:rgba(255,255,255,.1); box-shadow:var(--d-shadow), inset 0 1px 0 rgba(255,255,255,.08); }
 
 /* ---------- Leiste oben (V2) ---------- */
 #d-top { position:absolute; top:18px; left:112px; right:28px; height:54px; border-radius:999px; display:flex; align-items:center; gap:12px; padding:0 9px 0 9px; }
@@ -89,7 +89,7 @@ body.d-hoert #d-top .punkt { animation-duration:.7s; }
 .d-raster { flex:1; min-height:0; display:grid; grid-template-columns:minmax(0, 2.05fr) minmax(280px, 1fr); grid-template-rows:minmax(0, 1.25fr) minmax(0, .75fr); gap:18px; }
 .d-karte { position:relative; border-radius:26px; background:var(--d-glass2); border:1px solid rgba(255,255,255,.5); padding:20px 22px; overflow:hidden;
   box-shadow:0 14px 34px -22px rgba(60,30,15,.45); transition:transform .6s var(--d-spring), box-shadow .4s; }
-html[data-thema="nacht"] .d-karte { border-color:rgba(255,255,255,.08); }
+html[data-modus="dunkel"] .d-karte { border-color:rgba(255,255,255,.08); }
 .d-karte:hover { transform:translateY(-3px); box-shadow:0 22px 44px -24px rgba(60,30,15,.55); }
 .d-karte::after { content:''; position:absolute; inset:0; pointer-events:none; border-radius:inherit;
   background:linear-gradient(115deg, transparent 35%, rgba(255,255,255,.35) 50%, transparent 65%); transform:translateX(-120%); }
@@ -288,7 +288,7 @@ body.d-breit #d-top, body.d-breit #d-main { left:280px; }
 #d-aktionen { grid-row:3; grid-column:1; display:grid; grid-template-columns:repeat(3, minmax(0, 1fr)); gap:10px; }
 .d-aktion { display:flex; align-items:center; gap:12px; height:50px; padding:0 14px; border-radius:16px; border:1px solid rgba(255,255,255,.45); cursor:pointer; text-align:left;
   background:var(--d-glass2); color:var(--d-ink); font-family:inherit; transition:transform .45s var(--d-spring), background .3s, box-shadow .3s; }
-html[data-thema="nacht"] .d-aktion { border-color:rgba(255,255,255,.08); }
+html[data-modus="dunkel"] .d-aktion { border-color:rgba(255,255,255,.08); }
 .d-aktion:hover { transform:translateY(-2px); background:var(--d-glass3); box-shadow:0 12px 26px -16px rgba(0,0,0,.45); }
 .d-aktion.klick { animation:d-klick .5s var(--d-spring); }
 @keyframes d-klick { 40% { transform:scale(.95); } }
@@ -322,7 +322,7 @@ html[data-thema="nacht"] .d-aktion { border-color:rgba(255,255,255,.08); }
 .d-kachel svg.spark path { stroke:var(--d-acc2); }
 .d-agent .balken b { background:linear-gradient(90deg, var(--d-acc1), var(--d-acc2), var(--d-acc3)); }
 .d-segment button.an, .d-pill.dunkel, #d-kal .gespr button { background:linear-gradient(135deg, var(--d-dark), color-mix(in srgb, var(--d-dark) 75%, var(--d-acc1))); }
-html[data-thema="nacht"] .d-segment button.an, html[data-thema="nacht"] .d-pill.dunkel, html[data-thema="nacht"] #d-kal .gespr button { background:linear-gradient(135deg, var(--d-acc1), var(--d-acc2)); color:#fff; }
+html[data-modus="dunkel"] .d-segment button.an, html[data-modus="dunkel"] .d-pill.dunkel, html[data-modus="dunkel"] #d-kal .gespr button { background:linear-gradient(135deg, var(--d-acc1), var(--d-acc2)); color:#fff; }
 #d-rail button.an { color:var(--d-acc1); }
 .d-aktion .ik { background:color-mix(in srgb, var(--d-acc3) 30%, var(--d-glass3)); }
 .d-kachel .bad.up, .d-stat .bad.up { color:#11936a; background:rgba(22,180,120,.13); }
@@ -330,10 +330,33 @@ html[data-thema="nacht"] .d-segment button.an, html[data-thema="nacht"] .d-pill.
 #d-themen { grid-template-columns:repeat(4, 1fr); }
 
 /* Einstellungen: tiefschwarz und gut lesbar (über dem hellen Glas) */
-body.dash #set { background:#0b0b0d !important; backdrop-filter:none !important; -webkit-backdrop-filter:none !important; color:#f4f4f5 !important;
+html:not([data-modus="dunkel"]) body.dash #set { background:#0b0b0d !important; backdrop-filter:none !important; -webkit-backdrop-filter:none !important; color:#f4f4f5 !important;
   border:1px solid rgba(255,255,255,.08); box-shadow:0 30px 80px -20px rgba(0,0,0,.7); }
-body.dash #set::before, body.dash #set::after { display:none !important; }
-body.dash #set .card { background:#17171a !important; border:1px solid rgba(255,255,255,.06); }
-body.dash #set h4, body.dash #set .note, body.dash #set .v { color:rgba(244,244,245,.6) !important; }
-body.dash #set .row, body.dash #set .lbl, body.dash #set .sh span { color:#f4f4f5 !important; }
-body.dash #set select, body.dash #set input[type="text"], body.dash #set input:not([type]) { background:#222226 !important; color:#fff !important; border-color:rgba(255,255,255,.1) !important; }
+html:not([data-modus="dunkel"]) body.dash #set::before, body.dash #set::after { display:none !important; }
+html:not([data-modus="dunkel"]) body.dash #set .card { background:#17171a !important; border:1px solid rgba(255,255,255,.06); }
+html:not([data-modus="dunkel"]) body.dash #set h4, body.dash #set .note, body.dash #set .v { color:rgba(244,244,245,.6) !important; }
+html:not([data-modus="dunkel"]) body.dash #set .row, body.dash #set .lbl, body.dash #set .sh span { color:#f4f4f5 !important; }
+html:not([data-modus="dunkel"]) body.dash #set select, body.dash #set input[type="text"], body.dash #set input:not([type]) { background:#222226 !important; color:#fff !important; border-color:rgba(255,255,255,.1) !important; }
+
+html[data-modus="dunkel"] body.dash #set { background:#f7f6f4 !important; backdrop-filter:none !important; color:#141414 !important; border:1px solid rgba(0,0,0,.06);
+  box-shadow:0 30px 80px -20px rgba(0,0,0,.8); }
+html[data-modus="dunkel"] body.dash #set::before, html[data-modus="dunkel"] body.dash #set::after { display:none !important; }
+html[data-modus="dunkel"] body.dash #set .card { background:#fff !important; border:1px solid rgba(0,0,0,.06); }
+html[data-modus="dunkel"] body.dash #set h4, html[data-modus="dunkel"] body.dash #set .note, html[data-modus="dunkel"] body.dash #set .v { color:rgba(20,20,20,.55) !important; }
+html[data-modus="dunkel"] body.dash #set .row, html[data-modus="dunkel"] body.dash #set .lbl, html[data-modus="dunkel"] body.dash #set .sh span { color:#141414 !important; }
+html[data-modus="dunkel"] body.dash #set select, html[data-modus="dunkel"] body.dash #set input[type="text"], html[data-modus="dunkel"] body.dash #set input:not([type]) {
+  background:#f0efed !important; color:#141414 !important; border-color:rgba(0,0,0,.1) !important; }
+html[data-modus="dunkel"] body.dash #set .btn, html[data-modus="dunkel"] body.dash #set .done { background:#141414 !important; color:#fff !important; }
+/* Einstellungen aufräumen: alte Widget-/Farb-Optionen gibt es im Dashboard nicht mehr */
+body.dash #set .d-weg { display:none !important; }
+.d-modus { display:flex; gap:6px; margin-top:8px; }
+.d-modus button { flex:1; height:36px; border-radius:12px; border:1px solid rgba(128,128,128,.25); background:transparent; color:inherit; font:600 13px inherit; font-family:inherit; cursor:pointer; }
+.d-modus button.an { background:linear-gradient(135deg, var(--d-acc1), var(--d-acc2)); color:#fff; border-color:transparent; }
+.d-farbpunkte { display:flex; flex-wrap:wrap; gap:10px; margin-top:8px; }
+.d-farbpunkte button { width:34px; height:34px; border-radius:50%; border:0; cursor:pointer; box-shadow:inset 0 0 0 3px rgba(255,255,255,.6); transition:transform .4s var(--d-spring); }
+.d-farbpunkte button:hover { transform:scale(1.12); }
+.d-farbpunkte button.an { box-shadow:inset 0 0 0 3px #fff, 0 0 0 3px var(--d-acc1); }
+#d-themen .d-modus { grid-column:1 / -1; margin:0 0 4px; }
+
+/* Untertitel: im Dashboard steht die Antwort in der Hauptkarte */
+body.dash:not(.mini) #caption { display:none !important; }

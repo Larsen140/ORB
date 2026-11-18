@@ -51,17 +51,21 @@ TOKEN_FILE = os.path.join(os.environ.get("LOCALAPPDATA", os.path.expanduser("~")
 ERLAUBTE_HOSTS = ("127.0.0.1:%d" % PORT, "localhost:%d" % PORT)
 
 STIMMEN = [
-    ["lokal:thorsten", "KI-Stimme Thorsten (lokal, männlich, sehr echt)"],
-    ["lokal:standard", "KI-Stimme Lina (lokal, weiblich)"],
-    ["de-DE-FlorianMultilingualNeural", "Florian (männlich, sehr natürlich)"],
-    ["de-DE-SeraphinaMultilingualNeural", "Seraphina (weiblich, sehr natürlich)"],
-    ["de-DE-ConradNeural", "Conrad (männlich)"],
-    ["de-DE-KillianNeural", "Killian (männlich)"],
+    ["de-DE-ChristophNeural", "Christoph (männlich, deutsch – Jarvis-Standard)"],
+    ["en-US-BrianMultilingualNeural", "Brian (männlich, sehr natürlich, leichter Akzent)"],
+    ["en-AU-WilliamMultilingualNeural", "William (männlich, ruhig, leichter Akzent)"],
+    ["de-AT-JonasNeural", "Jonas (männlich, österreichisch)"],
+    ["de-CH-JanNeural", "Jan (männlich, Schweizer Hochdeutsch)"],
+    ["lokal:thorsten", "KI-Stimme Thorsten (lokal, männlich)"],
+    ["de-DE-SeraphinaMultilingualNeural", "Seraphina (weiblich)"],
     ["de-DE-KatjaNeural", "Katja (weiblich)"],
-    ["de-DE-AmalaNeural", "Amala (weiblich)"],
+    ["lokal:standard", "KI-Stimme Lina (lokal, weiblich)"],
 ]
+# Microsoft hat diese Stimmen abgeschaltet – alte Einstellungen landen sonst still bei der Notfall-Frauenstimme
+STIMMEN_ERSATZ = {"de-DE-FlorianMultilingualNeural": "de-DE-ChristophNeural", "de-DE-ConradNeural": "de-DE-ChristophNeural",
+                  "de-DE-KillianNeural": "de-DE-ChristophNeural", "de-DE-AmalaNeural": "de-DE-KatjaNeural"}
 DEFAULT_CFG = {
-    "stimme": "de-DE-FlorianMultilingualNeural", "tempo": "+12%", "hoehe": "+0Hz", "lautstaerke": 160, "laut_v": 2,
+    "stimme": "de-DE-ChristophNeural", "tempo": "+6%", "hoehe": "-2Hz", "jarvis_effekt": True, "lautstaerke": 160, "laut_v": 2,
     "farbe": "rot", "effekte": "mittel", "untertitel": True,
     "sfx": True, "sfxlaut": 60, "ambient": False,
     "steuerung": "wort", "wakeword": "Jarvis", "schnipsen": True, "trading_start": True, "gaming_modus": True, "stimmung": True, "razer": True, "gesten": True, "ohr": True, "unterbrechen": True, "sprechen_unterbrechen": True, "nur_jarvis": True, "musik_schutz": True, "ducking": True,
@@ -73,7 +77,7 @@ DEFAULT_CFG = {
 }
 # Damit ORB immer dein Claude-Code-Login (Max-Abo) nutzt und nie einen API-Schlüssel
 CLAUDE_ENV_DROP = ("ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "ANTHROPIC_BASE_URL")
-VERSION = "149"
+VERSION = "150"
 ORB_UI = ("Deine Oberfläche (die Larsen gerade sieht): in der Mitte du als flüssige leuchtende Kugel mit Tropfen, "
           "Orbit-Ringen und Sternenhimmel; links eine Uhr und darunter der Gesprächsverlauf mit Eingabefeld; rechts "
           "Karten für System (CPU, RAM, Akku), Wetter mit Stundenvorschau, Aktivität (was du gerade tust) und Vorschläge; "
@@ -847,7 +851,8 @@ def _edge_einmal(text, cfg, frist):
 
     async def run():
         buf = bytearray()
-        stimme = cfg["stimme"] if "Neural" in str(cfg.get("stimme", "")) else "de-DE-SeraphinaMultilingualNeural"   # lokal:… → Netz-Ersatz
+        stimme = cfg["stimme"] if "Neural" in str(cfg.get("stimme", "")) else "de-DE-ChristophNeural"   # lokal:… → Netz-Ersatz
+        stimme = STIMMEN_ERSATZ.get(stimme, stimme)
         com = edge_tts.Communicate(text, stimme, rate=cfg["tempo"], pitch=cfg["hoehe"])
         it = com.stream().__aiter__()
         while True:
@@ -915,7 +920,7 @@ def synth_edge(text, cfg=None):
         try:
             c = cfg
             if nr >= 2 and any("NoAudio" in (f or "") for f in fehler):   # Stimme/Parameter abgelehnt → Standardstimme, normale Einstellungen
-                c = dict(cfg, stimme="de-DE-SeraphinaMultilingualNeural", tempo="+0%", hoehe="+0Hz")
+                c = dict(cfg, stimme="de-DE-ChristophNeural", tempo="+0%", hoehe="+0Hz")
             data = _edge_einmal(text, c, 18)
             q.put((nr, data if len(data) > 400 else None, None if len(data) > 400 else "leere Antwort"))   # leer = Fehler
         except Exception as e:
