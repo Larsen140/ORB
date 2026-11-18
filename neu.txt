@@ -1,1 +1,1 @@
-146|Altes Design entfernt, ORB nutzt nur noch das Glas-Dashboard
+147|Dashboard wie im Video: Seitenleiste, Schnellaktionen, Trading-Kennzahlen, schönere Farben, TradingView-Konto

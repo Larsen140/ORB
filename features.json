@@ -396,6 +396,11 @@
      "name": "Trade-Rechner",
      "text": "Entry 83,6 %, SL, Breakeven, TP und Lotgröße – als Hologramm.",
      "beispiel": "Jarvis, rechne mir den Trade aus"
+    },
+    {
+     "name": "Mein TradingView",
+     "text": "Öffnet deinen eigenen TradingView-Chart (dein Konto, deine Layouts) in Opera GX.",
+     "beispiel": "Jarvis, öffne mein TradingView"
     }
    ]
   },
@@ -611,7 +616,7 @@
     },
     {
      "name": "Farbthemen",
-     "text": "Sechs Looks zur Wahl: Koralle, Sand, Salbei, Ozean, Lavendel und Nacht – über den Farbknopf oben rechts.",
+     "text": "Acht Looks: Koralle, Sand, Salbei, Ozean, Lavendel, Gold, Rosé und Nacht – die Kugel färbt sich mit.",
      "beispiel": "Farbknopf → Ozean"
     },
     {

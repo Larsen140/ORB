@@ -8,9 +8,10 @@
   const ls = (k, v) => { try { if (v === undefined) return localStorage.getItem(k); localStorage.setItem(k, v); } catch (e) { return null; } };
   const escH = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;' }[c]));
   const THEMEN = [
-    ['koralle', 'Koralle', 'linear-gradient(135deg,#e8644f,#f39a76)'], ['sand', 'Sand', 'linear-gradient(135deg,#d9d2c9,#2fb39a)'],
-    ['salbei', 'Salbei', 'linear-gradient(135deg,#5f8f62,#9cc39a)'], ['ozean', 'Ozean', 'linear-gradient(135deg,#2f7fe0,#6fb2ff)'],
-    ['lavendel', 'Lavendel', 'linear-gradient(135deg,#8a5cf0,#c3a2ff)'], ['nacht', 'Nacht', 'linear-gradient(135deg,#1f1a17,#ff5a3c)'],
+    ['koralle', 'Koralle', 'linear-gradient(135deg,#ee5440,#ff7f66,#ffb38c)'], ['sand', 'Sand', 'linear-gradient(135deg,#e6dfd6,#2bb79c)'],
+    ['salbei', 'Salbei', 'linear-gradient(135deg,#3f7d5c,#5fa57a,#b4dcae)'], ['ozean', 'Ozean', 'linear-gradient(135deg,#1d5fe0,#2f8bff,#7fd3ff)'],
+    ['lavendel', 'Lavendel', 'linear-gradient(135deg,#6d3ef0,#9b6bff,#e0b4ff)'], ['gold', 'Gold', 'linear-gradient(135deg,#b9781a,#e0a63a,#f7d98a)'],
+    ['rose', 'Rosé', 'linear-gradient(135deg,#d93a6f,#f2668f,#ffb3c7)'], ['nacht', 'Nacht', 'linear-gradient(135deg,#181413,#ff5236)'],
   ];
   const IC = {
     home:'<path d="M12 3 2 11.5h3V20h5.5v-5.5h3V20H19v-8.5h3z"/>',
@@ -34,20 +35,23 @@
   const d = document.createElement('div'); d.id = 'dash';
   d.innerHTML = `
   <nav id="d-rail" class="dg d-rein" style="animation-delay:.05s">
-    <div class="orb" title="ORB"></div>
-    <button data-s="home" class="an">${svg('home')}<span class="tip">Übersicht</span></button>
-    <button data-s="trading">${svg('chart')}<span class="tip">Trading</span></button>
-    <button data-s="agenten">${svg('agenten')}<span class="tip">Agenten &amp; Aufgaben</span></button>
-    <button data-s="chat">${svg('chat')}<span class="tip">Gespräch</span></button>
+    <div class="kopf"><div class="orb" title="ORB"></div><div class="lab"><b>ORB</b><span>Jarvis · Glas-Zentrale</span></div>
+      <button class="auf" id="d-auf" title="Seitenleiste auf-/zuklappen">${svg('pfeil')}</button></div>
+    <form class="suche lab" id="d-suche" onsubmit="return false"><i></i><input placeholder="Frag ORB …" autocomplete="off"></form>
+    <div class="rubrik lab">Haupt</div>
+    <button data-s="home" class="an">${svg('home')}<span class="lab">Übersicht</span><span class="tip">Übersicht</span></button>
+    <button data-s="trading">${svg('chart')}<span class="lab">Trading</span><span class="tip">Trading</span></button>
+    <button data-s="agenten">${svg('agenten')}<span class="lab">Agenten</span><span class="tip">Agenten &amp; Aufgaben</span></button>
+    <button data-s="chat">${svg('chat')}<span class="lab">Gespräch</span><span class="tip">Gespräch</span></button>
     <div class="unten">
-      <button id="d-mic">${svg('mic')}<span class="tip">Sprechen (Leertaste halten)</span></button>
-      <button id="d-stop">${svg('stop')}<span class="tip">Stopp</span></button>
-      <button id="d-set">${svg('gear')}<span class="tip">Einstellungen</span></button>
+      <button id="d-mic">${svg('mic')}<span class="lab">Sprechen</span><span class="tip">Sprechen (Leertaste halten)</span></button>
+      <button id="d-stop">${svg('stop')}<span class="lab">Stopp</span><span class="tip">Stopp</span></button>
+      <button id="d-set">${svg('gear')}<span class="lab">Einstellungen</span><span class="tip">Einstellungen</span></button>
     </div>
   </nav>
   <header id="d-top" class="dg d-rein" style="animation-delay:.12s">
     <div class="av">L</div><div class="wil">Willkommen, Larsen</div>
-    <div class="mitte"><i class="punkt"></i><span id="d-status">Bereit</span></div>
+    <form class="mitte" id="d-frag" onsubmit="return false"><i class="punkt"></i><input placeholder="Frag ORB etwas … z. B. „Wie steht Gold?“" autocomplete="off"><span id="d-status">Bereit</span></form>
     <div class="rechts"><button class="d-rund" id="d-farbe" title="Farbthema">${svg('farbe')}</button></div>
   </header>
   <div id="d-themen" class="dg">${THEMEN.map(([k, n, g]) => `<button data-t="${k}"><i style="background:${g}"></i>${n}</button>`).join('')}</div>
@@ -72,6 +76,10 @@
           <div id="d-ring">
             <svg class="bogen" viewBox="0 0 100 100"><circle class="spur" cx="50" cy="50" r="46"/><circle class="wert" id="d-bogen" cx="50" cy="50" r="46" stroke-dasharray="289" stroke-dashoffset="289"/></svg>
             <div class="kugelplatz" id="d-kugel"></div>
+            <span class="blase" style="left:-4%;top:12%" data-geh="trading" title="Gold">📈</span>
+            <span class="blase" style="left:-12%;top:52%;animation-delay:-1.2s" data-geh="agenten" title="Agenten">🤖</span>
+            <span class="blase" style="left:8%;top:86%;animation-delay:-2.4s" id="d-bl-musik" title="Musik">🎵</span>
+            <span class="blase" style="left:82%;top:-6%;animation-delay:-3.1s" data-geh="chat" title="Gespräch">💬</span>
             <span class="proz" id="d-proz">Tag zu 0 % geschafft</span>
           </div>
         </div>
@@ -84,19 +92,35 @@
           <form class="gespr" id="d-form" onsubmit="return false"><input id="d-eingabe" placeholder="Nachricht an ORB …" autocomplete="off"><button title="Senden">↑</button></form>
         </div>
         <div id="d-kacheln">
-          <div class="d-karte d-kachel d-rein" data-geh="trading" style="animation-delay:.54s"><div class="d-h"><span class="ik">📈</span><span class="los bad" id="d-gold-d">–</span></div>
-            <div class="zahl" id="d-gold">–</div><svg class="spark" viewBox="0 0 100 26" preserveAspectRatio="none"><path id="d-spark" d=""/></svg><div class="lbl">Gold · XAU/USD (Vantage)</div></div>
-          <div class="d-karte d-kachel d-rein" data-geh="agenten" style="animation-delay:.6s"><div class="d-h"><span class="ik">🤖</span><span class="los bad" id="d-ag-b">live</span></div>
-            <div class="zahl" id="d-ag">0</div><div class="lbl" id="d-ag-l">Agenten arbeiten</div></div>
+          <div class="d-karte d-kachel akzent d-rein" data-geh="trading" style="animation-delay:.54s"><div class="d-h"><span class="ik">$</span><span class="los bad" id="d-gold-d">–</span></div>
+            <div class="zahl" id="d-gold">–</div><div class="fuss"><div><div class="lbl">Gold · XAU/USD</div><div class="unt">Vantage · live</div></div>
+            <svg class="spark" viewBox="0 0 100 26" preserveAspectRatio="none"><path id="d-spark" d=""/></svg></div></div>
+          <div class="d-karte d-kachel d-rein" data-geh="agenten" style="animation-delay:.6s"><div class="d-h"><span class="ik">${svg('agenten')}</span><span class="los bad up" id="d-ag-b">live</span></div>
+            <div class="zahl" id="d-ag">0</div><div class="fuss"><div><div class="lbl">Agenten aktiv</div><div class="unt" id="d-ag-l">gerade frei</div></div>
+            <svg class="spark" viewBox="0 0 100 26" preserveAspectRatio="none"><path id="d-spark-ag" d=""/></svg></div></div>
           <div class="d-karte d-kachel d-rein" style="animation-delay:.66s"><div class="d-h"><span class="ik">⚡</span><span class="los bad" id="d-ram">RAM –</span></div>
-            <div class="zahl" id="d-cpu">–</div><div class="lbl">CPU-Last · <span id="d-wx">Wetter lädt</span></div></div>
-          <div class="d-karte d-kachel eq d-rein" id="d-musik" style="animation-delay:.72s"><div class="d-h"><span class="ik">🎵</span><span class="los bad" id="d-mu-b">Spotify</span></div>
-            <div class="zahl" id="d-mu">Gerade keine Musik</div><div class="lbl" id="d-mu-a">Sag „spiel Musik“</div></div>
+            <div class="zahl" id="d-cpu">–</div><div class="fuss"><div><div class="lbl">CPU-Last</div><div class="unt" id="d-wx">Wetter lädt</div></div>
+            <svg class="spark" viewBox="0 0 100 26" preserveAspectRatio="none"><path id="d-spark-cpu" d=""/></svg></div></div>
+          <div class="d-karte d-kachel eq d-rein" id="d-musik" style="animation-delay:.72s"><div class="d-h"><span class="ik">♪</span><span class="los bad" id="d-mu-b">Spotify</span></div>
+            <div class="zahl" id="d-mu">Gerade keine Musik</div><div class="fuss"><div><div class="lbl" id="d-mu-a">Sag „spiel Musik“</div><div class="unt">Tippen = Play/Pause</div></div>
+            <div class="eqbars"><i></i><i></i><i></i><i></i><i></i></div></div></div>
+        </div>
+        <div id="d-aktionen">
+          ${[['📊', 'Gold-Analyse', 'Harmonics-Check', 'Analysiere Gold nach meiner Harmonics-Strategie'],
+             ['🗓', 'Mein Tag', 'Termine & Plan', 'Was steht heute an?'],
+             ['🎬', 'TikTok-Idee', '3 Vorschläge', 'Gib mir drei TikTok-Video-Ideen für heute'],
+             ['🩺', 'PC-Check', 'Doktor fragen', 'Mach einen PC-Check'],
+             ['🎵', 'Musik', 'Spotify-DJ', 'Spiel Musik passend zur Stimmung'],
+             ['🧱', 'Bau-Idee', 'Minecraft', 'Zeig mir drei Bau-Ideen für Minecraft']]
+            .map(([i, t, u, cmd], n) => `<button class="d-aktion d-rein" data-cmd="${escH(cmd)}" style="animation-delay:${.78 + n * .04}s"><span class="ik">${i}</span><span><b>${t}</b><small>${u}</small></span></button>`).join('')}
         </div>
       </div>
     </section>
     <section class="d-seite" data-s="trading">
-      <div class="d-kopf"><div><h1>Trading</h1><div class="unter">Gold · XAU/USD bei <b>Vantage</b> · Harmonics-Strategie</div></div></div>
+      <div class="d-kopf"><div><h1>Trading</h1><div class="unter">Gold · XAU/USD bei <b>Vantage</b> · Harmonics-Strategie</div></div>
+        <div class="knoepfe"><div class="d-segment" id="d-tf">${[['15', '15 Min'], ['60', '1 Std'], ['240', '4 Std'], ['D', 'Tag']].map(([x, n], i) => `<button data-tf="${x}" class="${i === 0 ? 'an' : ''}">${n}</button>`).join('')}</div>
+          <button class="d-pill dunkel" id="d-tv">${svg('chart')}Mein TradingView</button></div></div>
+      <div class="d-statreihe" id="d-tstats"></div>
       <div class="d-zweispaltig"><div class="d-karte d-chart" id="d-chart"></div>
         <div class="d-karte d-liste" id="d-goldinfo"><div class="d-h">Heute</div></div></div>
     </section>
@@ -120,6 +144,8 @@
   }
   function themaSetzen(t) {
     document.documentElement.dataset.thema = t; ls('orb_thema', t);
+    const kugel = { koralle:'rot', sand:'cyan', salbei:'gruen', ozean:'blau', lavendel:'lila', gold:'gold', rose:'rot', nacht:'rot' }[t];
+    try { if (kugel && typeof farbeGleiten === 'function') farbeGleiten(kugel); } catch (e) {}   // Kugel färbt sich passend zum Thema
     document.querySelectorAll('#d-themen button').forEach(b => b.classList.toggle('an', b.dataset.t === t));
   }
   const qp = new URLSearchParams(location.search);   // Test: /?thema=nacht&seite=trading
@@ -135,11 +161,29 @@
     seite = s;
     document.querySelectorAll('#d-rail [data-s]').forEach(b => b.classList.toggle('an', b.dataset.s === s));
     document.querySelectorAll('.d-seite').forEach(x => x.classList.toggle('an', x.dataset.s === s));
-    if (s === 'trading' && !$d('d-chart').firstChild)
-      $d('d-chart').innerHTML = '<iframe src="https://s.tradingview.com/widgetembed/?symbol=VANTAGE%3AXAUUSD&interval=15&theme=light&style=1&locale=de_DE&hide_side_toolbar=1&allow_symbol_change=0&saveimage=0" loading="lazy"></iframe>';
+    if (s === 'trading' && !$d('d-chart').firstChild) chartLaden('15');
     if (s === 'chat') setTimeout(() => { const m = $d('msgs'); if (m) m.scrollTop = m.scrollHeight; }, 50);
   }
+  function chartLaden(tf) {
+    const dunkel = document.documentElement.dataset.thema === 'nacht' ? 'dark' : 'light';
+    $d('d-chart').innerHTML = `<iframe src="https://s.tradingview.com/widgetembed/?symbol=VANTAGE%3AXAUUSD&interval=${tf}&theme=${dunkel}&style=1&locale=de_DE&hide_side_toolbar=0&allow_symbol_change=1&saveimage=0&studies=%5B%5D" loading="lazy"></iframe>`;
+  }
+  document.querySelectorAll('#d-tf button').forEach(b => b.onclick = () => {
+    document.querySelectorAll('#d-tf button').forEach(x => x.classList.toggle('an', x === b)); chartLaden(b.dataset.tf); });
+  $d('d-tv').onclick = () => fetch('/tradingview', { method:'POST', headers:{ 'Content-Type':'application/json' }, body:JSON.stringify({ symbol:'VANTAGE:XAUUSD' }) }).catch(() => {});
   document.querySelectorAll('#d-rail [data-s]').forEach(b => b.onclick = () => geh(b.dataset.s));
+  // Seitenleiste auf-/zuklappen (wie im Video), Zustand merken
+  const railBreit = an => { document.body.classList.toggle('d-breit', an); ls('orb_rail', an ? '1' : '0'); };
+  railBreit(qp.get('breit') === '1' || ls('orb_rail') === '1');
+  $d('d-auf').onclick = () => railBreit(!document.body.classList.contains('d-breit'));
+  // Text an ORB schicken (oben, Seitenleiste, Kalender, Schnellaktionen)
+  function anOrb(v) {
+    const t = $d('txt'), s2 = $d('send'); if (!v || !t || !s2) return;
+    t.value = v; t.dispatchEvent(new Event('input', { bubbles:true })); s2.click();
+  }
+  ['d-frag', 'd-suche'].forEach(id => { const f = $d(id); f.onsubmit = () => { const i = f.querySelector('input'); anOrb(i.value.trim()); i.value = ''; i.blur(); return false; }; });
+  d.querySelectorAll('.d-aktion').forEach(b => b.onclick = () => { anOrb(b.dataset.cmd); b.classList.add('klick'); setTimeout(() => b.classList.remove('klick'), 500); });
+  $d('d-bl-musik').onclick = () => $d('d-musik').click();
   d.querySelectorAll('[data-geh]').forEach(b => b.addEventListener('click', () => geh(b.dataset.geh)));
   $d('d-set').onclick = () => $d('gear') && $d('gear').click();
   $d('d-stop').onclick = () => $d('stopb') && $d('stopb').click();
@@ -148,10 +192,7 @@
     if (mic) mic.dispatchEvent(new PointerEvent(ev, { bubbles:true, pointerId:e.pointerId, button:e.button, buttons:e.buttons }));
   }));
   $d('d-neu').onclick = () => { geh('home'); const i = $d('d-eingabe'); i.focus(); i.placeholder = 'Was soll ORB erledigen?'; };
-  $d('d-form').onsubmit = () => {
-    const v = $d('d-eingabe').value.trim(), t = $d('txt'), s = $d('send'); if (!v || !t || !s) return false;
-    t.value = v; t.dispatchEvent(new Event('input', { bubbles:true })); s.click(); $d('d-eingabe').value = ''; return false;
-  };
+  $d('d-form').onsubmit = () => { anOrb($d('d-eingabe').value.trim()); $d('d-eingabe').value = ''; return false; };
 
   // ---------- Zahlen hochzählen ----------
   function zaehlen(el, ziel, fmt = v => Math.round(v)) {
@@ -161,6 +202,12 @@
     (function s() { const u = Math.max(0, Math.min(1, (performance.now() - t0) / dauer)), e = 1 - Math.pow(1 - u, 3);
       el.textContent = fmt(von + (ziel - von) * e); if (u < 1) requestAnimationFrame(s); })();
   }
+  function spark(id, werte) {
+    const el = $d(id), v = werte.filter(x => typeof x === 'number'); if (!el || v.length < 2) return;
+    const lo = Math.min(...v), hi = Math.max(...v), r = hi - lo || 1;
+    el.setAttribute('d', 'M' + v.map((x, i) => `${(i / (v.length - 1) * 100).toFixed(1)},${(24 - (x - lo) / r * 22).toFixed(1)}`).join(' L'));
+  }
+  const cpuVerlauf = [], agVerlauf = [];
   const usd = v => '$' + v.toLocaleString('en-US', { minimumFractionDigits:2, maximumFractionDigits:2 });
 
   // ---------- Begrüßung, Datum, Tagesring ----------
@@ -210,13 +257,22 @@
       const j = await (await fetch('/gold', { cache:'no-store' })).json(); if (typeof j.preis !== 'number') return;
       zaehlen($d('d-gold'), j.preis, usd);
       goldVerlauf.push(j.preis); if (goldVerlauf.length > 40) goldVerlauf.shift();
-      const ref = j.vortag_schluss || goldVerlauf[0], pr = ref ? (j.preis - ref) / ref * 100 : 0;
+      try { const tag = new Date().toDateString(), g = JSON.parse(ls('orb_gold') || '{}');   // eigener Tagesverlauf, falls die Quelle keine Tageswerte liefert
+        if (g.tag !== tag) { g.tag = tag; g.start = j.preis; g.hoch = j.preis; g.tief = j.preis; }
+        g.hoch = Math.max(g.hoch, j.preis); g.tief = Math.min(g.tief, j.preis); ls('orb_gold', JSON.stringify(g));
+        j.heute_hoch = j.heute_hoch || g.hoch; j.heute_tief = j.heute_tief || g.tief; j.tag_start = g.start; } catch (e) {}
+      const ref = j.vortag_schluss || j.tag_start || goldVerlauf[0], pr = typeof j.veraenderung === 'number' ? j.veraenderung : ref ? (j.preis - ref) / ref * 100 : 0;
       const b = $d('d-gold-d'); b.textContent = (pr >= 0 ? '▲ +' : '▼ ') + pr.toFixed(2) + ' %'; b.className = 'los bad ' + (pr >= 0 ? 'up' : 'dn');
       $d('d-w3').textContent = (pr >= 0 ? '+' : '') + pr.toFixed(1) + ' %';
       const v = [j.vortag_tief, j.vortag_hoch, j.vortag_schluss, j.heute_tief, j.heute_hoch, ...goldVerlauf].filter(x => typeof x === 'number');
       const lo = Math.min(...v), hi = Math.max(...v), r = hi - lo || 1, pts = v.map((x, i) => `${(i / (v.length - 1 || 1) * 100).toFixed(1)},${(24 - (x - lo) / r * 22).toFixed(1)}`);
       $d('d-spark').setAttribute('d', 'M' + pts.join(' L'));
       const z = (k, w) => w == null ? '' : `<div class="d-agent"><div class="s" style="margin:0">${k}</div><div class="k" style="font-size:18px">${w}</div></div>`;
+      const st = (ik, k, w, pill, pk) => `<div class="d-karte d-stat"><div class="d-h"><span class="ik">${ik}</span>${k}</div><div class="zahl">${w}</div>${pill ? `<span class="bad ${pk}">${pill}</span>` : ''}</div>`;
+      const spanne = j.heute_hoch && j.heute_tief ? j.heute_hoch - j.heute_tief : null;
+      $d('d-tstats').innerHTML = st('$', 'Gold jetzt', usd(j.preis), (pr >= 0 ? '▲ +' : '▼ ') + pr.toFixed(2) + ' %', pr >= 0 ? 'up' : 'dn') +
+        st('↑', 'Tageshoch', j.heute_hoch ? usd(j.heute_hoch) : '–', '', '') + st('↓', 'Tagestief', j.heute_tief ? usd(j.heute_tief) : '–', '', '') +
+        st('↔', 'Tagesspanne', spanne ? usd(spanne) : '–', j.session ? escH(j.session) : '', '');
       $d('d-goldinfo').innerHTML = '<div class="d-h">Heute</div>' + z('Aktueller Preis', usd(j.preis)) + z('Tageshoch', j.heute_hoch && usd(j.heute_hoch)) +
         z('Tagestief', j.heute_tief && usd(j.heute_tief)) + z('Vortag (Schluss)', j.vortag_schluss && usd(j.vortag_schluss)) + z('Session', j.session && escH(j.session));
     } catch (e) {}
@@ -225,7 +281,7 @@
   // ---------- System, Wetter, Musik ----------
   async function ladeSys() {
     try { const s = await (await fetch('/sys')).json();
-      if (s.cpu != null && s.cpu >= 0 && s.cpu <= 100) zaehlen($d('d-cpu'), s.cpu, v => Math.round(v) + ' %');
+      if (s.cpu != null && s.cpu >= 0 && s.cpu <= 100) { zaehlen($d('d-cpu'), s.cpu, v => Math.round(v) + ' %'); cpuVerlauf.push(s.cpu); if (cpuVerlauf.length > 30) cpuVerlauf.shift(); spark('d-spark-cpu', cpuVerlauf); }
       if (s.ram != null) $d('d-ram').textContent = 'RAM ' + Math.round(s.ram) + ' %'; } catch (e) {}
   }
   async function ladeWetter() {
@@ -235,7 +291,7 @@
     try { const s = await (await fetch('/spotify', { cache:'no-store' })).json();
       $d('d-mu').textContent = s.spielt ? s.titel : s.laeuft ? 'Pausiert' : 'Gerade keine Musik';
       $d('d-mu-a').textContent = s.spielt ? s.kuenstler : s.laeuft ? 'Spotify' : 'Sag „spiel Musik“';
-      $d('d-mu-b').textContent = s.spielt ? '▶ läuft' : 'Spotify'; } catch (e) {}
+      $d('d-mu-b').textContent = s.spielt ? '▶ läuft' : 'Spotify'; $d('d-musik').classList.toggle('spielt', !!s.spielt); } catch (e) {}
   }
   $d('d-musik').onclick = () => fetch('/media', { method:'POST', headers:{ 'Content-Type':'application/json' }, body:JSON.stringify({ cmd:'play' }) }).then(() => setTimeout(ladeMusik, 400)).catch(() => {});
 
@@ -248,7 +304,8 @@
   function agentenZeigen(list) {
     agenten = list; const lauf = list.filter(a => a.status === 'laeuft');
     zaehlen($d('d-w2'), lauf.length); zaehlen($d('d-ag'), lauf.length);
-    $d('d-ag-l').textContent = lauf.length ? (lauf[0].titel || 'Aufgabe') + (lauf.length > 1 ? ` + ${lauf.length - 1}` : '') : 'Agenten arbeiten';
+    agVerlauf.push(lauf.length); if (agVerlauf.length > 30) agVerlauf.shift(); spark('d-spark-ag', agVerlauf.length > 1 ? agVerlauf : [0, 0]);
+    $d('d-ag-l').textContent = lauf.length ? (lauf[0].titel || 'Aufgabe') + (lauf.length > 1 ? ` + ${lauf.length - 1}` : '') : 'gerade frei';
     const k = JSON.stringify(list.map(a => [a.id, a.status, a.schritt, a.prozent])); if (k === agK) return; agK = k;
     $d('d-agliste').innerHTML = list.length ? list.map((a, i) => `<div class="d-agent ${a.status === 'laeuft' ? '' : 'fertig'}" style="animation-delay:${i * .05}s">
       <div class="k"><i></i>${escH(a.titel || 'Aufgabe')}<span style="margin-left:auto;font-size:12px;opacity:.6">${a.status === 'laeuft' ? (a.prozent ? a.prozent + ' %' : 'läuft') : 'fertig'}</span></div>
@@ -296,6 +353,10 @@
     try { LAY = window.DASH_LAY(); } catch (e) {}
   })();
 
+  // ---------- Lichtfleck folgt der Maus auf jeder Karte ----------
+  d.addEventListener('pointermove', e => { const k = e.target.closest('.d-karte'); if (!k) return; const r = k.getBoundingClientRect();
+    k.style.setProperty('--mx', (e.clientX - r.left) + 'px'); k.style.setProperty('--my', (e.clientY - r.top) + 'px'); });
+  // Lichtkante folgt
   // ---------- Hintergrund folgt leicht der Maus ----------
   addEventListener('mousemove', e => {
     document.documentElement.style.setProperty('--d-px', ((e.clientX / innerWidth - .5) * -14).toFixed(1) + 'px');

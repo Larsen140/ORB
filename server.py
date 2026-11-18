@@ -73,7 +73,7 @@ DEFAULT_CFG = {
 }
 # Damit ORB immer dein Claude-Code-Login (Max-Abo) nutzt und nie einen API-Schlüssel
 CLAUDE_ENV_DROP = ("ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "ANTHROPIC_BASE_URL")
-VERSION = "146"
+VERSION = "147"
 ORB_UI = ("Deine Oberfläche (die Larsen gerade sieht): in der Mitte du als flüssige leuchtende Kugel mit Tropfen, "
           "Orbit-Ringen und Sternenhimmel; links eine Uhr und darunter der Gesprächsverlauf mit Eingabefeld; rechts "
           "Karten für System (CPU, RAM, Akku), Wetter mit Stundenvorschau, Aktivität (was du gerade tust) und Vorschläge; "
@@ -2221,6 +2221,35 @@ def ff_news_heute():
     return sorted(out, key=lambda x: x["zeit"])
 
 
+_GOLD_TAG = {"t": 0.0, "d": {}}
+
+
+def gold_tag():
+    """Tageswerte fürs Dashboard (10 Min. zwischengespeichert): Hoch/Tief/Vortag vom Gold-Future, auf den Spot-Preis
+    verschoben (Future liegt meist ~20 $ höher), plus Tagesveränderung in % und die laufende Session."""
+    if time.time() - _GOLD_TAG["t"] < 600:
+        return _GOLD_TAG["d"]
+    d = {}
+    try:
+        r = _json_holen("https://query1.finance.yahoo.com/v8/finance/chart/GC=F?interval=1d&range=5d")["chart"]["result"][0]
+        q = r["indicators"]["quote"][0]
+        tage = [(h, l, c) for h, l, c in zip(q["high"], q["low"], q["close"]) if h and l and c]
+        if len(tage) >= 2:
+            versatz = gold_preis() - tage[-1][2]
+            d["heute_hoch"], d["heute_tief"] = round(tage[-1][0] + versatz, 2), round(tage[-1][1] + versatz, 2)
+            d["vortag_hoch"], d["vortag_tief"] = round(tage[-2][0] + versatz, 2), round(tage[-2][1] + versatz, 2)
+            d["vortag_schluss"] = round(tage[-2][2] + versatz, 2)
+            d["veraenderung"] = round((tage[-1][2] - tage[-2][2]) / tage[-2][2] * 100, 3)
+    except Exception:
+        pass
+    try:
+        d["session"] = session_jetzt()
+    except Exception:
+        pass
+    _GOLD_TAG.update(t=time.time(), d=d)
+    return d
+
+
 def gold_daten():
     d = {}
     try:
@@ -3091,7 +3120,7 @@ class Handler(BaseHTTPRequestHandler):
                 self.send(200, {})
         elif u.path == "/gold":
             try:
-                self.send(200, {"preis": gold_preis(), "zeit": GOLD["zeit"]})
+                self.send(200, dict(gold_tag(), preis=gold_preis(), zeit=GOLD["zeit"]))
             except Exception:
                 self.send(200, {})
         elif u.path == "/termine":
@@ -3278,6 +3307,15 @@ class Handler(BaseHTTPRequestHandler):
             OHR["n"] += 1
             OHR["ev"].append({"id": OHR["n"], "typ": typ, "text": text, "t": time.time()})
             self.send(200, {"ok": True})
+        elif u.path == "/tradingview":   # Dashboard: „Mein TradingView“ – Chart in Larsens Opera GX (sein Konto, seine Layouts)
+            sym = re.sub(r"[^A-Z0-9:._!-]", "", str(b.get("symbol") or "VANTAGE:XAUUSD").upper())[:40]
+            opera = os.path.join(os.environ.get("LOCALAPPDATA", ""), "Programs", "Opera GX", "opera.exe")
+            url = "https://www.tradingview.com/chart/?symbol=" + urllib.parse.quote(sym)
+            try:
+                subprocess.Popen([opera, url] if os.path.exists(opera) else ["cmd", "/c", "start", "", url], creationflags=NO_WINDOW)
+                self.send(200, {"ok": True})
+            except Exception as e:
+                self.send(500, {"ok": False, "fehler": str(e)[:120]})
         elif u.path == "/mini":   # Mini-ORB: kleine Kugel in der Ecke, immer obenauf
             self.send(200, {"ok": bool(ON_MINI[0])})
             if ON_MINI[0]:
