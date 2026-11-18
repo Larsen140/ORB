@@ -338,14 +338,14 @@ html:not([data-modus="dunkel"]) body.dash #set h4, body.dash #set .note, body.da
 html:not([data-modus="dunkel"]) body.dash #set .row, body.dash #set .lbl, body.dash #set .sh span { color:#f4f4f5 !important; }
 html:not([data-modus="dunkel"]) body.dash #set select, body.dash #set input[type="text"], body.dash #set input:not([type]) { background:#222226 !important; color:#fff !important; border-color:rgba(255,255,255,.1) !important; }
 
-html[data-modus="dunkel"] body.dash #set { background:#f7f6f4 !important; backdrop-filter:none !important; color:#141414 !important; border:1px solid rgba(0,0,0,.06);
+html[data-modus="dunkel"] body.dash #set { background:color-mix(in srgb, var(--d-acc1) 7%, #cfcac5) !important; backdrop-filter:none !important; color:#141414 !important; border:1px solid rgba(0,0,0,.06);
   box-shadow:0 30px 80px -20px rgba(0,0,0,.8); }
 html[data-modus="dunkel"] body.dash #set::before, html[data-modus="dunkel"] body.dash #set::after { display:none !important; }
-html[data-modus="dunkel"] body.dash #set .card { background:#fff !important; border:1px solid rgba(0,0,0,.06); }
+html[data-modus="dunkel"] body.dash #set .card { background:color-mix(in srgb, var(--d-acc1) 5%, #dedad6) !important; border:1px solid rgba(0,0,0,.06); }
 html[data-modus="dunkel"] body.dash #set h4, html[data-modus="dunkel"] body.dash #set .note, html[data-modus="dunkel"] body.dash #set .v { color:rgba(20,20,20,.55) !important; }
 html[data-modus="dunkel"] body.dash #set .row, html[data-modus="dunkel"] body.dash #set .lbl, html[data-modus="dunkel"] body.dash #set .sh span { color:#141414 !important; }
 html[data-modus="dunkel"] body.dash #set select, html[data-modus="dunkel"] body.dash #set input[type="text"], html[data-modus="dunkel"] body.dash #set input:not([type]) {
-  background:#f0efed !important; color:#141414 !important; border-color:rgba(0,0,0,.1) !important; }
+  background:color-mix(in srgb, var(--d-acc1) 4%, #e8e5e1) !important; color:#141414 !important; border-color:rgba(0,0,0,.1) !important; }
 html[data-modus="dunkel"] body.dash #set .btn, html[data-modus="dunkel"] body.dash #set .done { background:#141414 !important; color:#fff !important; }
 /* Einstellungen aufräumen: alte Widget-/Farb-Optionen gibt es im Dashboard nicht mehr */
 body.dash #set .d-weg { display:none !important; }
@@ -360,3 +360,14 @@ body.dash #set .d-weg { display:none !important; }
 
 /* Untertitel: im Dashboard steht die Antwort in der Hauptkarte */
 body.dash:not(.mini) #caption { display:none !important; }
+
+/* Schalter, Regler und Knöpfe in der gewählten Farbe */
+body.dash input.sw:checked { background:linear-gradient(135deg, var(--d-acc1), var(--d-acc2)) !important;
+  box-shadow:inset 0 1px 2px rgba(0,0,0,.2), 0 0 14px color-mix(in srgb, var(--d-acc1) 55%, transparent) !important; }
+body.dash input[type=range] { background:linear-gradient(90deg, var(--d-acc1), var(--d-acc2) var(--p,50%), rgba(128,128,128,.25) var(--p,50%)) !important; }
+body.dash #set .btn:hover, body.dash #set .done:hover { box-shadow:0 0 0 3px color-mix(in srgb, var(--d-acc1) 45%, transparent); }
+body.dash #set h4 { color:var(--d-acc1) !important; opacity:.9; }
+body.dash #set select:focus, body.dash #set input:focus { outline:2px solid color-mix(in srgb, var(--d-acc1) 60%, transparent); }
+/* Hell-Modus: weißes Glas etwas zurücknehmen (weniger grell) */
+html:not([data-modus="dunkel"]) { --d-glass2:rgba(250,246,242,.5); --d-glass3:rgba(252,249,246,.64); }
+html:not([data-modus="dunkel"]) #d-kal { background:rgba(250,246,242,.58); }

@@ -378,6 +378,8 @@
     try { LAY = window.DASH_LAY(); } catch (e) {}
   })();
 
+  // Rechtsklick-Menü des Browsers abschalten (in Eingabefeldern bleibt es für Kopieren/Einfügen)
+  addEventListener('contextmenu', e => { if (!e.target.closest('input, textarea, [contenteditable]')) e.preventDefault(); });
   // ---------- Lichtfleck folgt der Maus auf jeder Karte ----------
   d.addEventListener('pointermove', e => { const k = e.target.closest('.d-karte'); if (!k) return; const r = k.getBoundingClientRect();
     k.style.setProperty('--mx', (e.clientX - r.left) + 'px'); k.style.setProperty('--my', (e.clientY - r.top) + 'px'); });
