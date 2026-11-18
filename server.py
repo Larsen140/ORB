@@ -77,7 +77,7 @@ DEFAULT_CFG = {
 }
 # Damit ORB immer dein Claude-Code-Login (Max-Abo) nutzt und nie einen API-Schlüssel
 CLAUDE_ENV_DROP = ("ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "ANTHROPIC_BASE_URL")
-VERSION = "156"
+VERSION = "157"
 ORB_UI = ("Deine Oberfläche (die Larsen gerade sieht): in der Mitte du als flüssige leuchtende Kugel mit Tropfen, "
           "Orbit-Ringen und Sternenhimmel; links eine Uhr und darunter der Gesprächsverlauf mit Eingabefeld; rechts "
           "Karten für System (CPU, RAM, Akku), Wetter mit Stundenvorschau, Aktivität (was du gerade tust) und Vorschläge; "
@@ -2857,7 +2857,15 @@ def tv_dock(an, rect=None, symbol="VANTAGE:XAUUSD"):
     except Exception:
         pass
     u.ShowWindow(h, 4)   # zeigen, ohne zu aktivieren
-    u.SetWindowPos(h, 0, x, y, w, hh, 0x0010 | 0x0020 | 0x0040)   # NOACTIVATE | FRAMECHANGED | SHOWWINDOW
+    # Edge zeichnet seine Titelleiste selbst: Fenster um ihre Höhe nach oben schieben und den Streifen wegschneiden
+    T = 30
+    u.SetWindowPos(h, 0, x, y - T, w, hh + T, 0x0010 | 0x0020 | 0x0040)   # NOACTIVATE | FRAMECHANGED | SHOWWINDOW
+    try:
+        sk = (u.GetDpiForWindow(h) or 96) / 96.0
+        g = ctypes.windll.gdi32
+        u.SetWindowRgn(h, g.CreateRectRgn(0, int(T * sk), int(w * sk) + 2, int((hh + T) * sk) + 2), True)
+    except Exception:
+        pass
     return True
 
 

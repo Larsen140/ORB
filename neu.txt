@@ -1,1 +1,1 @@
-156|Tastaturfarbe nur noch beim Klick auf eine Farbe, ohne aufblitzendes Fenster
+157|Trading-Seite aufgeräumt: TradingView ohne Titelleiste, größerer Chart
