@@ -523,6 +523,11 @@
      "name": "Große Projekte",
      "text": "Apps, Websites, Spiele baut der Projekt-Entwickler im Hintergrund.",
      "beispiel": "Jarvis, bau mir eine Website für …"
+    },
+    {
+     "name": "Gesichtssperre",
+     "text": "Beim PC-Start erkennt ORB unsichtbar per Webcam, ob du es bist – sonst sperrt er WhatsApp, Instagram und Snapchat und schickt dir ein Foto per Telegram.",
+     "beispiel": "Jarvis, lerne mein Gesicht neu"
     }
    ]
   }

@@ -1,1 +1,1 @@
-165|Mini-ORB entfernt
+166|Gesichtssperre: beim PC-Start unsichtbarer Webcam-Scan, private Apps nur für dich

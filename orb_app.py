@@ -210,6 +210,22 @@ def stimme_wache():
         time.sleep(10)
 
 
+def gesicht_beim_start():
+    """Gesichtssperre: nur beim PC-Start (nicht bei jedem ORB-Neustart/Update) unsichtbar per Webcam prüfen, ob Larsen davor sitzt.
+    Ist er es nicht, sperrt gesicht.py WhatsApp/Instagram/Snapchat, bis er erkannt wird."""
+    try:
+        import psutil
+        import shutil
+        if not server.load_cfg().get("gesichtssperre", True) or time.time() - psutil.boot_time() > 600:
+            return
+        pyw = shutil.which("pyw") or shutil.which("pythonw")
+        skript = os.path.join(os.path.dirname(os.path.abspath(server.__file__)), "gesicht.py")
+        if pyw and os.path.exists(skript) and os.path.exists(os.path.join(os.environ.get("LOCALAPPDATA", ""), "ORB", "gesicht", "profil.npy")):
+            subprocess.Popen([pyw] + (["-3"] if pyw.lower().endswith("pyw.exe") else []) + [skript, "waechter"], creationflags=0x08000000)
+    except Exception as e:
+        print("Gesichtssperre:", e)
+
+
 def telegram_start():
     """Telegram-Brücke (telegram_orb.py neben server.py) im ORB-Prozess laufen lassen – nur Standardbibliothek."""
     try:
@@ -878,7 +894,8 @@ def main():
     threading.Thread(target=ohr_wache, daemon=True).start()            # lokales Ohr: „Hey Jarvis“ + Whisper
     threading.Thread(target=stimme_wache, daemon=True).start()         # lokale KI-Stimme (Chatterbox)
     threading.Thread(target=server.live_bildschirm, daemon=True).start()  # Bildschirm in Echtzeit
-    threading.Thread(target=telegram_start, daemon=True).start()          # ORB per Telegram vom Handy
+    threading.Thread(target=telegram_start, daemon=True).start()
+    threading.Thread(target=gesicht_beim_start, daemon=True).start()   # Gesichtssperre (nur direkt nach dem PC-Start)          # ORB per Telegram vom Handy
     threading.Thread(target=orb_unsichtbar_fuer_aufnahme, daemon=True).start()
     threading.Thread(target=update_loop, daemon=True).start()
     threading.Thread(target=announce_update, daemon=True).start()
