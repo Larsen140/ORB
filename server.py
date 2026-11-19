@@ -77,7 +77,7 @@ DEFAULT_CFG = {
 }
 # Damit ORB immer dein Claude-Code-Login (Max-Abo) nutzt und nie einen API-Schlüssel
 CLAUDE_ENV_DROP = ("ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "ANTHROPIC_BASE_URL")
-VERSION = "161"
+VERSION = "162"
 ORB_UI = ("Deine Oberfläche (die Larsen gerade sieht): in der Mitte du als flüssige leuchtende Kugel mit Tropfen, "
           "Orbit-Ringen und Sternenhimmel; links eine Uhr und darunter der Gesprächsverlauf mit Eingabefeld; rechts "
           "Karten für System (CPU, RAM, Akku), Wetter mit Stundenvorschau, Aktivität (was du gerade tust) und Vorschläge; "
@@ -704,6 +704,8 @@ SKIN_FERTIG = re.compile(r"\b(wir\s+sind|ich\s+bin|sind\s+wir)\s+fertig\b", re.I
 def skin_still(an=None):
     """Abfragen (an=None), einschalten (True, frischt auch die Zeit auf) oder ausschalten (False). Nach 30 Min. ohne
     Skin-Tätigkeit schaltet er sich von selbst ab, damit ORB nie dauerhaft stumm bleibt."""
+    SKIN_STILL["an"] = False   # Minecraft/Skins sind entfernt (18.11.): „Skin“ im Satz darf ORB nicht mehr stummschalten
+    return False
     if an is True:
         if not SKIN_STILL["an"]:
             print("Skin-Modus: still")

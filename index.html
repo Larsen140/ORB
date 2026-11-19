@@ -1896,7 +1896,8 @@ function snapFertig(c) {
   c.snap = f.hell >= hellMin && f.kurz <= kurzMax;
   c.ruhig = ueber(c.slow) < ueber(c.rms) * (.1 + .05 * sEmpf);   // gleichmäßiges Lüfterrauschen zählt nicht als Geräusch
   const vorher = lautBl.filter(x => x[0] > c.t - 1000 && x[0] < c.t - 30 && x[1] > c.pk * .3).length;   // ein früherer Schnipser = 2 Blöcke
-  const musikStreng = f.hell >= hellMin * 2 && f.kurz <= .2 && vorher <= 1;   // bei Musik nur ganz eindeutige Schnipser
+  // bei Musik nur eindeutige Schnipser: deutlich heller als nötig und kurz – sehr helle zählen auch, wenn Beats davor lagen
+  const musikStreng = f.hell >= hellMin * 2 && f.kurz <= .3 && (vorher <= 2 || f.hell >= hellMin * 5);
   c.warum = musik && !musikStreng ? 'gerade läuft Musik' : vorher > 3 ? 'kurz davor war es nicht still (Sprache/Tippen?)'
     : stimmeT > c.t - 1500 ? 'gerade wurde gesprochen' : f.hell < hellMin ? 'klang nicht hell genug' : f.kurz > kurzMax ? 'hallte zu lange nach' : '';
   c.streng = !c.warum; c.win = null; c.fertig = true;

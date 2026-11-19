@@ -55,10 +55,10 @@
   </nav>
   <header id="d-top" class="dg d-rein" style="animation-delay:.12s">
     <div class="av">L</div><div class="wil">Willkommen, Larsen</div>
-    <form class="mitte" id="d-frag" onsubmit="return false"><i class="punkt"></i><input placeholder="Frag ORB etwas … z. B. „Wie steht Gold?“" autocomplete="off"><span id="d-status">Bereit</span></form>
+    <form class="mitte" id="d-frag" onsubmit="return false"><i class="punkt"></i><input placeholder="Frag ORB etwas … z. B. „Wie wird das Wetter morgen?“" autocomplete="off"><span id="d-status">Bereit</span></form>
     <div class="rechts"><button class="d-rund" id="d-farbe" title="Farbthema">${svg('farbe')}</button></div>
   </header>
-  <div id="d-themen" class="dg"><div class="d-modus"><button data-m="hell">☀ Hell</button><button data-m="dunkel">☾ Dunkel</button></div>${THEMEN.map(([k, n, g]) => `<button data-t="${k}"><i style="background:${g}"></i>${n}</button>`).join('')}</div>
+  <div id="d-themen" class="dg"><div class="d-modus"><button data-m="hell">☀ Hell</button><button data-m="dunkel">☾ Dunkel</button><button data-m="auto">◐ Auto</button></div>${THEMEN.map(([k, n, g]) => `<button data-t="${k}"><i style="background:${g}"></i>${n}</button>`).join('')}</div>
   <main id="d-main" class="dg d-rein" style="animation-delay:.18s">
     <section class="d-seite an" data-s="home">
       <div class="d-kopf d-rein" style="animation-delay:.3s">
@@ -185,8 +185,12 @@
     if (chat) { if (an) $d('d-chatplatz').appendChild(chat); else chatHeim.insertBefore(chat, chatNach); }
     try { LAY = layout(); } catch (e) {}
   }
+  let modusWahl = 'hell';
+  const modusJetzt = () => modusWahl === 'auto' ? ((h => h >= 19 || h < 7)(new Date().getHours()) ? 'dunkel' : 'hell') : modusWahl;
+  setInterval(() => { if (modusWahl === 'auto' && document.documentElement.dataset.modus !== modusJetzt()) modusSetzen('auto'); }, 60000);
   function modusSetzen(m) {
-    document.documentElement.dataset.modus = m; ls('orb_modus', m);
+    modusWahl = m; ls('orb_modus', m);
+    document.documentElement.dataset.modus = modusJetzt();
     document.querySelectorAll('.d-modus button').forEach(b => b.classList.toggle('an', b.dataset.m === m));
     if (seite === 'trading' && typeof chartLaden === 'function') chartLaden((document.querySelector('#d-tf .an') || {}).dataset?.tf || '15');
   }
@@ -215,7 +219,7 @@
     if (row) {
       row.classList.add('d-weg');
       const neu = document.createElement('div'); neu.className = 'row col';
-      neu.innerHTML = `Darstellung<div class="d-modus"><button data-m="hell">☀ Hell</button><button data-m="dunkel">☾ Dunkel</button></div>
+      neu.innerHTML = `Darstellung<div class="d-modus"><button data-m="hell">☀ Hell</button><button data-m="dunkel">☾ Dunkel</button><button data-m="auto">◐ Auto</button></div>
         <div style="margin-top:12px">Farbthema</div><div class="d-farbpunkte">${THEMEN.map(([k, n, g]) => `<button data-t="${k}" title="${n}" style="background:${g}"></button>`).join('')}</div>`;
       row.parentNode.insertBefore(neu, row);
     }
@@ -223,7 +227,7 @@
     const wl = $d('wlist'); if (wl) wl.closest('.grp').classList.add('d-weg');
     const un = $d('s_unter'); if (un) un.closest('.row').classList.add('d-weg');   // Antwort steht in der Hauptkarte
     const mu = $d('s_musik'); if (mu) mu.closest('.row').firstChild.textContent = 'Bei Musik: Klatschen nur bei deutlichem Knall';
-    modusSetzen(document.documentElement.dataset.modus || 'hell'); themaSetzen(document.documentElement.dataset.thema || 'koralle');
+    modusSetzen(modusWahl || 'hell'); themaSetzen(document.documentElement.dataset.thema || 'koralle');
   })();
   addEventListener('click', e => { if (!e.target.closest('#d-themen')) $d('d-themen').classList.remove('an'); });
 
@@ -606,6 +610,15 @@
     $d('dk-sekbar').style.width = (n.getSeconds() / 59 * 100) + '%';
   }
   uhrKachel(); setInterval(uhrKachel, 1000);
+  // Tastenkürzel: Strg+K oder / → Eingabe oben · 1–6 → Seiten (nur wenn gerade nicht getippt wird)
+  const SEITEN = ['home', 'trading', 'journal', 'notizen', 'agenten', 'chat'];
+  addEventListener('keydown', e => {
+    if (!document.body.classList.contains('dash')) return;
+    const tippt = e.target.closest && e.target.closest('input, textarea, select, [contenteditable]');
+    if ((e.ctrlKey && e.key.toLowerCase() === 'k') || (!tippt && e.key === '/')) { e.preventDefault(); e.stopPropagation(); const i = document.querySelector('#d-frag input'); i.focus(); i.select(); return; }
+    if (tippt) { if (e.key === 'Escape') e.target.blur(); return; }
+    if (!e.ctrlKey && !e.altKey && !e.metaKey && /^[1-6]$/.test(e.key)) { e.preventDefault(); e.stopPropagation(); geh(SEITEN[+e.key - 1]); }
+  }, true);
   zeit(); woche(); ladeTermine(); ladeGold(); ladeSys(); ladeWetter(); ladeMusik();
   setInterval(zeit, 30000); setInterval(ladeTermine, 30000); setInterval(ladeGold, 20000);
   setInterval(ladeSys, 3000); setInterval(ladeWetter, 600000); setInterval(ladeMusik, 4000);

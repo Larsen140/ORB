@@ -511,7 +511,7 @@
     },
     {
      "name": "Farbthemen",
-     "text": "Hell oder Dunkel, dazu sieben Farbthemen (Koralle, Sand, Salbei, Ozean, Lavendel, Gold, Rosé) – die Kugel färbt sich mit.",
+     "text": "Hell, Dunkel oder Auto (ab 19 Uhr dunkel), dazu sieben Farbthemen – Kugel und Tastatur färben sich mit.",
      "beispiel": "Farbknopf → Ozean"
     },
     {
@@ -543,6 +543,11 @@
      "name": "Notizen",
      "text": "Notizen-Tab mit Farben, Anheften, Suche und Auto-Speichern – ORB kennt alle Notizen.",
      "beispiel": "Jarvis, notier dir: Freitag keine Trades"
+    },
+    {
+     "name": "Tastenkürzel",
+     "text": "Strg+K oder / springt ins Eingabefeld, die Tasten 1–6 wechseln die Seiten des Dashboards.",
+     "beispiel": "2 → Trading"
     }
    ]
   }
