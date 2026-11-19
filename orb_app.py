@@ -871,7 +871,7 @@ def main():
     server.set_autostart(bool(cfg.get("autostart", True)))
     threading.Thread(target=server.mikro_standard, daemon=True).start()   # gewähltes Mikro (TONOR) = Windows-Standard
     threading.Thread(target=clap_loop, daemon=True).start()
-    threading.Thread(target=spiel_wache, daemon=True).start()
+    # Gaming-Modus (Mini-Kugel im Spiel) entfernt – spiel_wache läuft nicht mehr
     threading.Thread(target=server.chroma_loop, daemon=True).start()   # Razer-Licht
     threading.Thread(target=server.pc_wache, daemon=True).start()      # warnt bei vollem RAM/Platte, heißer GPU
     threading.Thread(target=server.musik_logger, daemon=True).start()  # Musikgeschmack für den Spotify-DJ

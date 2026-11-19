@@ -68,16 +68,16 @@ DEFAULT_CFG = {
     "stimme": "de-DE-ChristophNeural", "tempo": "+6%", "hoehe": "-2Hz", "jarvis_effekt": True, "lautstaerke": 160, "laut_v": 2,
     "farbe": "rot", "effekte": "mittel", "untertitel": True,
     "sfx": True, "sfxlaut": 60, "ambient": False,
-    "steuerung": "wort", "wakeword": "Jarvis", "schnipsen": True, "trading_start": True, "gaming_modus": True, "stimmung": True, "razer": True, "gesten": False, "ohr": True, "unterbrechen": True, "sprechen_unterbrechen": True, "nur_jarvis": True, "musik_schutz": True, "ducking": True,
+    "steuerung": "wort", "wakeword": "Jarvis", "schnipsen": True, "trading_start": True, "gaming_modus": False, "stimmung": True, "razer": True, "gesten": False, "ohr": True, "unterbrechen": True, "sprechen_unterbrechen": True, "nur_jarvis": True, "musik_schutz": True, "ducking": True,
     "tts_anbieter": "edge",
     "klatschen": True, "dauerzuhoeren": True, "empfindlichkeit": 6, "schnips_empf": 6, "mikro": "TONOR", "kalib": {}, "satzpause": 2.0, "begruessung": True, "ort": "", "name": "",
-    "schlafen": 5, "vollbild": True, "spiel_mini": True, "nur_meine_stimme": True, "streng_jarvis": True, "tastatur_farbe": True, "autostart": True, "schlaf_schliessen": True, "bildschirm": False,
+    "schlafen": 5, "vollbild": True, "spiel_mini": False, "nur_meine_stimme": True, "streng_jarvis": True, "tastatur_farbe": True, "autostart": True, "schlaf_schliessen": True, "bildschirm": False,
     "modell": "claude-opus-5-5", "laenge": "kurz", "rechte": "auto", "tempo_claude": "low",
     "ordner": os.path.join(os.path.expanduser("~"), "Documents", "Jarvis"), "sitzung": "",
 }
 # Damit ORB immer dein Claude-Code-Login (Max-Abo) nutzt und nie einen API-Schlüssel
 CLAUDE_ENV_DROP = ("ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "ANTHROPIC_BASE_URL")
-VERSION = "162"
+VERSION = "163"
 ORB_UI = ("Deine Oberfläche (die Larsen gerade sieht): in der Mitte du als flüssige leuchtende Kugel mit Tropfen, "
           "Orbit-Ringen und Sternenhimmel; links eine Uhr und darunter der Gesprächsverlauf mit Eingabefeld; rechts "
           "Karten für System (CPU, RAM, Akku), Wetter mit Stundenvorschau, Aktivität (was du gerade tust) und Vorschläge; "
@@ -2388,6 +2388,7 @@ _spiel = {"t": 0.0, "name": ""}
 
 def spiel_laeuft():
     """Name des laufenden Spiels (Steam, Epic, Riot, Roblox, EA, Ubisoft, Battle.net, Xbox) oder ''. 5 s zwischengespeichert."""
+    return ""   # Gaming-Modus entfernt (19.11.): Spiele werden nicht mehr erkannt, ORB verhält sich immer gleich
     if time.time() - _spiel["t"] < 5:
         return _spiel["name"]
     name = ""

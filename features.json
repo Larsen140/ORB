@@ -61,11 +61,6 @@
      "beispiel": "Einstellungen → Mikro kalibrieren"
     },
     {
-     "name": "Mini-ORB",
-     "text": "Kleine Kugel in der Ecke, immer obenauf.",
-     "beispiel": "Jarvis, mach dich klein"
-    },
-    {
      "name": "Wissensbasis",
      "text": "Merkt sich alles dauerhaft in deinem Jarvis-Ordner.",
      "beispiel": "Merk dir, dass ich Sushi mag"
@@ -359,19 +354,9 @@
    "icon": "⛏",
    "features": [
     {
-     "name": "Befehle im Spiel",
-     "text": "ORB tippt Befehle in den Chat, auch während du spielst.",
-     "beispiel": "Jarvis, mach Tag und klares Wetter"
-    },
-    {
      "name": "Bauen",
      "text": "Ganze Bauten per Befehlsfolge.",
      "beispiel": "Bau mir ein kleines Haus vor mir"
-    },
-    {
-     "name": "Hilfe im Spiel",
-     "text": "Crafting- und Redstone-Fragen, Antwort gesprochen und im Spiel-Chat.",
-     "beispiel": "Jarvis, wie crafte ich einen Beobachter?"
     },
     {
      "name": "Eigener Server",
@@ -410,11 +395,6 @@
    "name": "Spotify-DJ",
    "icon": "🎧",
    "features": [
-    {
-     "name": "Spotify steuern",
-     "text": "Abspielen, Pause, Weiter – ohne Token.",
-     "beispiel": "Nächster Song"
-    },
     {
      "name": "DJ",
      "text": "Merkt sich, was du hörst und überspringst, und wählt passend.",
@@ -466,33 +446,13 @@
      "name": "Guthaben ändern",
      "text": "Geld hinzufügen oder genau setzen; App übernimmt es in Sekunden.",
      "beispiel": "Gib mir 10.000 in Larsens World"
-    },
-    {
-     "name": "Einstellungen ändern",
-     "text": "Werte der Casino-Spiele anpassen.",
-     "beispiel": "Stell das Glücksrad auf mehr Gewinne"
-    },
-    {
-     "name": "Code ändern",
-     "text": "Neue Spiele oder Funktionen für die World auf Zuruf.",
-     "beispiel": "Jarvis, bau in die World ein neues Spiel"
     }
    ]
   },
   {
-   "name": "Gaming-Modus",
+   "name": "Licht & Stimmung",
    "icon": "🎮",
    "features": [
-    {
-     "name": "Platz machen",
-     "text": "Läuft ein Spiel, gibt ORB Grafikkarte und Speicher frei.",
-     "beispiel": "startet von selbst"
-    },
-    {
-     "name": "Mini-ORB im Spiel",
-     "text": "Startest du ein Spiel, wird ORB zur kleinen Kugel unten rechts mit Mini-Hologramm, ohne dein Spiel zu stören.",
-     "beispiel": "Jarvis, wo finde ich Diamanten?"
-    },
     {
      "name": "Tastatur in ORBs Farbe",
      "text": "Die Acer-Nitro-Tastatur leuchtet automatisch in deinem gewählten Farbthema.",
@@ -518,11 +478,6 @@
      "name": "Neue Funktionen auf Zuruf",
      "text": "Wünsche für ORB gehen an den Entwickler – mit eigenem Fortschritts-Hologramm.",
      "beispiel": "Jarvis, bau dir ein Wetter-Widget"
-    },
-    {
-     "name": "Große Projekte",
-     "text": "Apps, Websites, Spiele baut der Projekt-Entwickler im Hintergrund.",
-     "beispiel": "Jarvis, bau mir eine Website für …"
     },
     {
      "name": "Automatische Updates",

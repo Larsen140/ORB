@@ -595,7 +595,7 @@
   // Webcam ist entfernt: Kamera-Ansicht und Gesten nie mehr starten
   try { kameraAn = () => {}; } catch (e) {}
   try { gestenStart = () => {}; if (typeof gestenStop === 'function') gestenStop(); } catch (e) {}
-  ['s_gesten'].forEach(id => { const el = $d(id); if (el) el.closest('.row').classList.add('d-weg'); });
+  ['s_gesten', 's_gaming'].forEach(id => { const el = $d(id); if (el) el.closest('.row').classList.add('d-weg'); });
 
   d.querySelectorAll('.dw[data-geh]').forEach(b => b.addEventListener('click', () => geh(b.dataset.geh)));
   function uhrKachel() {
