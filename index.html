@@ -2336,8 +2336,7 @@ async function ask(text, getippt) {
   if (S.sleep) { S.sleep = false; document.body.classList.remove('sleeping'); }
   const t0 = text.replace(/[.!?,]+$/g, '').trim();
   // Mini-ORB per Sprache: „Mini-Modus“ / „mach dich klein“ – „mach dich groß“ / „Vollbild“
-  if (MINI_RE.test(t0)) { addMsg('me', text); SFX.close(); return miniModus(true); }
-  if (GROSS_RE.test(t0)) { addMsg('me', text); SFX.open(); return miniModus(false); }
+  // Mini-ORB („mach dich klein“) entfernt (19.11.)
   // „Kamera an“ / „Kamera aus“ – nur auf ausdrücklichen Befehl, „aus“ beendet sofort
   if (KAM_RE.test(t0)) { addMsg('me', text); if (KAM_AUS_RE.test(t0)) { kameraAus(); hint('Kamera ist aus', 2000); } else kameraAn(); return; }
   // „Sphäre in meine Hand“ (schaltet die Kamera dafür ein) und lokale Kamera-Befehle („zeig mir das Wetter“, „zeichnen“, „räum auf“)
