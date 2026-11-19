@@ -77,7 +77,7 @@ DEFAULT_CFG = {
 }
 # Damit ORB immer dein Claude-Code-Login (Max-Abo) nutzt und nie einen API-Schlüssel
 CLAUDE_ENV_DROP = ("ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "ANTHROPIC_BASE_URL")
-VERSION = "160"
+VERSION = "161"
 ORB_UI = ("Deine Oberfläche (die Larsen gerade sieht): in der Mitte du als flüssige leuchtende Kugel mit Tropfen, "
           "Orbit-Ringen und Sternenhimmel; links eine Uhr und darunter der Gesprächsverlauf mit Eingabefeld; rechts "
           "Karten für System (CPU, RAM, Akku), Wetter mit Stundenvorschau, Aktivität (was du gerade tust) und Vorschläge; "
@@ -1511,6 +1511,12 @@ AUS_RE = re.compile(r"^/(aus|beenden)\b|\b(schalt\w*|mach\w*|fahr\w*)\s+(dich|or
                     r"|^(orb|jarvis)?\s*(komplett|ganz|vollständig)\s+(ausschalten|beenden|aus)\W*$", re.I)
 PAUSE_RE = re.compile(r"\b(pause[n-]?modus|stumm[\s-]*modus|zuhör[\s-]*pause)\b", re.I)
 PAUSE = {"an": False}
+HANDY = {"t": 0.0}   # letzte Nachricht per Telegram: dann am PC weder Stimme noch Klänge (Antwort geht nur aufs Handy)
+
+
+def handy_still():
+    """True, solange das Gespräch übers Handy läuft (15 Min. wie die Telegram-Weiterleitung, bis Larsen am PC spricht/tippt)."""
+    return time.time() - HANDY["t"] < 900
 
 
 def befehl_text(text):
@@ -1588,6 +1594,7 @@ def pause_schalten(an, heard=""):
 
 
 def ask(text):
+    HANDY["t"] = time.time() if text.startswith("[Per Telegram") else 0.0
     if aus_befehl(text):
         orb_aus(text)
         return True
@@ -3208,6 +3215,7 @@ class Handler(BaseHTTPRequestHandler):
             # Meeting oder Spiel: nicht zuhören – außer Minecraft: da hört ORB weiter auf „Jarvis“ (Befehle im Spiel)
             st["anruf"] = call_aktiv() or bool(st["spiel"] and st["spiel"] != "Minecraft")   # während Meet/Teams/Zoom nicht zuhören
             st["tarn"] = tarnmodus.aktiv()   # Tarnmodus: Oberfläche ganz stumm
+            st["handy"] = handy_still()   # Gespräch per Telegram: Oberfläche stumm, Sprachnachricht trotzdem fürs Handy
             st["pause"] = PAUSE["an"]   # Pausemodus: Oberfläche hört nicht zu, Telegram/Tippen gehen weiter
             st["anruf"] = st["anruf"] or PAUSE["an"]
             st["version"] = VERSION   # Fenster lädt sich neu, wenn eine neue Version läuft
