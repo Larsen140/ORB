@@ -220,7 +220,11 @@ def gesicht_beim_start():
     try:
         import psutil
         import shutil
-        if not server.load_cfg().get("gesichtssperre", True) or time.time() - psutil.boot_time() > 600:
+        # Windows-Schnellstart: boot_time bleibt beim „Herunterfahren“ alt → Start der Anmeldung (explorer.exe) zählt
+        anmeldung = min((p.info["create_time"] for p in psutil.process_iter(["name", "create_time"])
+                         if (p.info["name"] or "").lower() == "explorer.exe"), default=psutil.boot_time())
+        sitzung = max(psutil.boot_time(), anmeldung)
+        if not server.load_cfg().get("gesichtssperre", True) or time.time() - sitzung > 600:
             return
         pyw = shutil.which("pyw") or shutil.which("pythonw")
         skript = os.path.join(os.path.dirname(os.path.abspath(server.__file__)), "gesicht.py")

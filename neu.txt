@@ -1,1 +1,1 @@
-169|Gesichtssperre: scannt beim Start weiter, bis ein Gesicht erkannt wird; Fremde sofort per Telegram-Foto
+170|Gesichtssperre scannt auch nach Herunterfahren mit Windows-Schnellstart
