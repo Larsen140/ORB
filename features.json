@@ -149,6 +149,11 @@
      "name": "Männliche Jarvis-Stimme",
      "text": "Christoph als Standard (oder Brian, William, Jonas, Jan) mit dezentem Jarvis-Effekt: tiefer, mit KI-Schimmer.",
      "beispiel": "Einstellungen → Stimme → Sprecher"
+    },
+    {
+     "name": "Mini-ORB",
+     "text": "Kleine Kugel in der Ecke, immer obenauf.",
+     "beispiel": "Jarvis, mach dich klein"
     }
    ]
   },
@@ -409,6 +414,11 @@
      "name": "Musikgeschmack",
      "text": "Merkt sich, was du hörst und skippst, und wählt danach aus.",
      "beispiel": "Jarvis, mehr wie das hier"
+    },
+    {
+     "name": "Spotify steuern",
+     "text": "Abspielen, Pause, Weiter – ohne Token.",
+     "beispiel": "Nächster Song"
     }
    ]
   },
@@ -446,6 +456,16 @@
      "name": "Guthaben ändern",
      "text": "Geld hinzufügen oder genau setzen; App übernimmt es in Sekunden.",
      "beispiel": "Gib mir 10.000 in Larsens World"
+    },
+    {
+     "name": "Einstellungen ändern",
+     "text": "Werte der Casino-Spiele anpassen.",
+     "beispiel": "Stell das Glücksrad auf mehr Gewinne"
+    },
+    {
+     "name": "Code ändern",
+     "text": "Neue Spiele oder Funktionen für die World auf Zuruf.",
+     "beispiel": "Jarvis, bau in die World ein neues Spiel"
     }
    ]
   },
@@ -503,6 +523,11 @@
      "name": "Tastenkürzel",
      "text": "Strg+K oder / springt ins Eingabefeld, die Tasten 1–6 wechseln die Seiten des Dashboards.",
      "beispiel": "2 → Trading"
+    },
+    {
+     "name": "Große Projekte",
+     "text": "Apps, Websites, Spiele baut der Projekt-Entwickler im Hintergrund.",
+     "beispiel": "Jarvis, bau mir eine Website für …"
     }
    ]
   }
