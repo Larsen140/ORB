@@ -1,1 +1,1 @@
-167|Gesicht lernen geführt: vorne, links, rechts
+168|Gesichtssperre: bei fremdem Gesicht ist ORB komplett unsichtbar, stumm und nicht aufrufbar

@@ -77,7 +77,7 @@ DEFAULT_CFG = {
 }
 # Damit ORB immer dein Claude-Code-Login (Max-Abo) nutzt und nie einen API-Schlüssel
 CLAUDE_ENV_DROP = ("ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "ANTHROPIC_BASE_URL")
-VERSION = "167"
+VERSION = "168"
 ORB_UI = ("Deine Oberfläche (die Larsen gerade sieht): in der Mitte du als flüssige leuchtende Kugel mit Tropfen, "
           "Orbit-Ringen und Sternenhimmel; links eine Uhr und darunter der Gesprächsverlauf mit Eingabefeld; rechts "
           "Karten für System (CPU, RAM, Akku), Wetter mit Stundenvorschau, Aktivität (was du gerade tust) und Vorschläge; "
@@ -719,6 +719,8 @@ def skin_still(an=None):
 
 def write_state(**kw):
     """Zustand schreiben – mit Lock (mehrere Threads) und Wiederholung, falls Windows die Datei kurz sperrt."""
+    if kw.get("parts") and fremd_gesperrt():
+        kw["parts"] = []   # Fremden-Sperre: nie etwas laut sagen, auch nicht „laut“-Ansagen
     if not kw.pop("laut", False) and kw.get("parts") and (skin_still() or tarnmodus.aktiv()):
         kw["parts"] = []   # Skin- oder Tarnmodus: Text nur anzeigen (und per Telegram), nicht vorlesen
     with _state_lock:
@@ -1452,6 +1454,37 @@ class Brain:
 
 
 BRAIN = Brain()
+
+
+# ---------- Fremden-Sperre (gesicht.py): fremdes Gesicht → ORB unsichtbar, stumm, nicht aufrufbar ----------
+GESICHT_DIR = os.path.join(os.environ.get("LOCALAPPDATA", ""), "ORB", "gesicht")
+FREMD = {"t": 0.0, "an": False}
+
+
+def fremd_gesperrt():
+    """Sperrt der Gesichts-Wächter ORB gerade (sperre.json mit seiner PID)? Läuft der Wächter nicht mehr,
+    gilt die Sperre nicht – so kann ein abgestürzter Wächter Larsen nie aussperren. 1 s zwischengespeichert."""
+    if time.time() - FREMD["t"] < 1:
+        return FREMD["an"]
+    an = False
+    try:
+        with open(os.path.join(GESICHT_DIR, "sperre.json"), encoding="utf-8") as f:
+            pid = int(json.load(f).get("pid", 0))
+        import psutil
+        an = bool(pid) and "gesicht.py" in " ".join(psutil.Process(pid).cmdline())
+    except Exception:
+        an = False
+    FREMD.update(t=time.time(), an=an)
+    return an
+
+
+def weckversuch():
+    """Jemand will ORB holen (Klatschen, „Jarvis“, ORB.exe) → der Wächter scannt sofort neu: ist es Larsen, geht die Sperre auf."""
+    try:
+        with open(os.path.join(GESICHT_DIR, "weckversuch"), "w") as f:
+            f.write(str(time.time()))
+    except Exception:
+        pass
 
 
 # ---------- Tarnmodus: PC wirkt aus, Meetings/Downloads/ORB/Telegram laufen weiter (tarnmodus.py) ----------
@@ -3533,6 +3566,10 @@ class Handler(BaseHTTPRequestHandler):
             name_stopp = re.search(r"(?i)\b(jarvis|orb|stopp?|hör auf|aufhören|sei still|ruhe)\b", text) and not eigen
             if typ == "text" and echo and not name_stopp:
                 return self.send(200, {"ok": False, "grund": "Echo – ORB sprach gerade"})
+            if fremd_gesperrt():   # Fremder am PC: „Jarvis“ & Fragen ignorieren, nur neu scannen lassen
+                if typ == "wake":
+                    weckversuch()
+                return self.send(200, {"ok": False, "grund": "gesperrt"})
             if typ == "wake" and time.time() - LAST_WACH[0] > 3 and ON_SHOW[0]:
                 threading.Thread(target=ON_SHOW[0], kwargs={"wake": True}, daemon=True).start()   # Fenster zu/versteckt: aufwecken
             OHR["n"] += 1

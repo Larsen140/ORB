@@ -97,6 +97,8 @@ def _voll(h):
 
 def _neu_oeffnen(extra, hash_=""):
     """Fenster schließen und neu öffnen (ein mit --start-fullscreen geöffnetes Fenster lässt sich nicht verkleinern)."""
+    if server.fremd_gesperrt():
+        return
     hide_window()
     time.sleep(1.2)
     browser = find_browser()
@@ -119,6 +121,8 @@ def mini(an=True):
     sw, sh = u.GetSystemMetrics(0), u.GetSystemMetrics(1)
     w, hh = 300, 360
     x, y = sw - w - 18, sh - hh - 60
+    if server.fremd_gesperrt():
+        return
     hs = orb_windows()
     if not hs:
         if an:
@@ -226,6 +230,37 @@ def gesicht_beim_start():
         print("Gesichtssperre:", e)
 
 
+def fremd_wache():
+    """Fremden-Sperre (gesicht.py): solange ein fremdes Gesicht erkannt ist, bleibt das ORB-Fenster ganz zu – keine Kugel,
+    kein Taskleisten-Eintrag, keine Stimme. Wächter, Telegram und Server laufen unsichtbar weiter.
+    Erkennt der Wächter Larsen wieder, kommt ORB zurück: nach einem Weckversuch sichtbar, sonst wie gewohnt im Hintergrund."""
+    vorher = False
+    while True:
+        time.sleep(1)
+        try:
+            an = server.fremd_gesperrt()
+            if an:
+                if not vorher:
+                    server.log_close("Fremden-Sperre: ORB versteckt")
+                    server.BRAIN.kill() if not server.BRAIN.busy else None
+                    server.web_schliessen_fenster()
+                if window_open() or window_process_running():
+                    hide_window()
+            elif vorher:
+                server.log_close("Fremden-Sperre aufgehoben – Larsen erkannt")
+                try:
+                    weck = time.time() - os.path.getmtime(os.path.join(server.GESICHT_DIR, "weckversuch")) < 60
+                except OSError:
+                    weck = False
+                if weck:
+                    show(wake=True)
+                elif server.load_cfg().get("steuerung", "wort") == "wort":
+                    show(hidden=True)   # wieder unsichtbar auf „Jarvis“ lauschen
+            vorher = an
+        except Exception as e:
+            print("Fremden-Sperre:", e)
+
+
 def telegram_start():
     """Telegram-Brücke (telegram_orb.py neben server.py) im ORB-Prozess laufen lassen – nur Standardbibliothek."""
     try:
@@ -290,6 +325,9 @@ def window_process_running():
 
 
 def show(wake=False, hidden=False):
+    if server.fremd_gesperrt():
+        server.weckversuch()   # Fremder will ORB holen → nichts zeigen, Wächter scannt neu (ist es doch Larsen?)
+        return
     if server.tarnmodus.aktiv():
         return   # Tarnmodus: Klatschen & Co. holen das Fenster nicht hervor
     if wake:
@@ -895,6 +933,7 @@ def main():
     threading.Thread(target=stimme_wache, daemon=True).start()         # lokale KI-Stimme (Chatterbox)
     threading.Thread(target=server.live_bildschirm, daemon=True).start()  # Bildschirm in Echtzeit
     threading.Thread(target=telegram_start, daemon=True).start()
+    threading.Thread(target=fremd_wache, daemon=True).start()          # fremdes Gesicht → ORB unsichtbar und stumm
     threading.Thread(target=gesicht_beim_start, daemon=True).start()   # Gesichtssperre (nur direkt nach dem PC-Start)          # ORB per Telegram vom Handy
     threading.Thread(target=orb_unsichtbar_fuer_aufnahme, daemon=True).start()
     threading.Thread(target=update_loop, daemon=True).start()
