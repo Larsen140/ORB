@@ -71,17 +71,38 @@ def gesichter(sekunden, det, rec, anzahl=12):
     return merkmale, bild
 
 
+def ansagen(text):
+    """ORB sagt es laut (und zeigt es im Chat) – für das geführte Lernen."""
+    import urllib.request
+    try:
+        tok = open(os.path.join(os.environ.get("LOCALAPPDATA", ""), "ORB", "token.txt")).read().strip()
+        req = urllib.request.Request("http://127.0.0.1:8766/announce", data=json.dumps({"text": text}).encode(),
+                                     headers={"X-ORB-Token": tok, "Content-Type": "application/json"})
+        urllib.request.urlopen(req, timeout=3).read()
+    except Exception:
+        pass
+    print(text, flush=True)
+
+
 def lernen():
+    """Geführt: vorne, links, rechts – je Richtung mehrere Bilder. Gespeichert werden alle Merkmale (Profil = mehrere Ansichten)."""
     det, rec = modelle()
-    print("Bitte ca. 8 Sekunden in die Kamera schauen, Kopf leicht bewegen …", flush=True)
-    m, _ = gesichter(10, det, rec, anzahl=30)
-    if len(m) < 8:
-        print(json.dumps({"ok": False, "fehler": "zu wenig Gesichtsbilder (%d) – mehr Licht, näher ran" % len(m)}))
+    alle = []
+    for richtung, satz in (("vorne", "Schau bitte gerade in die Kamera."), ("links", "Jetzt den Kopf leicht nach links drehen."),
+                           ("rechts", "Und jetzt leicht nach rechts.")):
+        ansagen(satz)
+        time.sleep(2.2)   # Ansage abwarten
+        m, _ = gesichter(4, det, rec, anzahl=12)
+        log("Lernen", richtung, len(m), "Bilder")
+        alle += m
+    if len(alle) < 10:
+        ansagen("Das hat nicht geklappt, ich habe dein Gesicht zu selten gesehen. Mehr Licht und etwas näher ran, dann nochmal.")
+        print(json.dumps({"ok": False, "bilder": len(alle)}))
         return
-    p = np.mean(m, axis=0)
-    np.save(PROFIL, p / np.linalg.norm(p))
-    log("Profil gelernt aus", len(m), "Bildern")
-    print(json.dumps({"ok": True, "bilder": len(m)}))
+    np.save(PROFIL, np.array([x.ravel() for x in alle]))
+    ansagen("Fertig, ich kenne dein Gesicht jetzt von vorne, links und rechts.")
+    log("Profil gelernt aus", len(alle), "Bildern (vorne/links/rechts)")
+    print(json.dumps({"ok": True, "bilder": len(alle)}))
 
 
 def pruefen(sekunden=6):
@@ -92,7 +113,8 @@ def pruefen(sekunden=6):
     m, bild = gesichter(sekunden, det, rec, anzahl=5)
     if not m:
         return {"ergebnis": "kein_gesicht"}
-    wert = float(max(float(np.dot(x.ravel(), profil.ravel())) for x in m))
+    P = profil.reshape(-1, profil.shape[-1])   # eine oder mehrere gespeicherte Ansichten
+    wert = float(max(float(np.max(P @ x.ravel())) for x in m))
     if wert >= SCHWELLE:
         return {"ergebnis": "larsen", "wert": round(wert, 3)}
     if bild is not None:
