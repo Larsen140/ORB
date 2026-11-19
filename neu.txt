@@ -1,1 +1,1 @@
-168|Gesichtssperre: bei fremdem Gesicht ist ORB komplett unsichtbar, stumm und nicht aufrufbar
+169|Gesichtssperre: scannt beim Start weiter, bis ein Gesicht erkannt wird; Fremde sofort per Telegram-Foto

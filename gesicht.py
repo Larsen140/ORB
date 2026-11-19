@@ -2,7 +2,7 @@
 
   py -3 gesicht.py lernen      → ~8 s in die Kamera schauen: Profil von Larsens Gesicht anlegen
   py -3 gesicht.py pruefen     → einmal scannen; gibt JSON {"ergebnis": "larsen"|"fremd"|"kein_gesicht", "wert": …} aus
-  py -3 gesicht.py waechter    → beim PC-Start: scannen; ist es nicht Larsen, private Apps (WhatsApp, Instagram, Snapchat)
+  py -3 gesicht.py waechter    → beim PC-Start: alle ~3 s scannen, bis ein Gesicht zu sehen ist; ist es nicht Larsen, private Apps (WhatsApp, Instagram, Snapchat)
                                   sperren und ORB selbst unsichtbar/stumm/nicht aufrufbar machen, bis Larsen erkannt wird
                                   (neuer Scan bei jedem Öffnungs- oder Weckversuch). Meldet Fremde per Telegram.
 Dateien in %LOCALAPPDATA%\\ORB\\gesicht: Modelle, profil.npy, letzter_fremder.jpg, gesicht.log, sperre.json, weckversuch.
@@ -210,41 +210,48 @@ def weck_zeit():
 
 
 def waechter():
-    time.sleep(8)   # Windows und Kamera hochfahren lassen
-    r = pruefen(8)
-    log("Start-Scan:", r)
-    if r["ergebnis"] in ("larsen", "kein_profil"):
+    """Beim PC-Start: alles gesperrt lassen und alle paar Sekunden scannen, bis wirklich ein Gesicht zu sehen ist.
+    Larsen → Sperre weg, fertig. Fremder → gesperrt lassen, Foto per Telegram, danach Neu-Scan bei Öffnungsversuchen.
+    Komplett unsichtbar: nichts auf dem Bildschirm."""
+    if not os.path.exists(PROFIL):
         sperre_setzen(False)
         return
-    sperre_setzen(True)   # ab jetzt ist auch ORB selbst versteckt und stumm
+    sperre_setzen(True)   # von Anfang an: ORB versteckt und stumm, bis Larsen erkannt ist
     try:
-        if r["ergebnis"] == "fremd":
-            telegram("⚠️ ORB: Am PC sitzt jemand, der nicht du bist – ORB und private Apps sind gesperrt.",
-                     os.path.join(BASIS, "letzter_fremder.jpg"))
+        time.sleep(8)   # Windows und Kamera hochfahren lassen
+        fremd_gemeldet = False
         letzter_scan, weck_gesehen = 0.0, weck_zeit()
         while True:
-            time.sleep(1)
             f = private_fenster()
-            weck = weck_zeit() > weck_gesehen   # jemand wollte ORB holen (Klatschen, „Jarvis“, ORB.exe)
-            if not f and not weck:
-                continue
-            # Öffnungsversuch → nochmal scannen: ist es jetzt Larsen? (höchstens alle 20 s, bei ORB-Weckversuch alle 5 s)
-            if time.time() - letzter_scan > (5 if weck else 20):
-                weck_gesehen = weck_zeit()
-                letzter_scan = time.time()
-                r = pruefen(4)
-                log("Scan bei Öffnungsversuch (%s):" % ("ORB" if weck else "App"), r)
-                if r["ergebnis"] == "larsen":
-                    log("Larsen erkannt – Sperre aufgehoben")
-                    return
-                if r["ergebnis"] == "fremd":
-                    was = f[0][3][:40] if f else "ORB"
-                    telegram("⚠️ ORB: Jemand wollte %s öffnen – gesperrt." % was, os.path.join(BASIS, "letzter_fremder.jpg"))
             if f:
                 sperren(f)
+            weck = weck_zeit() > weck_gesehen   # jemand wollte ORB holen (Klatschen, „Jarvis“, ORB.exe)
+            if not fremd_gemeldet:
+                # noch kein Gesicht gesehen → ständig weiterscannen (alle ~3 s)
+                faellig = time.time() - letzter_scan > 3
+            else:
+                # Fremder erkannt → nur bei Öffnungsversuch neu scannen (bei ORB-Weckversuch alle 5 s, sonst alle 20 s)
+                faellig = (f or weck) and time.time() - letzter_scan > (5 if weck else 20)
+            if not faellig:
+                time.sleep(1)
+                continue
+            weck_gesehen = weck_zeit()
+            r = pruefen(4)
+            letzter_scan = time.time()
+            log("Scan (%s):" % ("Start" if not fremd_gemeldet else "ORB" if weck else "App"), r)
+            if r["ergebnis"] in ("larsen", "kein_profil"):
+                log("Larsen erkannt – Sperre aufgehoben")
+                return
+            if r["ergebnis"] == "fremd":
+                bild = os.path.join(BASIS, "letzter_fremder.jpg")
+                if not fremd_gemeldet:
+                    fremd_gemeldet = True
+                    telegram("⚠️ ORB: Am PC sitzt jemand, der nicht du bist – ORB und private Apps sind gesperrt.", bild)
+                elif f or weck:
+                    was = f[0][3][:40] if f else "ORB"
+                    telegram("⚠️ ORB: Jemand wollte %s öffnen – gesperrt." % was, bild)
     finally:
         sperre_setzen(False)   # ORB wieder sichtbar und bedienbar
-
 
 if __name__ == "__main__":
     was = sys.argv[1] if len(sys.argv) > 1 else "pruefen"
