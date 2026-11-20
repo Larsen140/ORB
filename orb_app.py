@@ -365,11 +365,11 @@ def show(wake=False, hidden=False):
     if hidden:   # unsichtbar starten (Autostart/Update): außerhalb des Bildschirms → kein Aufblitzen
         extra = ["--window-position=-32000,-32000", "--window-size=1280,800"]
     t0 = time.time()
-    subprocess.Popen([browser, "--app=" + url, "--user-data-dir=" + profile] + LEAN + extra)
+    proc = subprocess.Popen([browser, "--app=" + url, "--user-data-dir=" + profile] + LEAN + extra)
     if hidden:
         threading.Thread(target=hide_hidden_soon, daemon=True).start()
     else:
-        threading.Thread(target=verdeckt_starten, args=(t0,), daemon=True).start()
+        threading.Thread(target=verdeckt_starten, args=(t0, proc.pid), daemon=True).start()
 
 
 def _fenster_der_profilprozesse():
@@ -395,16 +395,38 @@ def _fenster_der_profilprozesse():
     return out
 
 
-def verdeckt_starten(t0):
+def _fenster_von_pid(pid):
+    """Sichtbare Hauptfenster genau dieses Prozesses – sehr schnell (kein Durchsuchen aller Prozesse)."""
+    from ctypes import wintypes
+    u = ctypes.windll.user32
+    out = []
+
+    @ctypes.WINFUNCTYPE(wintypes.BOOL, wintypes.HWND, wintypes.LPARAM)
+    def cb(h, _):
+        p = wintypes.DWORD()
+        u.GetWindowThreadProcessId(h, ctypes.byref(p))
+        if p.value == pid and u.IsWindowVisible(h) and u.GetParent(h) == 0:
+            out.append(h)
+        return True
+    u.EnumWindows(cb, 0)
+    return out
+
+
+def verdeckt_starten(t0, pid=0):
     """Startbild ohne Flackern: das neue Fenster sofort DURCHSICHTIG schalten (nicht verstecken – so rendert der Browser ganz
     normal weiter und nichts reißt), bis das Dashboard „bereit“ meldet; dann in 0,3 s weich einblenden. Spätestens nach 7 s."""
     u = ctypes.windll.user32
     u.SetWindowLongW.restype = ctypes.c_long
     fenster = {}
     ende = time.time() + 7
+    naechste_vollsuche = 0.0
     while time.time() < ende:
         try:
-            for h in _fenster_der_profilprozesse():
+            gefunden = _fenster_von_pid(pid) if pid else []
+            if not gefunden and time.time() > naechste_vollsuche:   # Edge hat den Start evtl. an einen anderen Prozess übergeben
+                naechste_vollsuche = time.time() + .25
+                gefunden = _fenster_der_profilprozesse()
+            for h in gefunden:
                 if h not in fenster:
                     ex = u.GetWindowLongW(h, -20)
                     u.SetWindowLongW(h, -20, ex | 0x80000)           # WS_EX_LAYERED
@@ -414,7 +436,7 @@ def verdeckt_starten(t0):
             pass
         if fenster and server.FENSTER_BEREIT[0] > t0:
             break
-        time.sleep(.01)
+        time.sleep(.004 if not fenster else .02)
     for stufe in range(1, 13):   # weich einblenden (~0,3 s)
         for h in fenster:
             try:
