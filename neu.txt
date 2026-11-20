@@ -1,1 +1,1 @@
-175|Begrüßung wird nicht mehr unten abgeschnitten
+176|Kein Flackern der Kugel mehr: Pegel geglättet, Lichtwellen im Dashboard aus

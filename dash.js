@@ -466,13 +466,14 @@
   // Rechtsklick-Menü des Browsers abschalten (in Eingabefeldern bleibt es für Kopieren/Einfügen)
   addEventListener('contextmenu', e => { if (!e.target.closest('input, textarea, [contenteditable]')) e.preventDefault(); });
   // ---------- Live: Pegelbalken + Leuchten der Hauptkarte folgen ORBs Stimme / deinem Sprechen ----------
-  const pegelBs = [...document.querySelectorAll('#d-pegel b')]; let pegelGl = 0, pegelT = 0;
+  const pegelBs = [...document.querySelectorAll('#d-pegel b')]; let pegelGl = 0, pegelRuhig = 0, pegelT = 0;
   (function pegel(now) {
     requestAnimationFrame(pegel);
     if (now - pegelT < 50 || !document.body.classList.contains('dash')) return; pegelT = now;   // 20 Bilder/s reichen
     const lvl = typeof S !== 'undefined' ? Math.min(1, (S.level || 0) * 1.6 + (typeof listening !== 'undefined' && listening ? .15 : 0)) : 0;
     pegelGl += (lvl - pegelGl) * .35;
-    document.documentElement.style.setProperty('--d-lvl', pegelGl.toFixed(3));
+    pegelRuhig += (lvl * .6 - pegelRuhig) * .08;   // Leuchtrand der Hauptkarte: nur sanft mitatmen (kein Flackern)
+    document.documentElement.style.setProperty('--d-lvl', pegelRuhig.toFixed(3));
     pegelBs.forEach((b, i) => b.style.transform = `scaleY(${(.18 + pegelGl * (.55 + .45 * Math.abs(Math.sin(now / (130 + i * 37) + i)))).toFixed(2)})`);
   })(0);
   // ---------- 3D: Karten neigen sich leicht zur Maus ----------
@@ -636,6 +637,8 @@
     $d('dn-titel').value = ''; $d('dn-text').value = ''; $d('dn-status').textContent = 'Gelöscht'; ladeNotizen(); };
   setTimeout(ladeNotizen, 2200); setInterval(() => { if (seite === 'notizen' && document.activeElement !== $d('dn-text') && document.activeElement !== $d('dn-titel')) ladeNotizen(); }, 10000);
 
+  // Lichtwellen über den ganzen Bildschirm (z. B. bei „Ich höre“) wirken auf dem hellen Glas wie Blitze → im Dashboard aus
+  try { const _welle = ripple; ripple = (...x) => { if (!document.body.classList.contains('dash')) return _welle(...x); }; } catch (e) {}
   // Webcam ist entfernt: Kamera-Ansicht und Gesten nie mehr starten
   try { kameraAn = () => {}; } catch (e) {}
   try { gestenStart = () => {}; if (typeof gestenStop === 'function') gestenStop(); } catch (e) {}

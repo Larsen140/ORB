@@ -1353,7 +1353,7 @@ function kinoPost(t, c1, c2) {
   down(K.A, K.B); blur(K.B, K.B2, 1.5); blur(K.B, K.B2, 2.5);
   kinoPass(K.comp, null, [K.S, K.A, K.B], u => {
     gl.uniform2f(u.uRes, glc.width, glc.height); gl.uniform2f(u.uC, K.cx, K.cy); gl.uniform1f(u.uR, K.r); gl.uniform1f(u.uT, t);
-    gl.uniform1f(u.uLevel, S.level); gl.uniform1f(u.uSpeak, S.speakVis); gl.uniform1f(u.uThink, S.think); gl.uniform1f(u.uSleep, S.sleepVis);
+    gl.uniform1f(u.uLevel, VIS.lvl); gl.uniform1f(u.uSpeak, S.speakVis); gl.uniform1f(u.uThink, S.think); gl.uniform1f(u.uSleep, S.sleepVis);
     gl.uniform3f(u.uCol, c1[0], c1[1], c1[2]); gl.uniform3f(u.uCol2, c2[0], c2[1], c2[2]);
   });
   gl.activeTexture(gl.TEXTURE0);
@@ -1390,7 +1390,7 @@ function renderGL(t, cx, cy, R, speaking) {
   gl.uniform3f(U.uCol, c1[0], c1[1], c1[2]); gl.uniform3f(U.uCol2, c2[0], c2[1], c2[2]);
   const c3 = mix(BASE3, AMBER, S.warn).map(v => v / 255), c4 = mix(BASE4, AMBER, S.warn).map(v => v / 255);
   gl.uniform3f(U.uCol3, c3[0], c3[1], c3[2]); gl.uniform3f(U.uCol4, c4[0], c4[1], c4[2]);
-  gl.uniform1f(U.uLevel, S.level); gl.uniform1f(U.uEnergy, S.energy); gl.uniform1f(U.uSpeak, S.speakVis);
+  gl.uniform1f(U.uLevel, VIS.lvl); gl.uniform1f(U.uEnergy, VIS.en); gl.uniform1f(U.uSpeak, S.speakVis);
   gl.uniform1f(U.uListen, S.listenVis); gl.uniform1f(U.uSleep, S.sleepVis); gl.uniform1f(U.uThink, S.think);
   gl.uniform4fv(U.uD, dropArr); gl.uniform4f(U.uB, S.bands[0], S.bands[1], S.bands[2], S.bands[3]);
   gl.drawArrays(gl.TRIANGLES, 0, 3);
@@ -4323,6 +4323,12 @@ const GROSS_RE = MINI_KERN(/^(mach dich |werd(e)? |geh |wechsel(e)? |schalt(e)? 
 const miniModus = an => fetch('/mini', { method:'POST', headers:{ 'Content-Type':'application/json' }, body:JSON.stringify({ an }) }).catch(() => {});
 
 const SPIEL_HTML = document.documentElement.classList.contains('spiel');
+// Im Glas-Dashboard sitzt die Kugel auf heller Fläche: Pegel (Stimme, Mikro, Denken) stark geglättet, sonst wirkt sie wie Flackern
+const VIS = { lvl:0, en:0 };
+function visPegel() {
+  if (!document.body.classList.contains('dash')) { VIS.lvl = S.level; VIS.en = S.energy; return; }
+  VIS.lvl += (S.level * .4 - VIS.lvl) * .06; VIS.en += (S.energy * .6 - VIS.en) * .05;
+}
 let lastT = performance.now();
 function frame(now) {
   requestAnimationFrame(frame);
@@ -4397,7 +4403,8 @@ function frame(now) {
   const bootE = 1 - Math.pow(1 - S.boot, 3), pop = S.boot < 1 ? 1 + Math.sin(S.boot * Math.PI) * .1 : 1;
   const Rb = LAY.rb || Math.min(LAY.cw * .8, H) * .15;
   const cx = LAY.mid + S.px * (LAY.rb ? 3 : 10), cy = (LAY.cy || H * .44) + S.py * (LAY.rb ? 2 : 6);
-  const R = Rb * (1 + Math.sin(t * 1.3) * .02 * (1 - S.speakVis) + S.level * .12) * (1 - .22 * S.sleepVis) * Math.max(.02, bootE) * pop;
+  visPegel();
+  const R = Rb * (1 + Math.sin(t * 1.3) * .02 * (1 - S.speakVis) + VIS.lvl * .12) * (1 - .22 * S.sleepVis) * Math.max(.02, bootE) * pop;
   const hEl = $('holo');
   if (hEl.classList.contains('on')) {
     if (now > holoUntil) holoHide();
@@ -4545,7 +4552,7 @@ function drawFx(t, dt, now, cx, cy, R, speaking) {
   }
   // Staub
   for (const p of parts) {
-    p.a += p.sp * dt * (.1 + S.energy * .6 + S.level * .5);
+    p.a += p.sp * dt * (.1 + VIS.en * .6 + VIS.lvl * .5);
     if (S.listenVis > .3) { p.r -= dt * .45 * S.listenVis; if (p.r < 1.15) p.r = 3; }
     const rr = R * (p.r + Math.sin(t * .7 + p.wob) * .08), px = cx + Math.cos(p.a) * rr, py = cy + Math.sin(p.a) * rr * (.8 + p.z * .35);
     const pc = pcol(p.ci, (.14 + p.z * .42) * (.45 + S.energy) * fade, .35);
