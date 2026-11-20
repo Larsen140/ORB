@@ -236,57 +236,6 @@ def stimme_wache():
         time.sleep(10)
 
 
-def gesicht_beim_start():
-    """Gesichtssperre: nur beim PC-Start (nicht bei jedem ORB-Neustart/Update) unsichtbar per Webcam prüfen, ob Larsen davor sitzt.
-    Ist er es nicht, sperrt gesicht.py WhatsApp/Instagram/Snapchat, bis er erkannt wird."""
-    try:
-        import psutil
-        import shutil
-        # Windows-Schnellstart: boot_time bleibt beim „Herunterfahren“ alt → Start der Anmeldung (explorer.exe) zählt
-        anmeldung = min((p.info["create_time"] for p in psutil.process_iter(["name", "create_time"])
-                         if (p.info["name"] or "").lower() == "explorer.exe"), default=psutil.boot_time())
-        sitzung = max(psutil.boot_time(), anmeldung)
-        if not server.load_cfg().get("gesichtssperre", True) or time.time() - sitzung > 600:
-            return
-        pyw = shutil.which("pyw") or shutil.which("pythonw")
-        skript = os.path.join(os.path.dirname(os.path.abspath(server.__file__)), "gesicht.py")
-        if pyw and os.path.exists(skript) and os.path.exists(os.path.join(os.environ.get("LOCALAPPDATA", ""), "ORB", "gesicht", "profil.npy")):
-            subprocess.Popen([pyw] + (["-3"] if pyw.lower().endswith("pyw.exe") else []) + [skript, "waechter"], creationflags=0x08000000)
-    except Exception as e:
-        print("Gesichtssperre:", e)
-
-
-def fremd_wache():
-    """Fremden-Sperre (gesicht.py): solange ein fremdes Gesicht erkannt ist, bleibt das ORB-Fenster ganz zu – keine Kugel,
-    kein Taskleisten-Eintrag, keine Stimme. Wächter, Telegram und Server laufen unsichtbar weiter.
-    Erkennt der Wächter Larsen wieder, kommt ORB zurück: nach einem Weckversuch sichtbar, sonst wie gewohnt im Hintergrund."""
-    vorher = False
-    while True:
-        time.sleep(1)
-        try:
-            an = server.fremd_gesperrt()
-            if an:
-                if not vorher:
-                    server.log_close("Fremden-Sperre: ORB versteckt")
-                    server.BRAIN.kill() if not server.BRAIN.busy else None
-                    server.web_schliessen_fenster()
-                if window_open() or window_process_running():
-                    hide_window()
-            elif vorher:
-                server.log_close("Fremden-Sperre aufgehoben – Larsen erkannt")
-                try:
-                    weck = time.time() - os.path.getmtime(os.path.join(server.GESICHT_DIR, "weckversuch")) < 60
-                except OSError:
-                    weck = False
-                if weck:
-                    show(wake=True)
-                elif server.load_cfg().get("steuerung", "wort") == "wort":
-                    show(hidden=True)   # wieder unsichtbar auf „Jarvis“ lauschen
-            vorher = an
-        except Exception as e:
-            print("Fremden-Sperre:", e)
-
-
 def telegram_start():
     """Telegram-Brücke (telegram_orb.py neben server.py) im ORB-Prozess laufen lassen – nur Standardbibliothek."""
     try:
@@ -1061,8 +1010,6 @@ def main():
     threading.Thread(target=stimme_wache, daemon=True).start()         # lokale KI-Stimme (Chatterbox)
     threading.Thread(target=server.live_bildschirm, daemon=True).start()  # Bildschirm in Echtzeit
     threading.Thread(target=telegram_start, daemon=True).start()
-    threading.Thread(target=fremd_wache, daemon=True).start()          # fremdes Gesicht → ORB unsichtbar und stumm
-    threading.Thread(target=gesicht_beim_start, daemon=True).start()   # Gesichtssperre (nur direkt nach dem PC-Start)          # ORB per Telegram vom Handy
     threading.Thread(target=orb_unsichtbar_fuer_aufnahme, daemon=True).start()
     threading.Thread(target=update_loop, daemon=True).start()
     threading.Thread(target=announce_update, daemon=True).start()

@@ -480,6 +480,16 @@
    "icon": "🛠",
    "features": [
     {
+     "name": "Second Brain",
+     "text": "Dein ganzes Wissen als 3D-Universum mit Schwarzem Loch: alle Claude-Chats, Projekte, GitHub, Apps und alle ORB-Daten als anklickbare Sterne mit Dashboards. Knopf links in der Leiste oder per Sprache.",
+     "beispiel": "Jarvis, öffne Second Brain"
+    },
+    {
+     "name": "Galaxie-Design",
+     "text": "ORB im Weltraum-Look passend zu Second Brain: echtes Schwarzes Loch mit Lichtkrümmung, Sterne und Nebel im Hintergrund. Farbthemen bleiben wählbar – sie färben die Tastatur nicht mehr ein.",
+     "beispiel": "Farbthema oben rechts wechseln"
+    },
+    {
      "name": "Glas-Dashboard",
      "text": "ORBs Oberfläche im Milchglas-Look: Begrüßung, Kugel im Tagesring, Kalender mit Wetter- und Notiz-Widget, Uhr, Agenten, System, Musik und Schnellaktionen – dazu Seiten für Trading, Journal, Notizen, Agenten und Gespräch.",
      "beispiel": "Seitenleiste links: Übersicht, Trading, Agenten, Gespräch"
@@ -523,11 +533,6 @@
      "name": "Große Projekte",
      "text": "Apps, Websites, Spiele baut der Projekt-Entwickler im Hintergrund.",
      "beispiel": "Jarvis, bau mir eine Website für …"
-    },
-    {
-     "name": "Gesichtssperre",
-     "text": "Beim PC-Start erkennt ORB unsichtbar per Webcam, ob du es bist – sonst sperrt er WhatsApp, Instagram und Snapchat, versteckt sich selbst komplett (keine Kugel, keine Stimme, nicht aufrufbar) und schickt dir ein Foto per Telegram. Erkennt er dich wieder, ist er sofort normal da.",
-     "beispiel": "Jarvis, lerne mein Gesicht neu"
     },
     {
      "name": "Fokus-Timer",

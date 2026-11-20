@@ -1,1 +1,1 @@
-190|ORB schläft im Hintergrund nicht mehr ein, kein Selbst-Einschalten und kein Start-Sound-Dauerfeuer, lässt dich ausreden
+191|Neues Galaxie-Design passend zu Second Brain (Weltraum, Schwarzes Loch, dunkles Glas), Second Brain per Knopf oder Sprache öffnen, Farbthemen färben Tastatur und Maus nicht mehr, Gesichtssperre entfernt

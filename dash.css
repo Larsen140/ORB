@@ -706,3 +706,26 @@ html[data-modus="dunkel"] .d-meeting { color:#ff7a68; } html[data-modus="dunkel"
 #dj-liste, .dn-liste, #d-agliste, #d-termine { -webkit-mask-image:linear-gradient(#000 calc(100% - 26px), transparent); mask-image:linear-gradient(#000 calc(100% - 26px), transparent); padding-bottom:18px; }
 .dj-liste { display:flex; flex-direction:column; }
 #dj-liste { flex:1; min-height:0; overflow:auto; scrollbar-width:thin; }
+
+/* ===== Galaxie-Design (20.11.2026) – passend zu Second Brain: Weltraum statt Foto, dunkles Glas, Schwarzes Loch ===== */
+html.galaxie body.dash #dbg { background:#000 !important; filter:none !important; }
+html.galaxie body.dash #dbg::after { background:radial-gradient(ellipse at 50% 50%, transparent 50%, rgba(0,0,0,.55) 100%); }
+#d-galaxie { position:absolute; inset:0; width:100%; height:100%; display:block; }
+html.galaxie[data-modus="dunkel"] { --d-ink:#f4f2ee; --d-sub:rgba(244,242,238,.62); --d-line:rgba(255,255,255,.10);
+  --d-glass:rgba(12,12,16,.50); --d-glass2:rgba(18,18,24,.66); --d-glass3:rgba(30,30,38,.80); --d-dark:#f4f2ee;
+  --d-shadow:0 24px 70px -20px rgba(0,0,0,.8), 0 2px 6px rgba(0,0,0,.4); }
+html.galaxie[data-modus="dunkel"] .dg { border-color:rgba(255,255,255,.10); box-shadow:var(--d-shadow), inset 0 1px 0 rgba(255,255,255,.10); }
+html.galaxie[data-modus="dunkel"] .d-karte { border-color:rgba(255,255,255,.08); }
+html.galaxie body.dash #d-aurora { opacity:.16 !important; }
+html.galaxie[data-modus="dunkel"] body.dash #d-aurora { opacity:.18 !important; }
+/* Start-Intro im Weltraum: das Schwarze Loch scheint durch, Ringe und Schrift leuchten golden-weiß */
+html.galaxie #d-introschicht, html.galaxie body.d-intro::before {
+  background:radial-gradient(55% 55% at 50% 46%, rgba(0,0,0,.25) 0%, rgba(0,0,0,.82) 70%, #000 100%); }
+html.galaxie #d-introschicht i { border-color:color-mix(in srgb, var(--d-acc2) 35%, #fff3e0);
+  box-shadow:0 0 34px color-mix(in srgb, var(--d-acc1) 60%, #f3c98b), inset 0 0 30px color-mix(in srgb, var(--d-acc1) 35%, transparent); }
+html.galaxie #d-introschicht .txt b span { text-shadow:0 0 26px color-mix(in srgb, var(--d-acc1) 55%, #f3c98b), 0 0 4px rgba(255,255,255,.6); }
+html.galaxie #d-introschicht::after { background:radial-gradient(circle, color-mix(in srgb, var(--d-acc2) 40%, #fff6e6) 0%, transparent 62%); }
+/* Galaxie: große Fläche nur noch hauchzart, damit Sterne und Schwarzes Loch durchscheinen – Karten bleiben gut lesbar */
+html.galaxie body.dash #d-main { background:rgba(8,8,12,.18) !important; backdrop-filter:blur(3px) saturate(120%) !important; -webkit-backdrop-filter:blur(3px) saturate(120%) !important; }
+html.galaxie[data-modus="dunkel"] { --d-glass2:rgba(16,16,22,.58); --d-glass3:rgba(26,26,34,.74); }
+html.galaxie body.dash #d-rail, html.galaxie body.dash #d-top { background:rgba(10,10,14,.42) !important; backdrop-filter:blur(14px) saturate(140%) !important; -webkit-backdrop-filter:blur(14px) saturate(140%) !important; }

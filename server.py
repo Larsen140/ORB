@@ -71,13 +71,13 @@ DEFAULT_CFG = {
     "steuerung": "wort", "wakeword": "Jarvis", "schnipsen": True, "trading_start": True, "gaming_modus": False, "stimmung": True, "razer": True, "gesten": False, "ohr": True, "unterbrechen": True, "sprechen_unterbrechen": True, "nur_jarvis": True, "musik_schutz": True, "ducking": True,
     "tts_anbieter": "edge",
     "klatschen": True, "dauerzuhoeren": True, "empfindlichkeit": 6, "schnips_empf": 6, "mikro": "TONOR", "kalib": {}, "satzpause": 2.0, "begruessung": True, "ort": "", "name": "",
-    "schlafen": 5, "vollbild": True, "spiel_mini": False, "nur_meine_stimme": True, "streng_jarvis": True, "tastatur_farbe": True, "gesichtssperre": True, "autostart": True, "schlaf_schliessen": False, "bildschirm": False,
+    "schlafen": 5, "vollbild": True, "spiel_mini": False, "nur_meine_stimme": True, "streng_jarvis": True, "tastatur_farbe": False, "autostart": True, "schlaf_schliessen": False, "bildschirm": False,
     "modell": "claude-opus-5-5", "laenge": "kurz", "rechte": "auto", "tempo_claude": "low",
     "ordner": os.path.join(os.path.expanduser("~"), "Documents", "Jarvis"), "sitzung": "",
 }
 # Damit ORB immer dein Claude-Code-Login (Max-Abo) nutzt und nie einen API-Schlüssel
 CLAUDE_ENV_DROP = ("ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "ANTHROPIC_BASE_URL")
-VERSION = "190"
+VERSION = "191"
 ORB_UI = ("Deine Oberfläche (die Larsen gerade sieht): in der Mitte du als flüssige leuchtende Kugel mit Tropfen, "
           "Orbit-Ringen und Sternenhimmel; links eine Uhr und darunter der Gesprächsverlauf mit Eingabefeld; rechts "
           "Karten für System (CPU, RAM, Akku), Wetter mit Stundenvorschau, Aktivität (was du gerade tust) und Vorschläge; "
@@ -1118,7 +1118,9 @@ _apps_lock = threading.Lock()
 ALIASES = {"rechner": "rechner", "taschenrechner": "rechner", "explorer": "datei-explorer",
            "dateien": "datei-explorer", "datei explorer": "datei-explorer", "einstellungen": "einstellungen",
            "notepad": "editor", "browser": "opera gx", "opera": "opera gx", "taskmanager": "task-manager",
-           "task manager": "task-manager", "word": "word", "excel": "excel", "powerpoint": "powerpoint"}
+           "task manager": "task-manager", "word": "word", "excel": "excel", "powerpoint": "powerpoint",
+           "second brain": "jarvis brain", "secondbrain": "jarvis brain", "gehirn": "jarvis brain", "mein gehirn": "jarvis brain",
+           "brain": "jarvis brain", "wissen": "jarvis brain", "universum": "jarvis brain"}
 SITES = {"youtube": "https://www.youtube.com", "google": "https://www.google.de", "netflix": "https://www.netflix.com",
          "twitch": "https://www.twitch.tv", "gmail": "https://mail.google.com", "tiktok": "https://www.tiktok.com",
          "instagram": "https://www.instagram.com", "amazon": "https://www.amazon.de", "github": "https://github.com",
@@ -1466,35 +1468,16 @@ class Brain:
 BRAIN = Brain()
 
 
-# ---------- Fremden-Sperre (gesicht.py): fremdes Gesicht → ORB unsichtbar, stumm, nicht aufrufbar ----------
-GESICHT_DIR = os.path.join(os.environ.get("LOCALAPPDATA", ""), "ORB", "gesicht")
-FREMD = {"t": 0.0, "an": False}
+# ---------- Gesichtssperre: am 20.11.2026 entfernt – Platzhalter, damit alte Aufrufe weiter funktionieren ----------
+GESICHT_DIR = ""
 
 
 def fremd_gesperrt():
-    """Sperrt der Gesichts-Wächter ORB gerade (sperre.json mit seiner PID)? Läuft der Wächter nicht mehr,
-    gilt die Sperre nicht – so kann ein abgestürzter Wächter Larsen nie aussperren. 1 s zwischengespeichert."""
-    if time.time() - FREMD["t"] < 1:
-        return FREMD["an"]
-    an = False
-    try:
-        with open(os.path.join(GESICHT_DIR, "sperre.json"), encoding="utf-8") as f:
-            pid = int(json.load(f).get("pid", 0))
-        import psutil
-        an = bool(pid) and "gesicht.py" in " ".join(psutil.Process(pid).cmdline())
-    except Exception:
-        an = False
-    FREMD.update(t=time.time(), an=an)
-    return an
+    return False
 
 
 def weckversuch():
-    """Jemand will ORB holen (Klatschen, „Jarvis“, ORB.exe) → der Wächter scannt sofort neu: ist es Larsen, geht die Sperre auf."""
-    try:
-        with open(os.path.join(GESICHT_DIR, "weckversuch"), "w") as f:
-            f.write(str(time.time()))
-    except Exception:
-        pass
+    pass
 
 
 # ---------- Tarnmodus: PC wirkt aus, Meetings/Downloads/ORB/Telegram laufen weiter (tarnmodus.py) ----------
@@ -2778,6 +2761,7 @@ def tastatur_farbe(farbe):
     """Acer-Nitro-Tastatur einfärben: Farbe in eine Datei schreiben und die geplante Aufgabe „ORB Tastatur“ starten
     (läuft mit Admin-Rechten, die Acer-Schnittstelle verlangt das). Ohne eingerichtete Aufgabe passiert nichts."""
     farbe = farbe.strip().lstrip("#").lower()
+    return False   # 20.11.2026: Farbthemen färben die Tastatur nicht mehr ein (Larsens Wunsch)
     if not re.fullmatch(r"[0-9a-f]{6}", farbe) or not load_cfg().get("tastatur_farbe", True):
         return False
     if farbe == _TASTATUR["farbe"] and time.time() - _TASTATUR["t"] < 600:
@@ -3642,6 +3626,15 @@ class Handler(BaseHTTPRequestHandler):
             self.send(200, {"ok": bool(ON_MINI[0])})
             if ON_MINI[0]:
                 threading.Thread(target=ON_MINI[0], args=(bool(b.get("an", True)),), daemon=True).start()
+        elif u.path == "/secondbrain":   # Second Brain (Jarvis Brain) öffnen – liest alles neu ein und zeigt das Universum
+            ok = False
+            try:
+                lnk = os.path.join(os.environ.get("APPDATA", ""), "Microsoft", "Windows", "Start Menu", "Programs", "Jarvis Brain.lnk")
+                if os.path.isfile(lnk):
+                    os.startfile(lnk); ok = True
+            except Exception as e:
+                print("Second Brain:", e)
+            self.send(200, {"ok": ok})
         elif u.path == "/show":  # Fenster öffnen bzw. nach vorne holen (z. B. zweiter Doppelklick auf ORB.exe)
             CALL_FREI[0] = True   # Larsen hat ORB selbst geholt (Klatschen) → auch im Meet zuhören (max. 3 Min. ohne Gespräch)
             CALL_FREI_T[0] = time.time()

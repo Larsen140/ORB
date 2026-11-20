@@ -48,6 +48,7 @@
     <button data-s="notizen">${svg('notiz')}<span class="lab">Notizen</span><span class="tip">Notizen</span></button>
     <button data-s="agenten">${svg('agenten')}<span class="lab">Agenten</span><span class="tip">Agenten &amp; Aufgaben</span></button>
     <button data-s="chat">${svg('chat')}<span class="lab">Gespräch</span><span class="tip">Gespräch</span></button>
+    <button id="d-brain"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3.2" fill="currentColor"/><ellipse cx="12" cy="12" rx="9.5" ry="3.4" fill="none" stroke="currentColor" stroke-width="1.6"/><circle cx="4.5" cy="6" r="1" fill="currentColor"/><circle cx="19.5" cy="18" r="1" fill="currentColor"/><circle cx="18" cy="5" r=".7" fill="currentColor"/></svg><span class="lab">Second Brain</span><span class="tip">Second Brain öffnen</span></button>
     <div class="unten">
       <button id="d-mic">${svg('mic')}<span class="lab">Sprechen</span><span class="tip">Sprechen (Leertaste halten)</span></button>
       <button id="d-stop">${svg('stop')}<span class="lab">Stopp</span><span class="tip">Stopp</span></button>
@@ -212,13 +213,13 @@
   }
   const qp = new URLSearchParams(location.search);   // Test: /?thema=nacht&seite=trading
   let seite = 'home';
-  modusSetzen(qp.get('modus') || ls('orb_modus') || 'hell');
+  if (!ls('orb_galaxie')) { ls('orb_galaxie', '1'); ls('orb_modus', 'dunkel'); }   // Galaxie-Design (20.11.2026): einmalig auf Dunkel umstellen
+  modusSetzen(qp.get('modus') || ls('orb_modus') || 'dunkel');
   themaSetzen(qp.get('thema') || ls('orb_thema') || 'koralle');
   designSetzen(true);   // altes Design gibt es nicht mehr
   $d('d-farbe').onclick = e => { e.stopPropagation(); $d('d-themen').classList.toggle('an'); };
   document.addEventListener('click', e => { const t = e.target.closest('[data-t]'), m = e.target.closest('[data-m]');
-    if (t) { themaSetzen(t.dataset.t);
-      if (window._dTaste) fetch('/tastatur', { method:'POST', headers:{ 'Content-Type':'application/json' }, body:JSON.stringify({ farbe:window._dTaste }) }).catch(() => {}); }
+    if (t) themaSetzen(t.dataset.t);
     if (m) { e.stopPropagation(); modusSetzen(m.dataset.m); } }, true);
   // Einstellungen aufräumen: alte Farbwahl & Widget-Optionen ausblenden, Hell/Dunkel + Farbthema einsetzen
   (function einstellungen() {
@@ -286,6 +287,7 @@
   const railBreit = an => { document.body.classList.toggle('d-breit', an); ls('orb_rail', an ? '1' : '0'); };
   railBreit(qp.get('breit') === '1' || ls('orb_rail') === '1');
   $d('d-auf').onclick = () => railBreit(!document.body.classList.contains('d-breit'));
+  $d('d-brain').onclick = () => fetch('/secondbrain', { method:'POST', headers:{ 'Content-Type':'application/json' }, body:'{}' }).catch(() => {});
   // Text an ORB schicken (oben, Seitenleiste, Kalender, Schnellaktionen)
   function anOrb(v) {
     const t = $d('txt'), s2 = $d('send'); if (!v || !t || !s2) return;
