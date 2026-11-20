@@ -696,3 +696,13 @@ body.d-sofort #dash { transition:none !important; }
 .d-meeting button { height:26px; padding:0 10px; border-radius:999px; border:0; cursor:pointer; font:600 11.5px inherit; font-family:inherit; color:#fff; background:#de4636; }
 .d-meeting.erlaubt button { background:#14a46e; }
 html[data-modus="dunkel"] .d-meeting { color:#ff7a68; } html[data-modus="dunkel"] .d-meeting.erlaubt { color:#4fd69c; }
+
+/* Meeting-Hinweis: fest rechts in der oberen Leiste, Eingabe macht Platz */
+#d-top .d-meeting { position:absolute; right:58px; top:50%; transform:translateY(-50%); margin:0; z-index:3; white-space:nowrap; }
+#d-top:has(.d-meeting.an) .mitte { width:min(440px, 30vw); left:calc(50% - 150px); }
+#d-top:has(.d-meeting.an) .mitte:focus-within { width:min(520px, 36vw); }
+@media (max-width:1500px) { #d-top .d-meeting #d-meeting-t { display:none; } #d-top:has(.d-meeting.an) .mitte { left:calc(50% - 90px); } }
+/* Listen (Trades, Agenten, Notizen): unten weich auslaufen statt hart abgeschnitten */
+#dj-liste, .dn-liste, #d-agliste, #d-termine { -webkit-mask-image:linear-gradient(#000 calc(100% - 26px), transparent); mask-image:linear-gradient(#000 calc(100% - 26px), transparent); padding-bottom:18px; }
+.dj-liste { display:flex; flex-direction:column; }
+#dj-liste { flex:1; min-height:0; overflow:auto; scrollbar-width:thin; }
