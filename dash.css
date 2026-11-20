@@ -532,13 +532,10 @@ html[data-modus="dunkel"] #d-aurora i:nth-child(1) { background:radial-gradient(
 
 /* Hauptkarte: rotierender Leuchtrand, stärker wenn ORB spricht */
 #d-held { overflow:hidden; }
-#d-held::after { content:''; position:absolute; inset:-2px; border-radius:inherit; padding:2px; pointer-events:none; transform:none !important;
-  background:conic-gradient(from var(--d-rand, 0deg), transparent 0 60%, rgba(255,255,255,.9) 72%, transparent 84%);
-  -webkit-mask:linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite:xor; mask-composite:exclude;
-  opacity:calc(.35 + var(--d-lvl, 0) * .65); animation:d-randdreh 6s linear infinite; }
-@property --d-rand { syntax:'<angle>'; inherits:false; initial-value:0deg; }
-@keyframes d-randdreh { to { --d-rand:360deg; } }
-#d-held { box-shadow:0 22px 50px -24px var(--d-acc1), 0 0 calc(var(--d-lvl, 0) * 60px) color-mix(in srgb, var(--d-acc2) 60%, transparent), inset 0 1px 0 rgba(255,255,255,.35); }
+#d-held::after { content:''; position:absolute; inset:0; border-radius:inherit; padding:1.5px; pointer-events:none; transform:none !important;
+  background:linear-gradient(135deg, rgba(255,255,255,.75), rgba(255,255,255,.08) 35%, transparent 60%, rgba(255,255,255,.35));
+  -webkit-mask:linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite:xor; mask-composite:exclude; }
+#d-held { box-shadow:0 22px 50px -24px var(--d-acc1), inset 0 1px 0 rgba(255,255,255,.35); }
 
 /* Pegelbalken oben */
 .d-pegel { display:flex; align-items:center; gap:2px; height:16px; margin:0 2px 0 -2px; }
@@ -630,3 +627,7 @@ body.dash #gl, body.dash #fx {
   -webkit-mask-image:radial-gradient(circle at var(--gx, 50%) var(--gy, 46%), #000 calc(var(--gr, 120px) * 1.35), transparent calc(var(--gr, 120px) * 2.2));
           mask-image:radial-gradient(circle at var(--gx, 50%) var(--gy, 46%), #000 calc(var(--gr, 120px) * 1.35), transparent calc(var(--gr, 120px) * 2.2)); }
 body.d-intro #gl, body.d-intro #fx { -webkit-mask-image:none; mask-image:none; }
+
+/* Hauptkarte: fester Verlauf ohne Maus-Lichtfleck (große Fläche würde bei jeder Mausbewegung neu gezeichnet) */
+#d-held { background-image:linear-gradient(140deg, var(--d-acc1), var(--d-acc2) 55%, var(--d-acc3)) !important; }
+#d-held { will-change:auto; contain:none; }
