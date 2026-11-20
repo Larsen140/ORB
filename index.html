@@ -2199,8 +2199,9 @@ function wake(frage) {
   if (verborgen || document.hidden) { verborgen = false; fetch('/show', { method:'POST' }).catch(() => {}); }   // aus dem Hintergrund nach vorne
   if (!S.sleep) return frage === undefined ? startListening() : frage ? ask(frage) : undefined;
   S.sleep = false; document.body.classList.remove('sleeping');
-  lastAct = performance.now(); bootT0 = performance.now();
-  SFX.boot(); SFX.liquid(); ripple(1.6); burst(80); replayEnter(); loadSys();
+  lastAct = performance.now();
+  if (document.body.classList.contains('dash')) loadSys();   // Glas-Dashboard: Aufwachen übernimmt das Intro (Kugel, Klang) – nichts doppelt
+  else { bootT0 = performance.now(); SFX.boot(); SFX.liquid(); ripple(1.6); burst(80); replayEnter(); loadSys(); }
   if (cfg.steuerung === 'wort') startWake();
   if (frage) { fetch('/warm', { method:'POST' }).catch(() => {}); setTimeout(() => ask(frage), 300); }   // „Jarvis, …“ – Frage direkt annehmen
   else if (frage === '') { fetch('/warm', { method:'POST' }).catch(() => {}); setTimeout(startListening, 700); }

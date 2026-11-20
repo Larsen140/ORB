@@ -1,1 +1,1 @@
-184|Flackern behoben: keine Grafikspeicher-Grenze mehr, weniger Neuzeichnen
+185|Flüssigerer Start mit Durchflug-Effekt, Musik-Widget mit Knöpfen, Widgets passen überall

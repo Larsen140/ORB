@@ -113,9 +113,11 @@
           <div class="d-karte d-kachel d-rein" style="animation-delay:.66s"><div class="d-h"><span class="ik">⚡</span><span class="los bad" id="d-ram">RAM –</span></div>
             <div class="zahl" id="d-cpu">–</div><div class="fuss"><div><div class="lbl">CPU-Last</div><div class="unt" id="d-wx">Wetter lädt</div></div>
             <svg class="spark" viewBox="0 0 100 26" preserveAspectRatio="none"><path id="d-spark-cpu" d=""/></svg></div></div>
-          <div class="d-karte d-kachel eq d-rein" id="d-musik" style="animation-delay:.72s"><div class="d-h"><span class="ik">♪</span><span class="los bad" id="d-mu-b">Spotify</span></div>
-            <div class="zahl" id="d-mu">Gerade keine Musik</div><div class="fuss"><div><div class="lbl" id="d-mu-a">Sag „spiel Musik“</div><div class="unt">Tippen = Play/Pause</div></div>
-            <div class="eqbars"><i></i><i></i><i></i><i></i><i></i></div></div></div>
+          <div class="d-karte d-kachel eq d-rein" id="d-musik" style="animation-delay:.72s"><div class="d-h"><span class="ik">♪</span><div class="eqbars"><i></i><i></i><i></i><i></i><i></i></div><span class="los bad" id="d-mu-b">Spotify</span></div>
+            <div class="zahl" id="d-mu">Gerade keine Musik</div><div class="lbl" id="d-mu-a">Sag „spiel Musik“</div>
+            <div class="mu-knoepfe"><button data-m="prev" title="Zurück"><svg viewBox="0 0 24 24"><path d="M6 6h2v12H6zm3.5 6 8.5 6V6z"/></svg></button>
+              <button data-m="play" id="d-mu-pp" class="haupt" title="Play/Pause"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></button>
+              <button data-m="next" title="Weiter"><svg viewBox="0 0 24 24"><path d="M16 6h2v12h-2zM6 18l8.5-6L6 6z"/></svg></button></div></div>
         </div>
         <div id="d-aktionen">
           ${[['✉️', 'Mails', 'Neues checken', 'Hab ich neue wichtige Mails?'],
@@ -398,9 +400,12 @@
     try { const s = await (await fetch('/spotify', { cache:'no-store' })).json();
       $d('d-mu').textContent = s.spielt ? s.titel : s.laeuft ? 'Pausiert' : 'Gerade keine Musik';
       $d('d-mu-a').textContent = s.spielt ? s.kuenstler : s.laeuft ? 'Spotify' : 'Sag „spiel Musik“';
-      $d('d-mu-b').textContent = s.spielt ? '▶ läuft' : 'Spotify'; $d('d-musik').classList.toggle('spielt', !!s.spielt); } catch (e) {}
+      $d('d-mu-b').textContent = s.spielt ? '▶ läuft' : 'Spotify'; $d('d-musik').classList.toggle('spielt', !!s.spielt); $d('d-mu-pp').innerHTML = s.spielt ? PAUSE : PLAY; } catch (e) {}
   }
-  $d('d-musik').onclick = () => fetch('/media', { method:'POST', headers:{ 'Content-Type':'application/json' }, body:JSON.stringify({ cmd:'play' }) }).then(() => setTimeout(ladeMusik, 400)).catch(() => {});
+  const PLAY = '<svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>', PAUSE = '<svg viewBox="0 0 24 24"><path d="M7 5h4v14H7zm6 0h4v14h-4z"/></svg>';
+  d.querySelectorAll('.mu-knoepfe button').forEach(b => b.onclick = e => { e.stopPropagation();
+    b.classList.remove('gedrueckt'); void b.offsetWidth; b.classList.add('gedrueckt');
+    fetch('/media', { method:'POST', headers:{ 'Content-Type':'application/json' }, body:JSON.stringify({ cmd:b.dataset.m }) }).then(() => setTimeout(ladeMusik, 450)).catch(() => {}); });
 
   // ---------- Agenten (aus ORBs Zustand) ----------
   if (typeof renderTasks === 'function') {
@@ -459,7 +464,9 @@
     requestAnimationFrame(gleiten);
     if (!document.body.classList.contains('dash') || document.body.classList.contains('mini')) return;
     zielBerechnen();
-    ist.x += (ziel.x - ist.x) * .12; ist.y += (ziel.y - ist.y) * .12; ist.r += (ziel.r - ist.r) * .12;
+    const jetzt = performance.now(), dt = Math.min(64, jetzt - (gleiten.t || jetzt)); gleiten.t = jetzt;
+    const k = 1 - Math.pow(1 - (gleiten.flug ? .085 : .14), dt / 16.7);   // bildratenunabhängig; beim Intro-Flug etwas langsamer = eleganter
+    ist.x += (ziel.x - ist.x) * k; ist.y += (ziel.y - ist.y) * k; ist.r += (ziel.r - ist.r) * k;
     const gx = Math.round(ist.x), gy = Math.round(ist.y), gr = Math.round(Math.max(14, ist.r));
     if (gx !== gleiten.gx || gy !== gleiten.gy || gr !== gleiten.gr) {   // nur bei echter Bewegung, nur an den Leinwänden (nicht an der ganzen Seite)
       gleiten.gx = gx; gleiten.gy = gy; gleiten.gr = gr;
@@ -659,7 +666,7 @@
     $d('dk-kw').textContent = 'KW ' + kw;
     $d('dk-datum').textContent = n.toLocaleDateString('de-DE', { weekday:'short', day:'numeric', month:'short' });
     const rest = 24 * 60 - (n.getHours() * 60 + n.getMinutes());
-    $d('dk-rest').textContent = `noch ${Math.floor(rest / 60)} h ${rest % 60} min heute`;
+    $d('dk-rest').textContent = `${Math.floor(rest / 60)} h ${rest % 60} min übrig`;
     $d('dk-sekbar').style.width = (n.getSeconds() / 59 * 100) + '%';
   }
   uhrKachel(); setInterval(uhrKachel, 1000);
@@ -714,11 +721,12 @@
     ov.innerHTML = `<i class="r1"></i><i class="r2"></i><i class="r3"></i><div class="txt"><b>${'ORB'.split('').map((c, i) => `<span style="animation-delay:${.25 + i * .09}s">${c}</span>`).join('')}</b><small>${gruss}</small></div>`;
     document.body.appendChild(ov);
     introSound();
-    setTimeout(() => { introKugel = false; }, 950);   // Kugel fliegt in den Ring
+    setTimeout(() => { introKugel = false; gleiten.flug = true; setTimeout(() => { gleiten.flug = false; }, 1400); }, 900);   // Kugel fliegt in den Ring
     setTimeout(() => {
       document.body.classList.remove('d-intro'); ov.classList.add('weg');
-      d.querySelectorAll('.d-rein').forEach((k, i) => { k.style.animation = 'none'; k.offsetHeight; k.style.animation = ''; });
-    }, 1050);
+      const teile = [...d.querySelectorAll('#d-rail, #d-top, .d-seite.an .d-kopf, .d-seite.an .d-karte, .d-seite.an .d-aktion, .d-seite.an .dw')];
+      teile.forEach((k, i) => { k.style.animation = 'none'; k.offsetHeight; k.style.animation = `d-rein .75s ${(.12 + Math.min(i, 18) * .035).toFixed(3)}s cubic-bezier(.16,1,.3,1) backwards`; });
+    }, 980);
     setTimeout(() => ov.remove(), 2000);
   }
   // Wegschicken (Schnipsen/Schlaf): ERST die Intro-Abdeckung malen, DANN verstecken – sonst zeigt Windows beim Holen kurz das alte Bild

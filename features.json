@@ -533,6 +533,11 @@
      "name": "Fokus-Timer",
      "text": "Widget im Kalender: 5, 25 oder 50 Minuten Fokuszeit – ORB sagt Bescheid, wenn sie um ist.",
      "beispiel": "Kalender → Fokus → ▶ Start"
+    },
+    {
+     "name": "Musik-Widget mit Knöpfen",
+     "text": "Zurück, Play/Pause und Weiter direkt in der Musik-Kachel – mit Titel, Künstler und Equalizer.",
+     "beispiel": "Musik-Kachel → ⏭"
     }
    ]
   }
