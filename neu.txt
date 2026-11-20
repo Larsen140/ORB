@@ -1,1 +1,1 @@
-176|Kein Flackern der Kugel mehr: Pegel geglättet, Lichtwellen im Dashboard aus
+177|Start ohne Flackern: Fenster wird unsichtbar fertig gemalt und weich eingeblendet

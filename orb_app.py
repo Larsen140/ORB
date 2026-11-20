@@ -396,26 +396,36 @@ def _fenster_der_profilprozesse():
 
 
 def verdeckt_starten(t0):
-    """Startbild ohne Flackern: das neue Fenster sofort verstecken (kein Grau/Schwarz/halbfertiges Laden zu sehen) und erst
-    zeigen, wenn das Dashboard „bereit“ meldet – dann spielt dort die Intro-Animation. Spätestens nach 7 s wird es gezeigt."""
+    """Startbild ohne Flackern: das neue Fenster sofort DURCHSICHTIG schalten (nicht verstecken – so rendert der Browser ganz
+    normal weiter und nichts reißt), bis das Dashboard „bereit“ meldet; dann in 0,3 s weich einblenden. Spätestens nach 7 s."""
     u = ctypes.windll.user32
-    versteckt = []
+    u.SetWindowLongW.restype = ctypes.c_long
+    fenster = {}
     ende = time.time() + 7
     while time.time() < ende:
         try:
             for h in _fenster_der_profilprozesse():
-                if h not in versteckt:
-                    u.ShowWindow(h, 0)
-                    versteckt.append(h)
+                if h not in fenster:
+                    ex = u.GetWindowLongW(h, -20)
+                    u.SetWindowLongW(h, -20, ex | 0x80000)           # WS_EX_LAYERED
+                    u.SetLayeredWindowAttributes(h, 0, 0, 2)          # ganz durchsichtig
+                    fenster[h] = ex
         except Exception:
             pass
-        if versteckt and server.FENSTER_BEREIT[0] > t0:
+        if fenster and server.FENSTER_BEREIT[0] > t0:
             break
-        time.sleep(.03)
-    time.sleep(.12)
-    for h in versteckt:
+        time.sleep(.01)
+    for stufe in range(1, 13):   # weich einblenden (~0,3 s)
+        for h in fenster:
+            try:
+                u.SetLayeredWindowAttributes(h, 0, int(255 * stufe / 12), 2)
+            except Exception:
+                pass
+        time.sleep(.025)
+    for h, ex in fenster.items():
         try:
-            u.ShowWindow(h, 5)
+            u.SetLayeredWindowAttributes(h, 0, 255, 2)
+            u.SetWindowLongW(h, -20, ex & ~0x80000)                 # wieder normales Fenster (volle Leistung)
         except Exception:
             pass
     bring_front()

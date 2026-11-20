@@ -638,7 +638,7 @@
   setTimeout(ladeNotizen, 2200); setInterval(() => { if (seite === 'notizen' && document.activeElement !== $d('dn-text') && document.activeElement !== $d('dn-titel')) ladeNotizen(); }, 10000);
 
   // Lichtwellen über den ganzen Bildschirm (z. B. bei „Ich höre“) wirken auf dem hellen Glas wie Blitze → im Dashboard aus
-  try { const _welle = ripple; ripple = (...x) => { if (!document.body.classList.contains('dash')) return _welle(...x); }; } catch (e) {}
+  try { const _welle = ripple; ripple = (k = 1) => { if (!document.body.classList.contains('dash')) return _welle(k); if (k >= 1) try { SFX.thump(); } catch (e) {} };   /* Klang bleibt */ } catch (e) {}
   // Webcam ist entfernt: Kamera-Ansicht und Gesten nie mehr starten
   try { kameraAn = () => {}; } catch (e) {}
   try { gestenStart = () => {}; if (typeof gestenStop === 'function') gestenStop(); } catch (e) {}
@@ -715,11 +715,16 @@
     setTimeout(() => ov.remove(), 2000);
   }
   if (document.body.classList.contains('d-intro')) {
-    const los = () => { if (document.visibilityState === 'visible') requestAnimationFrame(() => introStarten()); };
-    document.addEventListener('visibilitychange', los); los();
+    // Fenster ist anfangs durchsichtig: Intro erst starten, wenn ORB es einblendet (kurz nach „bereit“)
+    const los = () => { if (document.visibilityState === 'visible') setTimeout(() => requestAnimationFrame(() => introStarten()), 380); };
+    document.addEventListener('visibilitychange', () => { if (introStarten.lief) return; los(); });
     setTimeout(() => { if (document.body.classList.contains('d-intro')) { introKugel = false; document.body.classList.remove('d-intro'); } }, 9000);   // Notfall
   }
-  setTimeout(() => fetch('/bereit', { method:'POST', headers:{ 'Content-Type':'application/json' }, body:'{}' }).catch(() => {}), 250);
+  // „bereit“ erst, wenn die Seite wirklich gemalt hat (2 Bilder nach dem Aufbau) – dann blendet ORB das Fenster ein und das Intro startet
+  setTimeout(() => requestAnimationFrame(() => requestAnimationFrame(() => {
+    fetch('/bereit', { method:'POST', headers:{ 'Content-Type':'application/json' }, body:'{}' }).catch(() => {});
+    if (document.body.classList.contains('d-intro') && document.visibilityState === 'visible') setTimeout(() => requestAnimationFrame(() => introStarten()), 120);
+  })), 200);
   zeit(); woche(); ladeTermine(); ladeSys();
   setTimeout(ladeWetter, 500); setTimeout(ladeMusik, 900); setTimeout(ladeGold, 1400);   // gestaffelt: Start bleibt flüssig
   setInterval(zeit, 30000); setInterval(ladeTermine, 30000); setInterval(ladeGold, 20000);
