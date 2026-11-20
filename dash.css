@@ -623,3 +623,10 @@ body.d-intro::before { content:""; position:fixed; inset:0; z-index:2; pointer-e
 
 /* Abdeckung beim Wegschicken sofort (ohne Überblendung), damit sie vor dem Verstecken gemalt ist */
 body.d-sofort #dash, body.d-sofort #d-aurora { transition:none !important; }
+
+/* Kugel-Schein begrenzen: die Grafik der Kugel liegt als „Bildschirm“-Ebene über allem – ohne Maske überstrahlt ihr Glühen
+   das ganze helle Dashboard und pulsiert beim Sprechen (wirkt wie Flackern). Jetzt nur noch im Kreis um die Kugel. */
+body.dash #gl, body.dash #fx {
+  -webkit-mask-image:radial-gradient(circle at var(--gx, 50%) var(--gy, 46%), #000 calc(var(--gr, 120px) * 1.35), transparent calc(var(--gr, 120px) * 2.2));
+          mask-image:radial-gradient(circle at var(--gx, 50%) var(--gy, 46%), #000 calc(var(--gr, 120px) * 1.35), transparent calc(var(--gr, 120px) * 2.2)); }
+body.d-intro #gl, body.d-intro #fx { -webkit-mask-image:none; mask-image:none; }

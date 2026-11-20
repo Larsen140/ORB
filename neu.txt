@@ -1,1 +1,1 @@
-181|ORB erscheint nach Updates wieder sicher im Vollbild
+182|Kein Überstrahlen und Flackern mehr: Kugel-Schein bleibt bei der Kugel

@@ -460,6 +460,8 @@
     if (!document.body.classList.contains('dash') || document.body.classList.contains('mini')) return;
     zielBerechnen();
     ist.x += (ziel.x - ist.x) * .12; ist.y += (ziel.y - ist.y) * .12; ist.r += (ziel.r - ist.r) * .12;
+    const wurzel = document.documentElement.style;   // Kugel-Schein nur rund um die Kugel (sonst wäscht er das helle Glas aus und flackert)
+    wurzel.setProperty('--gx', ist.x.toFixed(0) + 'px'); wurzel.setProperty('--gy', ist.y.toFixed(0) + 'px'); wurzel.setProperty('--gr', Math.max(14, ist.r).toFixed(0) + 'px');
     try { LAY = window.DASH_LAY(); } catch (e) {}
   })();
 
