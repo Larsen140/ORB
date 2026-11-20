@@ -455,15 +455,19 @@
     const r = el && el.getBoundingClientRect(); if (!r || !r.width) return;
     ziel.x = r.left + r.width / 2; ziel.y = r.top + r.height / 2; ziel.r = seite === 'home' ? r.width * .34 : r.width * .5;
   }
-  (function gleiten() {
+  function gleiten() {
     requestAnimationFrame(gleiten);
     if (!document.body.classList.contains('dash') || document.body.classList.contains('mini')) return;
     zielBerechnen();
     ist.x += (ziel.x - ist.x) * .12; ist.y += (ziel.y - ist.y) * .12; ist.r += (ziel.r - ist.r) * .12;
-    const wurzel = document.documentElement.style;   // Kugel-Schein nur rund um die Kugel (sonst wäscht er das helle Glas aus und flackert)
-    wurzel.setProperty('--gx', ist.x.toFixed(0) + 'px'); wurzel.setProperty('--gy', ist.y.toFixed(0) + 'px'); wurzel.setProperty('--gr', Math.max(14, ist.r).toFixed(0) + 'px');
+    const gx = Math.round(ist.x), gy = Math.round(ist.y), gr = Math.round(Math.max(14, ist.r));
+    if (gx !== gleiten.gx || gy !== gleiten.gy || gr !== gleiten.gr) {   // nur bei echter Bewegung, nur an den Leinwänden (nicht an der ganzen Seite)
+      gleiten.gx = gx; gleiten.gy = gy; gleiten.gr = gr;
+      [document.getElementById('gl'), document.getElementById('fx')].forEach(c => { if (c) { c.style.setProperty('--gx', gx + 'px'); c.style.setProperty('--gy', gy + 'px'); c.style.setProperty('--gr', gr + 'px'); } });
+    }
     try { LAY = window.DASH_LAY(); } catch (e) {}
-  })();
+  }
+  gleiten();
 
   // Rechtsklick-Menü des Browsers abschalten (in Eingabefeldern bleibt es für Kopieren/Einfügen)
   addEventListener('contextmenu', e => { if (!e.target.closest('input, textarea, [contenteditable]')) e.preventDefault(); });
@@ -475,7 +479,6 @@
     const lvl = typeof S !== 'undefined' ? Math.min(1, (S.level || 0) * 1.6 + (typeof listening !== 'undefined' && listening ? .15 : 0)) : 0;
     pegelGl += (lvl - pegelGl) * .35;
     pegelRuhig += (lvl * .6 - pegelRuhig) * .08;   // Leuchtrand der Hauptkarte: nur sanft mitatmen (kein Flackern)
-    document.documentElement.style.setProperty('--d-lvl', pegelRuhig.toFixed(3));
     pegelBs.forEach((b, i) => b.style.transform = `scaleY(${(.18 + pegelGl * (.55 + .45 * Math.abs(Math.sin(now / (130 + i * 37) + i)))).toFixed(2)})`);
   })(0);
   // ---------- 3D: Karten neigen sich leicht zur Maus ----------
@@ -494,8 +497,9 @@
   // Lichtkante folgt
   // ---------- Hintergrund folgt leicht der Maus ----------
   addEventListener('mousemove', e => {
-    document.documentElement.style.setProperty('--d-px', ((e.clientX / innerWidth - .5) * -14).toFixed(1) + 'px');
-    document.documentElement.style.setProperty('--d-py', ((e.clientY / innerHeight - .5) * -10).toFixed(1) + 'px');
+    const hg = document.getElementById('dbg'); if (!hg || performance.now() - (hg._t || 0) < 50) return; hg._t = performance.now();
+    hg.style.setProperty('--d-px', ((e.clientX / innerWidth - .5) * -14).toFixed(0) + 'px');
+    hg.style.setProperty('--d-py', ((e.clientY / innerHeight - .5) * -10).toFixed(0) + 'px');
   });
 
   if (qp.get('seite')) geh(qp.get('seite'));

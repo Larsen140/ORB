@@ -1,1 +1,1 @@
-183|Hauptkarte flackert nicht mehr beim Sprechen
+184|Flackern behoben: keine Grafikspeicher-Grenze mehr, weniger Neuzeichnen

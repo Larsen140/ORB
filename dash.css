@@ -631,3 +631,7 @@ body.d-intro #gl, body.d-intro #fx { -webkit-mask-image:none; mask-image:none; }
 /* Hauptkarte: fester Verlauf ohne Maus-Lichtfleck (große Fläche würde bei jeder Mausbewegung neu gezeichnet) */
 #d-held { background-image:linear-gradient(140deg, var(--d-acc1), var(--d-acc2) 55%, var(--d-acc3)) !important; }
 #d-held { will-change:auto; contain:none; }
+
+/* Farbschleier ohne Mischmodus (sonst muss der ganze Bildschirm in jedem Bild neu verrechnet werden) */
+body.dash #d-aurora { mix-blend-mode:normal !important; opacity:.22 !important; }
+html[data-modus="dunkel"] body.dash #d-aurora { opacity:.28 !important; }
