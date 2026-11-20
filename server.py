@@ -77,7 +77,7 @@ DEFAULT_CFG = {
 }
 # Damit ORB immer dein Claude-Code-Login (Max-Abo) nutzt und nie einen API-Schlüssel
 CLAUDE_ENV_DROP = ("ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "ANTHROPIC_BASE_URL")
-VERSION = "186"
+VERSION = "187"
 ORB_UI = ("Deine Oberfläche (die Larsen gerade sieht): in der Mitte du als flüssige leuchtende Kugel mit Tropfen, "
           "Orbit-Ringen und Sternenhimmel; links eine Uhr und darunter der Gesprächsverlauf mit Eingabefeld; rechts "
           "Karten für System (CPU, RAM, Akku), Wetter mit Stundenvorschau, Aktivität (was du gerade tust) und Vorschläge; "
@@ -585,11 +585,18 @@ ABGEDECKT = [0.0]   # Seite hat die Intro-Abdeckung gemalt (erst dann darf das F
 CALL_FREI = [False]   # im Meet: Larsen hat ORB selbst geholt (Klatschen) → ORB hört zu, bis er wieder weg ist
 
 
+CALL_FREI_T = [0.0]   # wann Larsen ORB im Meeting zuletzt selbst geholt hat
+OHR_WAKE_T = [0.0]    # wann zuletzt „Jarvis“ gehört wurde (Weckwort oder Name im Satz)
+
+
 def call_aktiv():
-    """Meeting läuft UND Larsen hat ORB nicht selbst dazugeholt → nicht zuhören."""
+    """Meeting läuft UND Larsen hat ORB nicht selbst dazugeholt → nicht zuhören.
+    Die Freigabe (Klatschen im Meeting) läuft nach 3 Min. ohne Gespräch von selbst ab – nie mehr dauerhaft mithören."""
     if not in_call():
         CALL_FREI[0] = False
         return False
+    if CALL_FREI[0] and time.time() - max(CALL_FREI_T[0], LAST_ACTIVE[0]) > 180:
+        CALL_FREI[0] = False
     return not CALL_FREI[0]
 
 
@@ -3267,7 +3274,9 @@ class Handler(BaseHTTPRequestHandler):
             OHR["t"] = time.time()
             spiel = spiel_laeuft()
             an = load_cfg().get("ohr", True) and not call_aktiv() and not (spiel and spiel != "Minecraft")
-            self.send(200, {"an": an, "mitschreiben": an and time.time() - LAST_WACH[0] < 3,
+            # im Meeting nur direkt nach „Jarvis“ mitschreiben – sonst hört das Ohr nur aufs Weckwort (kein Mitschreiben des Meetings)
+            im_meeting = in_call()
+            self.send(200, {"an": an, "mitschreiben": an and time.time() - LAST_WACH[0] < 3 and (not im_meeting or time.time() - OHR_WAKE_T[0] < 20),
                             "stimmcheck": load_cfg().get("nur_meine_stimme", True)})
         elif u.path == "/stimmung":
             self.send(200, stimmung())
@@ -3572,6 +3581,8 @@ class Handler(BaseHTTPRequestHandler):
                 if typ == "wake":
                     weckversuch()
                 return self.send(200, {"ok": False, "grund": "gesperrt"})
+            if typ == "wake" or re.search(r"(?i)jarvis", text):
+                OHR_WAKE_T[0] = time.time()
             if typ == "wake" and time.time() - LAST_WACH[0] > 3 and ON_SHOW[0]:
                 threading.Thread(target=ON_SHOW[0], kwargs={"wake": True}, daemon=True).start()   # Fenster zu/versteckt: aufwecken
             OHR["n"] += 1
@@ -3610,7 +3621,8 @@ class Handler(BaseHTTPRequestHandler):
             if ON_MINI[0]:
                 threading.Thread(target=ON_MINI[0], args=(bool(b.get("an", True)),), daemon=True).start()
         elif u.path == "/show":  # Fenster öffnen bzw. nach vorne holen (z. B. zweiter Doppelklick auf ORB.exe)
-            CALL_FREI[0] = True   # Larsen hat ORB selbst geholt (Klatschen) → auch im Meet zuhören
+            CALL_FREI[0] = True   # Larsen hat ORB selbst geholt (Klatschen) → auch im Meet zuhören (max. 3 Min. ohne Gespräch)
+            CALL_FREI_T[0] = time.time()
             if ON_SHOW[0]:
                 threading.Thread(target=ON_SHOW[0], kwargs={"wake": bool(b.get("wake"))}, daemon=True).start()
             self.send(200, {"ok": True})
