@@ -1141,6 +1141,7 @@ uniform vec3 uCol, uCol2, uCol3, uCol4;
 uniform float uLevel, uEnergy, uSpeak, uListen, uSleep, uThink;
 uniform vec4 uB;   // Stimme in vier Bändern (tief … hoch)
 uniform vec4 uD[6];
+uniform float uHim;   // 1 = eigener Sternenhimmel (Vollbild), 0 = Dashboard (dort kommt der Himmel aus dem Hintergrund)
 // ===== ORB als Schwarzes Loch (20.11.2026, passend zu Second Brain): echte Lichtkrümmung, goldene Scheibe, reagiert auf Stimme =====
 float h21(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7)))*43758.5453); }
 float n2(vec2 p){ vec2 i = floor(p), f = fract(p); f = f*f*(3. - 2.*f);
@@ -1203,7 +1204,7 @@ void main(){
     }
     if (loch) al = 1.;
   }
-  col += (1. - al)*himmel(d)*(1. - .6*uSleep);
+  col += (1. - al)*himmel(d)*(1. - .6*uSleep)*uHim;
   // feiner Photonenschein und Hauch von Glühen, der beim Sprechen anschwillt
   float rr0 = length(p2);
   col += mix(vec3(1., .8, .55), uCol, .4)*exp(-abs(rr0 - .74)*22.)*.12*glanz;
@@ -1228,7 +1229,7 @@ function glProg(vs, fs, names) {   // Programm übersetzen; Attribut „p“ imm
   const u = {}; for (const n of names) u[n] = gl.getUniformLocation(p, n); return { p, U:u };
 }
 const SCENE_VS = 'attribute vec2 p; void main(){ gl_Position = vec4(p, 0., 1.); }';
-const SCENE_U = ['uRes', 'uC', 'uPar', 'uT', 'uR', 'uCol', 'uCol2', 'uCol3', 'uCol4', 'uLevel', 'uEnergy', 'uSpeak', 'uListen', 'uSleep', 'uThink', 'uD', 'uB'];
+const SCENE_U = ['uRes', 'uC', 'uPar', 'uT', 'uR', 'uCol', 'uCol2', 'uCol3', 'uCol4', 'uLevel', 'uEnergy', 'uSpeak', 'uListen', 'uSleep', 'uThink', 'uD', 'uB', 'uHim'];
 if (gl) {
   MAIN = glProg(SCENE_VS, FRAG, SCENE_U);
   glOk = !!MAIN;
@@ -1371,6 +1372,7 @@ function renderGL(t, cx, cy, R, speaking) {
   gl.uniform1f(U.uLevel, VIS.lvl); gl.uniform1f(U.uEnergy, VIS.en); gl.uniform1f(U.uSpeak, S.speakVis);
   gl.uniform1f(U.uListen, S.listenVis); gl.uniform1f(U.uSleep, S.sleepVis); gl.uniform1f(U.uThink, S.think);
   gl.uniform4fv(U.uD, dropArr); gl.uniform4f(U.uB, S.bands[0], S.bands[1], S.bands[2], S.bands[3]);
+  gl.uniform1f(U.uHim, document.body.classList.contains('dash') && !document.body.classList.contains('mini') ? 0 : 1);
   gl.drawArrays(gl.TRIANGLES, 0, 3);
   if (kino) { KINO.cx = cx * glScale; KINO.cy = (H - cy) * glScale; KINO.r = R * glScale; kinoPost(t, c1, c2); }
 }

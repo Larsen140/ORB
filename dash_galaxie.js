@@ -109,16 +109,8 @@ void main(){
   function schleife(now) {
     requestAnimationFrame(schleife);
     if (document.hidden || spar()) { if (!letzt) { malen(now); letzt = now; } return; }
-    if (now - letzt < 33) return;   // max. 30 Bilder/s
+    if (now - letzt < 15) return;   // max. ~60 Bilder/s – flüssig, der Shader ist leicht
     letzt = now; malen(now);
   }
   requestAnimationFrame(schleife);
-  // Rundes Fenster in der Hauptkarte: dort ist das Schwarze Loch (die ORB-Kugel) klar und tiefschwarz zu sehen
-  setInterval(() => {
-    const held = document.getElementById('d-held'), k = document.getElementById('d-kugel'); if (!held || !k) return;
-    const a = held.getBoundingClientRect(), b = k.getBoundingClientRect(); if (!b.width) return;
-    held.style.setProperty('--bhx', (b.left + b.width / 2 - a.left).toFixed(0) + 'px');
-    held.style.setProperty('--bhy', (b.top + b.height / 2 - a.top).toFixed(0) + 'px');
-    held.style.setProperty('--bhr', (b.width * .62).toFixed(0) + 'px');
-  }, 400);
 })();

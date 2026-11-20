@@ -730,6 +730,15 @@ html.galaxie[data-modus="dunkel"] body.dash #d-main { background:rgba(8,8,12,.18
 html.galaxie[data-modus="dunkel"] { --d-glass2:rgba(16,16,22,.58); --d-glass3:rgba(26,26,34,.74); }
 html.galaxie[data-modus="dunkel"] body.dash #d-rail, html.galaxie[data-modus="dunkel"] body.dash #d-top { background:rgba(10,10,14,.42) !important; backdrop-filter:blur(14px) saturate(140%) !important; -webkit-backdrop-filter:blur(14px) saturate(140%) !important; }
 
-/* Hauptkarte: rundes, weich auslaufendes Fenster über der ORB-Kugel (Schwarzes Loch) */
-html.galaxie #d-held { -webkit-mask-image:radial-gradient(circle at var(--bhx, 80%) var(--bhy, 50%), transparent calc(var(--bhr, 0px) * .9), #000 var(--bhr, 0px));
-  mask-image:radial-gradient(circle at var(--bhx, 80%) var(--bhy, 50%), transparent calc(var(--bhr, 0px) * .9), #000 var(--bhr, 0px)); }
+/* ===== Galaxie 2 (Version 193): Hauptkarte & Akzent-Kacheln als dunkles Glas mit Themen-Schimmer – wie Second Brain.
+   Kein ausgeschnittenes Fenster mehr: das Schwarze Loch sitzt frei in der Karte. ===== */
+html.galaxie[data-modus="dunkel"] #d-held, html.galaxie[data-modus="dunkel"] .d-kachel.akzent {
+  background-color:rgba(12,12,18,.58) !important;
+  background-image:radial-gradient(120% 140% at 0% 0%, color-mix(in srgb, var(--d-acc1) 30%, transparent) 0%, transparent 58%),
+                   radial-gradient(90% 120% at 100% 100%, color-mix(in srgb, var(--d-acc2) 14%, transparent) 0%, transparent 60%) !important;
+  border:1px solid color-mix(in srgb, var(--d-acc1) 38%, rgba(255,255,255,.08)) !important;
+  box-shadow:0 30px 70px -30px color-mix(in srgb, var(--d-acc1) 55%, transparent), inset 0 1px 0 rgba(255,255,255,.10) !important;
+  backdrop-filter:blur(18px) saturate(140%); -webkit-backdrop-filter:blur(18px) saturate(140%); }
+html.galaxie[data-modus="dunkel"] #d-held::before { background:radial-gradient(40% 40% at 72% 45%, color-mix(in srgb, var(--d-acc1) 16%, transparent), transparent 70%); }
+html.galaxie[data-modus="dunkel"] .d-kachel.akzent .zahl, html.galaxie[data-modus="dunkel"] #d-held .werte b { color:color-mix(in srgb, var(--d-acc3) 45%, #fff); }
+html.galaxie[data-modus="dunkel"] .d-kachel.akzent .ik, html.galaxie[data-modus="dunkel"] .d-kachel.akzent .bad { background:color-mix(in srgb, var(--d-acc1) 22%, rgba(255,255,255,.05)); }
