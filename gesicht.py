@@ -57,6 +57,10 @@ def gesichter(sekunden, det, rec, anzahl=12):
                 time.sleep(.1)
                 continue
             bild = fr
+            if float(fr.mean()) < 95:   # dunkel → Helligkeit ausgleichen, sonst sinkt die Ähnlichkeit (z. B. Morgenlicht)
+                lab = cv2.cvtColor(fr, cv2.COLOR_BGR2LAB); l, a_, b_ = cv2.split(lab)
+                l = cv2.createCLAHE(clipLimit=2.5, tileGridSize=(8, 8)).apply(l)
+                fr = cv2.cvtColor(cv2.merge((l, a_, b_)), cv2.COLOR_LAB2BGR)
             h, w = fr.shape[:2]
             det.setInputSize((w, h))
             _, faces = det.detect(fr)
@@ -221,6 +225,7 @@ def waechter():
         time.sleep(8)   # Windows und Kamera hochfahren lassen
         fremd_gemeldet = False
         letzter_scan, weck_gesehen = 0.0, weck_zeit()
+        fremd_in_folge, fremd_seit = 0, 0.0
         while True:
             f = private_fenster()
             if f:
@@ -230,8 +235,9 @@ def waechter():
                 # noch kein Gesicht gesehen → ständig weiterscannen (alle ~3 s)
                 faellig = time.time() - letzter_scan > 3
             else:
-                # Fremder erkannt → nur bei Öffnungsversuch neu scannen (bei ORB-Weckversuch alle 5 s, sonst alle 20 s)
-                faellig = (f or weck) and time.time() - letzter_scan > (5 if weck else 20)
+                # Fremd erkannt: die ersten 5 Min. weiter alle 5 s scannen (Fehlsperre bei schlechtem Licht schnell aufheben),
+                # danach nur bei Öffnungsversuch (ORB-Weckversuch alle 5 s, App alle 20 s)
+                faellig = time.time() - letzter_scan > 5 if time.time() - fremd_seit < 300 else                     (f or weck) and time.time() - letzter_scan > (5 if weck else 20)
             if not faellig:
                 time.sleep(1)
                 continue
@@ -239,13 +245,18 @@ def waechter():
             r = pruefen(4)
             letzter_scan = time.time()
             log("Scan (%s):" % ("Start" if not fremd_gemeldet else "ORB" if weck else "App"), r)
+            if r["ergebnis"] != "fremd":
+                fremd_in_folge = 0
             if r["ergebnis"] in ("larsen", "kein_profil"):
                 log("Larsen erkannt – Sperre aufgehoben")
                 return
             if r["ergebnis"] == "fremd":
+                fremd_in_folge += 1
                 bild = os.path.join(BASIS, "letzter_fremder.jpg")
+                if not fremd_gemeldet and fremd_in_folge < 2:
+                    continue   # ein einzelner schlechter Scan (Licht, Winkel) reicht nicht – gleich nochmal
                 if not fremd_gemeldet:
-                    fremd_gemeldet = True
+                    fremd_gemeldet, fremd_seit = True, time.time()
                     telegram("⚠️ ORB: Am PC sitzt jemand, der nicht du bist – ORB und private Apps sind gesperrt.", bild)
                 elif f or weck:
                     was = f[0][3][:40] if f else "ORB"

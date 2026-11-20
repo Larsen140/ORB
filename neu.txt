@@ -1,1 +1,1 @@
-172|Neuer Start: Intro-Animation mit Sound, kein Flackern mehr, Gesichtssperre robuster
+173|Gesichtssperre robuster bei schlechtem Licht, keine Fehlsperre mehr durch einen einzelnen Scan
