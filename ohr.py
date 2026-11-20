@@ -320,8 +320,15 @@ def main():
             m = orb("/ohr/modus") or {}
             modus.update(t=time.time(), mit=bool(m.get("mitschreiben")), an=m.get("an", True), stimm=m.get("stimmcheck", True))
             if modus["mit"]:
-                if wh.m is None:   # ORB ist wach → Whisper SOFORT vorladen, nicht erst beim ersten Satz (sonst 3–7 s Verzögerung)
-                    threading.Thread(target=wh.laden, daemon=True).start()
+                if wh.m is None and not getattr(wh, "vorladen", False):   # ORB ist wach → Whisper vorladen (nicht erst beim ersten Satz)
+                    wh.vorladen = True
+                    def _vor():
+                        time.sleep(3)   # erst das Dashboard flüssig einfliegen lassen, dann die Grafikkarte belasten
+                        try:
+                            wh.laden()
+                        finally:
+                            wh.vorladen = False
+                    threading.Thread(target=_vor, daemon=True).start()
                 wh.zuletzt = time.time()   # solange wach: geladen lassen
             else:
                 wh.frei()

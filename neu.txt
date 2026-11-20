@@ -1,1 +1,1 @@
-170|Gesichtssperre scannt auch nach Herunterfahren mit Windows-Schnellstart
+171|Flüssiger Start ohne Flackern, Design-Upgrade (Aurora, 3D-Karten, Live-Pegel), neue Widgets mit Wetter-Stunden und Fokus-Timer

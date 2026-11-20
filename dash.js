@@ -34,6 +34,7 @@
 
   // ---------- Aufbau ----------
   const bg = document.createElement('div'); bg.id = 'dbg';
+  const aurora = document.createElement('div'); aurora.id = 'd-aurora'; aurora.innerHTML = '<i></i><i></i><i></i>';
   const d = document.createElement('div'); d.id = 'dash';
   d.innerHTML = `
   <nav id="d-rail" class="dg d-rein" style="animation-delay:.05s">
@@ -55,7 +56,7 @@
   </nav>
   <header id="d-top" class="dg d-rein" style="animation-delay:.12s">
     <div class="av">L</div><div class="wil">Willkommen, Larsen</div>
-    <form class="mitte" id="d-frag" onsubmit="return false"><i class="punkt"></i><input placeholder="Frag ORB etwas … z. B. „Wie wird das Wetter morgen?“" autocomplete="off"><span id="d-status">Bereit</span></form>
+    <form class="mitte" id="d-frag" onsubmit="return false"><i class="punkt"></i><span class="d-pegel" id="d-pegel"><b></b><b></b><b></b><b></b><b></b></span><input placeholder="Frag ORB etwas … z. B. „Wie wird das Wetter morgen?“" autocomplete="off"><span id="d-status">Bereit</span></form>
     <div class="rechts"><button class="d-rund" id="d-farbe" title="Farbthema">${svg('farbe')}</button></div>
   </header>
   <div id="d-themen" class="dg"><div class="d-modus"><button data-m="hell">☀ Hell</button><button data-m="dunkel">☾ Dunkel</button><button data-m="auto">◐ Auto</button></div>${THEMEN.map(([k, n, g]) => `<button data-t="${k}"><i style="background:${g}"></i>${n}</button>`).join('')}</div>
@@ -93,8 +94,11 @@
           <div id="d-woche"></div>
           <div id="d-termine"><div class="leer">Lädt …</div></div>
           <div class="dw-reihe">
-            <div class="dw" id="dw-wetter"><div class="dw-k"><span id="dw-w-i">⛅</span>Wetter</div><b id="dw-w-t">–</b><small id="dw-w-x">lädt …</small></div>
+            <div class="dw" id="dw-wetter"><span id="dw-w-i">⛅</span><div class="dw-li"><div class="dw-k">Wetter</div><b id="dw-w-t">–</b><small id="dw-w-x">lädt …</small><span class="dw-mm" id="dw-w-mm"></span></div>
+              <div class="dw-std" id="dw-w-std"></div></div>
             <div class="dw" id="dw-notiz" data-geh="notizen"><div class="dw-k"><span>📌</span>Notiz</div><b id="dw-n-t">Keine Notiz</b><small id="dw-n-x">Sag „Jarvis, notier dir …“</small></div>
+            <div class="dw" id="dw-timer"><div class="dw-k"><span>⏱</span>Fokus</div><div class="tz"><svg viewBox="0 0 40 40"><circle class="sp" cx="20" cy="20" r="16"/><circle class="wt" id="dw-tm-r" cx="20" cy="20" r="16" stroke-dasharray="100.5" stroke-dashoffset="0"/></svg>
+              <b id="dw-tm">25:00</b></div><div class="dw-knopf"><button id="dw-tm-go">▶ Start</button><button data-min="5">5</button><button data-min="25">25</button><button data-min="50">50</button></div></div>
           </div>
           <div id="d-antwort"></div>
           <form class="gespr" id="d-form" onsubmit="return false"><input id="d-eingabe" placeholder="Nachricht an ORB …" autocomplete="off"><button title="Senden">↑</button></form>
@@ -176,7 +180,7 @@
       <div id="d-chatplatz"></div>
     </section>
   </main>`;
-  document.body.prepend(d); document.body.prepend(bg);
+  document.body.prepend(d); document.body.prepend(aurora); document.body.prepend(bg);
 
   // ---------- Design & Thema ----------
   const chat = $d('chatp'), chatHeim = chat && chat.parentNode, chatNach = chat && chat.nextSibling;
@@ -236,7 +240,11 @@
     seite = s;
     if (s !== 'trading' && typeof tvLage === 'function') { tvLetzt = ''; tvLage(); }   // Chart sofort weg, nicht erst bei der nächsten Abfrage
     document.querySelectorAll('#d-rail [data-s]').forEach(b => b.classList.toggle('an', b.dataset.s === s));
-    document.querySelectorAll('.d-seite').forEach(x => x.classList.toggle('an', x.dataset.s === s));
+    document.querySelectorAll('.d-seite').forEach(x => {
+      const an = x.dataset.s === s, war = x.classList.contains('an'); x.classList.toggle('an', an);
+      if (an && !war) [...x.querySelectorAll('.d-kopf, .d-karte, .d-statreihe > *, .dj-eingabe, .dn-karte')].slice(0, 24).forEach((k, i) => {   // gestaffelt einfliegen
+        k.style.animation = 'none'; k.offsetHeight; k.style.animation = `d-rein .6s ${(.04 * i).toFixed(2)}s var(--d-ease) backwards`; });
+    });
     if (s === 'trading' && !$d('d-chart').firstChild) quelleSetzen(tvQuelle);
     if (s === 'notizen') notizenZeigen();
     if (s === 'chat') setTimeout(() => { const m = $d('msgs'); if (m) m.scrollTop = m.scrollHeight; }, 50);
@@ -455,6 +463,26 @@
 
   // Rechtsklick-Menü des Browsers abschalten (in Eingabefeldern bleibt es für Kopieren/Einfügen)
   addEventListener('contextmenu', e => { if (!e.target.closest('input, textarea, [contenteditable]')) e.preventDefault(); });
+  // ---------- Live: Pegelbalken + Leuchten der Hauptkarte folgen ORBs Stimme / deinem Sprechen ----------
+  const pegelBs = [...document.querySelectorAll('#d-pegel b')]; let pegelGl = 0, pegelT = 0;
+  (function pegel(now) {
+    requestAnimationFrame(pegel);
+    if (now - pegelT < 50 || !document.body.classList.contains('dash')) return; pegelT = now;   // 20 Bilder/s reichen
+    const lvl = typeof S !== 'undefined' ? Math.min(1, (S.level || 0) * 1.6 + (typeof listening !== 'undefined' && listening ? .15 : 0)) : 0;
+    pegelGl += (lvl - pegelGl) * .35;
+    document.documentElement.style.setProperty('--d-lvl', pegelGl.toFixed(3));
+    pegelBs.forEach((b, i) => b.style.transform = `scaleY(${(.18 + pegelGl * (.55 + .45 * Math.abs(Math.sin(now / (130 + i * 37) + i)))).toFixed(2)})`);
+  })(0);
+  // ---------- 3D: Karten neigen sich leicht zur Maus ----------
+  let kippKarte = null;
+  d.addEventListener('pointermove', e => {
+    const k = e.target.closest('.d-karte, .d-aktion, .dw'); if (k !== kippKarte && kippKarte) kippKarte.style.removeProperty('--kx'), kippKarte.style.removeProperty('--ky');
+    kippKarte = k; if (!k || k.id === 'd-chart') return;
+    const r = k.getBoundingClientRect(), x = (e.clientX - r.left) / r.width - .5, y = (e.clientY - r.top) / r.height - .5;
+    const st = k.classList.contains('d-aktion') || k.classList.contains('dw') ? 6 : r.width > 500 ? 2 : 4;
+    k.style.setProperty('--kx', (-y * st).toFixed(2) + 'deg'); k.style.setProperty('--ky', (x * st).toFixed(2) + 'deg');
+  });
+  d.addEventListener('pointerleave', () => { if (kippKarte) { kippKarte.style.removeProperty('--kx'); kippKarte.style.removeProperty('--ky'); kippKarte = null; } });
   // ---------- Lichtfleck folgt der Maus auf jeder Karte ----------
   d.addEventListener('pointermove', e => { const k = e.target.closest('.d-karte'); if (!k) return; const r = k.getBoundingClientRect();
     k.style.setProperty('--mx', (e.clientX - r.left) + 'px'); k.style.setProperty('--my', (e.clientY - r.top) + 'px'); });
@@ -535,21 +563,35 @@
       await fetch('/journal', { method:'POST', headers:{ 'Content-Type':'application/json' }, body:JSON.stringify({ loeschen:b.dataset.id }) }).catch(() => {}); ladeJournal(); });
     $d('dj-wl').innerHTML = [...new Set(['XAUUSD', 'EURUSD', 'GBPUSD', 'USDJPY', 'NAS100', 'US30', 'BTCUSD', ...djDaten.map(x => x.waehrung)])].map(w => `<option value="${w}">`).join('');
   }
-  ladeJournal(); setInterval(ladeJournal, 15000);
+  setTimeout(ladeJournal, 1800); setInterval(ladeJournal, 15000);
   // Mini-Widgets in der Kalender-Karte
   async function wetterWidget() {
     try { const w = await (await fetch('/weather')).json(); if (!w || w.temp == null) return;
       const txt = String(w.desc || w.text || w.beschreibung || ''), t = txt.toLowerCase();
       $d('dw-w-i').textContent = /gewitter/.test(t) ? '⛈' : /schnee/.test(t) ? '❄️' : /regen|schauer|niesel/.test(t) ? '🌧' : /nebel/.test(t) ? '🌫' : /bewölkt|wolkig|bedeckt/.test(t) ? '☁️' : /klar|sonn|heiter/.test(t) ? (new Date().getHours() > 18 || new Date().getHours() < 7 ? '🌙' : '☀️') : '⛅';
-      $d('dw-w-t').textContent = Math.round(w.temp) + '°'; $d('d-w3').textContent = Math.round(w.temp) + '°'; $d('dw-w-x').textContent = txt + (w.city ? ' · ' + w.city : ''); } catch (e) {}
+      $d('dw-w-t').textContent = Math.round(w.temp) + '°'; $d('d-w3').textContent = Math.round(w.temp) + '°';
+      $d('dw-w-mm').textContent = (w.min != null ? `↓ ${Math.round(w.min)}°  ↑ ${Math.round(w.max)}°` : '') + (w.rain != null ? `  ·  💧 ${w.rain} %` : '');
+      const H = (w.hourly || []).slice(0, 6); if (H.length) { const lo = Math.min(...H.map(x => x.t)), hi = Math.max(...H.map(x => x.t)), r = hi - lo || 1;
+        $d('dw-w-std').innerHTML = H.map(x => `<div><b>${Math.round(x.t)}°</b><i style="height:${(8 + (x.t - lo) / r * 22).toFixed(0)}px"></i>${escH(x.h)}</div>`).join(''); } $d('dw-w-x').textContent = txt + (w.city ? ' · ' + w.city : ''); } catch (e) {}
   }
-  wetterWidget(); setInterval(wetterWidget, 600000);
+  setTimeout(wetterWidget, 600); setInterval(wetterWidget, 600000);
   function widgetsAktualisieren() {
     const n = [...dnListe].sort((a, b) => (b.angeheftet ? 1 : 0) - (a.angeheftet ? 1 : 0) || String(b.geaendert).localeCompare(String(a.geaendert)))[0];
     $d('dw-n-t').textContent = n ? n.titel : 'Keine Notiz';
     $d('dw-n-x').textContent = n ? n.text.replace(/\s+/g, ' ').slice(0, 70) : 'Sag „Jarvis, notier dir …“';
   }
   setInterval(widgetsAktualisieren, 3000);
+  // Fokus-Timer (ORB sagt Bescheid, wenn die Zeit um ist)
+  let tmMin = 25, tmEnde = 0, tmIv = 0;
+  const tmZeigen = () => { const rest = tmEnde ? Math.max(0, tmEnde - Date.now()) : tmMin * 60000;
+    $d('dw-tm').textContent = String(Math.floor(rest / 60000)).padStart(2, '0') + ':' + String(Math.floor(rest / 1000) % 60).padStart(2, '0');
+    $d('dw-tm-r').style.strokeDashoffset = (100.5 * (1 - rest / (tmMin * 60000))).toFixed(1);
+    if (tmEnde && rest <= 0) { tmStop(); fetch('/announce', { method:'POST', headers:{ 'Content-Type':'application/json' }, body:JSON.stringify({ text:`Deine ${tmMin} Minuten Fokuszeit sind um.` }) }).catch(() => {}); } };
+  const tmStop = () => { clearInterval(tmIv); tmEnde = 0; $d('dw-timer').classList.remove('laeuft'); $d('dw-tm-go').textContent = '▶ Start'; tmZeigen(); };
+  $d('dw-tm-go').onclick = e => { e.stopPropagation(); if (tmEnde) return tmStop();
+    tmEnde = Date.now() + tmMin * 60000; $d('dw-timer').classList.add('laeuft'); $d('dw-tm-go').textContent = '■ Stopp'; tmIv = setInterval(tmZeigen, 1000); tmZeigen(); };
+  document.querySelectorAll('#dw-timer [data-min]').forEach(b => b.onclick = e => { e.stopPropagation(); if (tmEnde) tmStop(); tmMin = +b.dataset.min; tmZeigen(); });
+  tmZeigen();
 
   // ---------- Notizen ----------
   let dnListe = [], dnAktiv = null, dnFarbe = '', dnTimer = 0, dnOffen = false;
@@ -590,7 +632,7 @@
   $d('dn-pin').onclick = async () => { if (!dnAktiv) return; await dnPost({ anheften:dnAktiv }); $d('dn-pin').classList.toggle('an'); ladeNotizen(); };
   $d('dn-weg').onclick = async () => { if (!dnAktiv) return; await dnPost({ loeschen:dnAktiv }); dnAktiv = null; dnOffen = false;
     $d('dn-titel').value = ''; $d('dn-text').value = ''; $d('dn-status').textContent = 'Gelöscht'; ladeNotizen(); };
-  ladeNotizen(); setInterval(() => { if (seite === 'notizen' && document.activeElement !== $d('dn-text') && document.activeElement !== $d('dn-titel')) ladeNotizen(); }, 10000);
+  setTimeout(ladeNotizen, 2200); setInterval(() => { if (seite === 'notizen' && document.activeElement !== $d('dn-text') && document.activeElement !== $d('dn-titel')) ladeNotizen(); }, 10000);
 
   // Webcam ist entfernt: Kamera-Ansicht und Gesten nie mehr starten
   try { kameraAn = () => {}; } catch (e) {}
@@ -619,7 +661,8 @@
     if (tippt) { if (e.key === 'Escape') e.target.blur(); return; }
     if (!e.ctrlKey && !e.altKey && !e.metaKey && /^[1-6]$/.test(e.key)) { e.preventDefault(); e.stopPropagation(); geh(SEITEN[+e.key - 1]); }
   }, true);
-  zeit(); woche(); ladeTermine(); ladeGold(); ladeSys(); ladeWetter(); ladeMusik();
+  zeit(); woche(); ladeTermine(); ladeSys();
+  setTimeout(ladeWetter, 500); setTimeout(ladeMusik, 900); setTimeout(ladeGold, 1400);   // gestaffelt: Start bleibt flüssig
   setInterval(zeit, 30000); setInterval(ladeTermine, 30000); setInterval(ladeGold, 20000);
   setInterval(ladeSys, 3000); setInterval(ladeWetter, 600000); setInterval(ladeMusik, 4000);
 })();

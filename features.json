@@ -528,6 +528,11 @@
      "name": "Gesichtssperre",
      "text": "Beim PC-Start erkennt ORB unsichtbar per Webcam, ob du es bist – sonst sperrt er WhatsApp, Instagram und Snapchat, versteckt sich selbst komplett (keine Kugel, keine Stimme, nicht aufrufbar) und schickt dir ein Foto per Telegram. Erkennt er dich wieder, ist er sofort normal da.",
      "beispiel": "Jarvis, lerne mein Gesicht neu"
+    },
+    {
+     "name": "Fokus-Timer",
+     "text": "Widget im Kalender: 5, 25 oder 50 Minuten Fokuszeit – ORB sagt Bescheid, wenn sie um ist.",
+     "beispiel": "Kalender → Fokus → ▶ Start"
     }
    ]
   }
