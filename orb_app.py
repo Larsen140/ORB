@@ -76,6 +76,13 @@ def orb_windows():
     return found
 
 
+def _ist_vollbild(h):
+    u = ctypes.windll.user32
+    r = (ctypes.c_long * 4)()
+    u.GetWindowRect(h, ctypes.byref(r))
+    return r[0] <= 0 and r[1] <= 0 and r[2] >= u.GetSystemMetrics(0) and r[3] >= u.GetSystemMetrics(1) and r[0] > -8
+
+
 def bring_front():
     """ORB-Fenster nach vorne holen – auch wenn es ausgeblendet war (Windows erlaubt das nur mit kleinem Alt-Tasten-Trick)."""
     try:
@@ -91,10 +98,10 @@ def bring_front():
                 u.ShowWindow(h, 9 if u.IsIconic(h) else 5)
             u.keybd_event(0x12, 0, 0, 0); u.keybd_event(0x12, 0, 2, 0)
             u.SetForegroundWindow(h)
-            if draussen and server.load_cfg().get("vollbild", True):
-                time.sleep(.25)
-                if u.GetForegroundWindow() == h:
-                    u.keybd_event(0x7A, 0, 0, 0); u.keybd_event(0x7A, 0, 2, 0)   # F11 = Vollbild wie beim normalen Start
+            if server.load_cfg().get("vollbild", True) and not _ist_vollbild(h):   # z. B. Edge hat den Vollbildmodus verlassen
+                time.sleep(.2)
+                if u.GetForegroundWindow() == h and not _ist_vollbild(h):
+                    u.keybd_event(0x7A, 0, 0, 0); u.keybd_event(0x7A, 0, 2, 0)   # F11 = Vollbild
     except Exception as e:
         print("Fenster nach vorne:", e)
 
@@ -433,6 +440,10 @@ def verdeckt_starten(t0, pid=0, verstecken=False):
             break
         time.sleep(.004 if not fenster else .02)
     if verstecken:   # Start im Hintergrund: fertig geladen verstecken, dann wieder undurchsichtig (fürs spätere Zeigen)
+        if server.load_cfg().get("vollbild", True):   # erst verstecken, wenn Edge wirklich im Vollbild ist
+            bis = time.time() + 3
+            while time.time() < bis and not all(_ist_vollbild(h) for h in fenster):
+                time.sleep(.05)
         for h, ex in fenster.items():
             try:
                 u.ShowWindow(h, 0)
