@@ -726,6 +726,10 @@ html.galaxie #d-introschicht i { border-color:color-mix(in srgb, var(--d-acc2) 3
 html.galaxie #d-introschicht .txt b span { text-shadow:0 0 26px color-mix(in srgb, var(--d-acc1) 55%, #f3c98b), 0 0 4px rgba(255,255,255,.6); }
 html.galaxie #d-introschicht::after { background:radial-gradient(circle, color-mix(in srgb, var(--d-acc2) 40%, #fff6e6) 0%, transparent 62%); }
 /* Galaxie: große Fläche nur noch hauchzart, damit Sterne und Schwarzes Loch durchscheinen – Karten bleiben gut lesbar */
-html.galaxie body.dash #d-main { background:rgba(8,8,12,.18) !important; backdrop-filter:blur(3px) saturate(120%) !important; -webkit-backdrop-filter:blur(3px) saturate(120%) !important; }
+html.galaxie[data-modus="dunkel"] body.dash #d-main { background:rgba(8,8,12,.18) !important; backdrop-filter:blur(3px) saturate(120%) !important; -webkit-backdrop-filter:blur(3px) saturate(120%) !important; }
 html.galaxie[data-modus="dunkel"] { --d-glass2:rgba(16,16,22,.58); --d-glass3:rgba(26,26,34,.74); }
-html.galaxie body.dash #d-rail, html.galaxie body.dash #d-top { background:rgba(10,10,14,.42) !important; backdrop-filter:blur(14px) saturate(140%) !important; -webkit-backdrop-filter:blur(14px) saturate(140%) !important; }
+html.galaxie[data-modus="dunkel"] body.dash #d-rail, html.galaxie[data-modus="dunkel"] body.dash #d-top { background:rgba(10,10,14,.42) !important; backdrop-filter:blur(14px) saturate(140%) !important; -webkit-backdrop-filter:blur(14px) saturate(140%) !important; }
+
+/* Hauptkarte: rundes, weich auslaufendes Fenster über der ORB-Kugel (Schwarzes Loch) */
+html.galaxie #d-held { -webkit-mask-image:radial-gradient(circle at var(--bhx, 80%) var(--bhy, 50%), transparent calc(var(--bhr, 0px) * .9), #000 var(--bhr, 0px));
+  mask-image:radial-gradient(circle at var(--bhx, 80%) var(--bhy, 50%), transparent calc(var(--bhr, 0px) * .9), #000 var(--bhr, 0px)); }

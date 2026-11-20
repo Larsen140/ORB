@@ -1140,99 +1140,77 @@ uniform vec2 uRes, uC, uPar; uniform float uT, uR;
 uniform vec3 uCol, uCol2, uCol3, uCol4;
 uniform float uLevel, uEnergy, uSpeak, uListen, uSleep, uThink;
 uniform vec4 uB;   // Stimme in vier Bändern (tief … hoch)
-vec3 pal(float x){ x = fract(x)*4.; return x < 1. ? mix(uCol, uCol2, x) : x < 2. ? mix(uCol2, uCol3, x - 1.) : x < 3. ? mix(uCol3, uCol4, x - 2.) : mix(uCol4, uCol, x - 3.); }
 uniform vec4 uD[6];
-float smin(float a, float b, float k){ float h = clamp(.5 + .5*(b - a)/k, 0., 1.); return mix(b, a, h) - k*h*(1. - h); }
-float wob(vec3 p){ return sin(p.x*3.1 + uT*1.3)*sin(p.y*2.7 - uT*1.1)*sin(p.z*3.3 + uT*.9); }
-float map(vec3 p){
-  float d = length(p) - (.80 + .06*uLevel);
-  d += wob(p)*(.04 + .06*uEnergy + .10*uLevel);
-  d += sin(p.y*10. - uT*9.)*sin(p.x*7. + uT*3.)*.018*uSpeak*(.35 + uLevel);
-  d += sin(length(p.xy)*15. - uT*11.)*.014*uListen*(.3 + uLevel*1.5);
-  for (int i = 0; i < 6; i++) d = smin(d, length(p - uD[i].xyz) - uD[i].w, .32);
-  return d;
-}
-vec3 nrm(vec3 p){ vec2 e = vec2(.003, 0.);
-  return normalize(vec3(map(p+e.xyy) - map(p-e.xyy), map(p+e.yxy) - map(p-e.yxy), map(p+e.yyx) - map(p-e.yyx))); }
+// ===== ORB als Schwarzes Loch (20.11.2026, passend zu Second Brain): echte Lichtkrümmung, goldene Scheibe, reagiert auf Stimme =====
 float h21(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7)))*43758.5453); }
+float n2(vec2 p){ vec2 i = floor(p), f = fract(p); f = f*f*(3. - 2.*f);
+  return mix(mix(h21(i), h21(i + vec2(1., 0.)), f.x), mix(h21(i + vec2(0., 1.)), h21(i + vec2(1., 1.)), f.x), f.y); }
+float fbm(vec2 p){ float v = 0., a = .5; for (int i = 0; i < 5; i++){ v += a*n2(p); p = p*2.03 + vec2(1.7, 9.2); a *= .5; } return v; }
 vec3 stars(vec2 uv, float sc, float th){
   vec2 g = uv*sc, id = floor(g), f = fract(g) - .5; float h = h21(id);
   if (h < th) return vec3(0.);
   vec2 o = vec2(h21(id + 1.3), h21(id + 7.1)) - .5;
   float tw = .5 + .5*sin(uT*(.8 + h*3.) + h*60.);
-  return mix(vec3(.75, .85, 1.), uCol2, h21(id + 3.)*.5)*smoothstep(.07, 0., length(f - o*.7))*tw*(h - th)/(1. - th)*2.2;
+  return mix(vec3(1., .86, .7), vec3(.75, .85, 1.), h21(id + 3.))*smoothstep(.08, 0., length(f - o*.7))*tw*(h - th)/(1. - th)*2.4;
 }
-vec3 bg(vec2 uv, vec2 p2, float rr){
-  float t = uT*.035; vec2 q = uv*1.3; float c = 0.;
-  for (int i = 0; i < 4; i++){ float fi = float(i);
-    q += .42*vec2(sin(q.y*1.3 + t*5. + fi*1.3), cos(q.x*1.1 - t*4. + fi*2.1));
-    c += .05/(abs(sin(q.x*1.6 + q.y*.9 + t*3.)) + .09); }
-  vec3 b = pal(uv.x*.25 + uv.y*.15 + t*.8)*c*.045;
-  // vier Leuchtwolken, jede in einer anderen Palettenfarbe
-  b += uCol *.085*exp(-length(uv - vec2(sin(uT*.045)*.85,        cos(uT*.037)*.42) + uPar*.03)*2.4);
-  b += uCol2*.08 *exp(-length(uv - vec2(sin(uT*.045 + 2.1)*.85,  cos(uT*.037 + 1.7)*.42) + uPar*.06)*2.8);
-  b += uCol3*.075*exp(-length(uv - vec2(sin(uT*.045 + 4.2)*.85,  cos(uT*.037 + 3.4)*.42) + uPar*.09)*3.2);
-  b += uCol4*.085*exp(-length(uv - vec2(sin(uT*.045 + 6.3)*.85,  cos(uT*.037 + 5.1)*.42) + uPar*.12)*3.0);
-  // Polarlicht-Bänder oben
-  float band = sin(uv.x*3.1 + uT*.12 + sin(uv.x*1.7 - uT*.08)*1.5)*.06 + .36;
-  b += pal(uv.x*.3 + uT*.02)*exp(-abs(uv.y - band)*26.)*.07*(.6 + .4*sin(uv.x*9. + uT*.5));
-  b += pal(uv.x*.3 + uT*.02 + .5)*exp(-abs(uv.y - band - .07)*34.)*.04;
-  b += stars(uv + uPar*.012 + vec2(uT*.002, 0.), 55., .982)*.9;
-  b += stars(uv + uPar*.035 + vec2(uT*.005, 0.), 120., .99)*.55;
-  float a = atan(p2.y, p2.x);
-  float rays = pow(.5 + .5*sin(a*9. + uT*.22)*sin(a*14. - uT*.15 + 1.), 5.)*exp(-max(rr - .8, 0.)*.5)*smoothstep(.8, 1.4, rr);
-  b += pal(a/6.2831 + uT*.01)*rays*(.06 + .16*uLevel + .05*uEnergy);
+vec3 himmel(vec3 d){   // Hintergrund in Blickrichtung d – wird vom Schwarzen Loch mitgekrümmt
+  vec2 uv = vec2(atan(d.x, -d.z), d.y)*1.6;
+  vec3 b = stars(uv + uPar*.01, 38., .975)*.9 + stars(uv + uPar*.02, 85., .988)*.6;
+  float neb = fbm(uv*1.4 + vec2(uT*.01, 0.));
+  b += mix(vec3(.75, .7, .65), uCol, .55)*pow(neb, 3.)*.16;
   return b;
 }
 void main(){
   vec2 fc = gl_FragCoord.xy, uv = (fc - .5*uRes)/uRes.y;
-  vec2 p2 = (fc - uC)/uR; float rr = length(p2);
-  // Stimme formt die Kugel: jedes Frequenzband wellt den Rand mit eigener Zahl von Bögen
-  float a0 = atan(p2.y, p2.x);
-  float def = (uB.x*sin(a0*3. + uT*1.7)*.026 + uB.y*sin(a0*5. - uT*2.3)*.019 + uB.z*sin(a0*8. + uT*3.1)*.013 + uB.w*sin(a0*12. - uT*3.7)*.009)*(1. - uSleep);
-  p2 /= 1. + def; rr = length(p2);
-  vec3 col = bg(uv, p2, rr)*(1. - .8*uSleep);
-  col *= 1. - .5*dot(uv, uv);
-  // ===== Leuchtende Energiekugel: rund, Plasma innen, heißer Kern, glühender Rand, Korona pulsiert mit der Stimme =====
-  float on = 1. - .7*uSleep;
-  float ang = atan(p2.y, p2.x);
-  // weiches Glühen um die Kugel
-  col += uCol*exp(-max(rr - 1., 0.)*(3.2 - 1.4*uLevel))*(.22 + .45*uLevel + .12*uEnergy)*on;
-  col += uCol2*exp(-max(rr - 1., 0.)*1.1)*.06*on;
-  // Korona: Strahlenkranz, der beim Sprechen aufflackert
-  float cor = .5 + .5*sin(ang*7. + uT*.7)*sin(ang*13. - uT*.5 + sin(uT*.3)*2.);
-  col += pal(ang/6.2831 + uT*.015)*smoothstep(1., 1.02, rr)*exp(-(rr - 1.)*(7. - 3.*uLevel))*(.12 + .5*uLevel*cor + .15*uEnergy)*on;
-  if (rr < 1.){
-    float z = sqrt(1. - rr*rr); vec3 n = vec3(p2, z);
-    // Plasma dreht sich langsam (schneller beim Nachdenken)
-    float a = uT*(.12 + .25*uThink); vec3 q = n;
-    q.xz = mat2(cos(a), -sin(a), sin(a), cos(a))*q.xz;
-    vec3 w = q*2.3; float pl = 0.;
-    for (int i = 0; i < 4; i++){
-      w += .38*vec3(sin(w.y*1.7 + uT*.55), sin(w.z*1.9 - uT*.45), sin(w.x*1.5 + uT*.4));
-      pl += .5/(1. + abs(sin(w.x + w.y + w.z))*3.2);
+  vec2 p2 = (fc - uC)/uR;
+  float wach = 1. - .7*uSleep;
+  // Kamera schaut fast flach auf die Scheibe, wiegt sich leicht; Bildgröße: Schatten ≈ 0,7 × Kugelradius
+  float D = 22., el = .10 + .025*sin(uT*.21) + .02*uThink;
+  vec3 ro = vec3(sin(uT*.03)*.6, D*el, D);
+  vec3 fw = normalize(-ro), rt = normalize(cross(vec3(0., 1., 0.), fw)), up = cross(fw, rt);
+  vec3 rd = normalize(fw + (p2.x*rt + p2.y*up)*.165);
+  vec3 col = vec3(0.); float al = 0.; vec3 d = rd;
+  float bb = dot(ro, rd), cc = dot(ro, ro) - 169., hh = bb*bb - cc;
+  float spin = uT*(1. + 1.4*uThink) + uT*.6*uLevel;
+  float glanz = (.85 + 1.25*uLevel + .45*uEnergy + .35*uSpeak)*wach;
+  if (hh > 0.){
+    vec3 p = ro + rd*max(-bb - sqrt(hh), 0.);
+    vec3 hc = cross(p, d); float h2 = dot(hc, hc); bool loch = false;
+    for (int i = 0; i < 150; i++){
+      float r = length(p); float dt = clamp(.05*r, .014, .7);
+      d = normalize(d - 1.5*h2*p/pow(r, 5.)*dt);
+      vec3 np = p + d*dt;
+      if (p.y*np.y < 0.){
+        vec3 q = mix(p, np, p.y/(p.y - np.y)); float rr = length(q.xz);
+        if (rr > 2.45 && rr < 10.5){
+          float ang = atan(q.z, q.x), ph = ang - spin*pow(rr, -1.5)*1.2;
+          vec2 dv = vec2(cos(ph), sin(ph))*rr;
+          float n = fbm(dv*1.1 + vec2(rr*1.9, -rr*.7));
+          float stimme = 1. + .55*(uB.x*sin(ang*3. + uT*1.7) + uB.y*sin(ang*5. - uT*2.3) + uB.z*sin(ang*8. + uT*3.1) + uB.w*sin(ang*12. - uT*3.7));
+          float prof = smoothstep(2.45, 3., rr)*(1. - smoothstep(5., 10.5, rr))*pow(3./rr, 2.);
+          vec3 vel = vec3(-sin(ang), 0., cos(ang))*min(.6, sqrt(.5/max(rr - 1., .5)));
+          float beam = clamp(pow(1./(1. + dot(vel, d)), 3.), .12, 3.2);
+          float I = prof*(.25 + 1.15*n*(.75 + .25*sin(rr*5. + n*7.)))*beam*1.8*glanz*stimme;
+          vec3 warm = mix(vec3(1., .72, .42), uCol, .3), tief = mix(vec3(.85, .42, .18), uCol2, .25);
+          vec3 c2 = mix(tief, warm, clamp(I*.9, 0., 1.)); c2 = mix(c2, vec3(1., .97, .92), clamp(I*.45 - .2, 0., 1.));
+          col += (1. - al)*c2*I; al += (1. - al)*clamp(I*1.15, 0., .97);
+        }
+      }
+      p = np;
+      if (length(p) < 1.){ loch = true; break; }
+      if (length(p) > 13.5 && dot(p, d) > 0.) break;
+      if (al > .99) break;
     }
-    pl /= 4.;
-    float fr = pow(1. - z, 2.);
-    vec3 c = mix(uCol*.45, pal(pl*1.6 + uT*.02), .45)*(.3 + pl*1.9)*(.85 + .9*uLevel + .35*uEnergy);   // Plasma
-    c += mix(uCol, vec3(1.), .6)*pow(z, 5.)*(.35 + 1.1*uLevel);                                         // heißer Kern
-    c += mix(uCol2, uCol3, .5 + .5*sin(ang*2. + uT*.3))*fr*(1.2 + .6*uLevel);                           // glühender Rand
-    c += vec3(1.)*pow(max(dot(n, normalize(vec3(-.45, .55, .7))), 0.), 40.)*.35;                        // Glanzpunkt
-#ifdef KINO
-    // Subsurface: Licht dringt ein und streut weich – leuchtender Terminator, Glühen aus der Tiefe am Rand
-    vec3 L = normalize(vec3(-.45, .55, .7)); float nl = dot(n, L);
-    c *= .5 + .32*clamp((nl + .6)/1.6, 0., 1.);
-    c += mix(uCol, uCol2, .35)*smoothstep(.55, 0., abs(nl + .05))*(.1 + .16*uLevel);
-    c += uCol*pow(1. - z, 1.3)*pl*(.3 + .45*uLevel + .2*uThink);
-    // weiche Reflexionen: Nebel der Umgebung (Fresnel) + eine weiche Lichtfläche
-    vec3 rd = reflect(vec3(0., 0., -1.), n); float fres = .04 + .96*pow(1. - z, 5.);
-    vec3 env = pal(rd.x*.18 + rd.y*.12 + uT*.01)*(.35 + .65*smoothstep(-.4, .9, rd.y));
-    float win = smoothstep(.14, 0., length(max(abs(rd.xy - vec2(-.5, .58)) - vec2(.16, .07), 0.)));
-    c += env*fres*.65 + vec3(1., .98, .95)*win*(.12 + fres*.8);
-    c += vec3(1., .97, .92)*pow(max(reflect(-L, n).z, 0.), 14.)*.16;                                    // breiter, weicher Glanz
-#endif
-    col = mix(col, c*(1. - .55*uSleep), smoothstep(1., .985, rr));
+    if (loch) al = 1.;
   }
+  col += (1. - al)*himmel(d)*(1. - .6*uSleep);
+  // feiner Photonenschein und Hauch von Glühen, der beim Sprechen anschwillt
+  float rr0 = length(p2);
+  col += mix(vec3(1., .8, .55), uCol, .4)*exp(-abs(rr0 - .74)*22.)*.12*glanz;
+  col += mix(vec3(1., .75, .45), uCol, .5)*exp(-max(rr0 - .7, 0.)*(3.4 - 1.2*uLevel))*(.04 + .12*uLevel)*wach;
+  for (int k = 0; k < 2; k++){ float w = fract(uT*.55 + float(k)*.5);
+    col += mix(vec3(1., .9, .75), uCol, .5)*exp(-abs(rr0 - (.76 + w*1.2))*20.)*(1. - w)*uListen*.5*wach; }
+  col *= 1. - .35*dot(uv, uv);
 #ifdef KINO
   gl_FragColor = vec4(sqrt(col/(1. + col)), 1.);   // HDR verpackt – Tonemapping im Kino-Durchgang
 #else
@@ -1360,7 +1338,7 @@ function kinoPost(t, c1, c2) {
 }
 function glResize() {
   W = innerWidth; H = innerHeight; if (W < 2 || H < 2) return;
-  glScale = [.45, .62, .9, 1][Q()] * Math.min(devicePixelRatio || 1, 1.5);   // etwas niedriger = deutlich weniger Grafiklast
+  glScale = [.45, .62, .9, 1][Q()] * Math.min(devicePixelRatio || 1, Q() === 3 ? 2 : 1.5);   // Kino: bis 4K-Pixeldichte, sonst sparsamer
   glc.width = Math.round(W * glScale); glc.height = Math.round(H * glScale);
   fxc.width = W; fxc.height = H;
   if (gl) gl.viewport(0, 0, glc.width, glc.height);

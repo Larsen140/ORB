@@ -727,13 +727,17 @@
           g.gain.setValueAtTime(0, start); g.gain.linearRampToValueAtTime(staerke, start + .02); g.gain.exponentialRampToValueAtTime(.0001, start + dauer);
           o.connect(g); g.connect(out); g.connect(echo); o.start(start); o.stop(start + dauer + .05); });
       };
-      rausch(t, .95, 180, 3200, .22);                                   // Kugel zündet
-      [659.3, 987.8, 1318.5, 1975.5].forEach((f, i) => ton(t + .18 + i * .07, f, 1.4, .07 - i * .01, 'triangle'));   // Ringe: Schimmer-Akkord
-      rausch(t + .9, .35, 2600, 500, .14);                              // Kugel fliegt in den Ring
-      const o = ac.createOscillator(), g = ac.createGain(); o.frequency.setValueAtTime(110, t + 1.08); o.frequency.exponentialRampToValueAtTime(52, t + 1.5);
-      g.gain.setValueAtTime(0, t + 1.08); g.gain.linearRampToValueAtTime(.32, t + 1.1); g.gain.exponentialRampToValueAtTime(.0001, t + 1.6);
-      o.connect(g); g.connect(out); o.start(t + 1.08); o.stop(t + 1.65);                 // weicher Aufschlag
-      ton(t + 1.1, 440, 1.1, .05); ton(t + 1.1, 659.3, 1.1, .035);
+      // Weltraum-Intro (passend zum Schwarzen Loch): tiefes Ansaugen, Zündung der Scheibe, schwebender Akkord, Aufschlag
+      const sub = (start, von, bis, dauer, staerke) => { const o = ac.createOscillator(), g = ac.createGain();
+        o.frequency.setValueAtTime(von, start); o.frequency.exponentialRampToValueAtTime(bis, start + dauer);
+        g.gain.setValueAtTime(0, start); g.gain.linearRampToValueAtTime(staerke, start + dauer * .35); g.gain.exponentialRampToValueAtTime(.0001, start + dauer);
+        o.connect(g); g.connect(out); o.start(start); o.stop(start + dauer + .05); };
+      rausch(t, 1.0, 60, 1400, .2);                                      // Raum saugt sich zusammen
+      sub(t, 34, 58, 1.2, .3);                                           // tiefes Grollen des Lochs
+      [164.8, 246.9, 329.6, 493.9].forEach((f, i) => ton(t + .2 + i * .09, f, 2.2, .05 - i * .008));   // schwebender Akkord
+      rausch(t + .9, .4, 3000, 420, .12);                                // Scheibe zündet und fliegt in den Ring
+      sub(t + 1.06, 96, 38, .7, .34);                                    // weicher Aufschlag
+      ton(t + 1.1, 659.3, 1.4, .03); ton(t + 1.16, 987.8, 1.2, .018);   // Funkeln der Sterne
       setTimeout(() => ac.close().catch(() => {}), 3500);
     } catch (e) {}
   }

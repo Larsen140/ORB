@@ -1,5 +1,6 @@
 /* Galaxie-Hintergrund für das ORB-Dashboard – passend zu Second Brain (Jarvis Brain).
-   Ein einziger WebGL-Shader: Sternenhimmel + Nebel + Schwarzes Loch mit echter Lichtkrümmung (Schwarzschild).
+   Ein einziger WebGL-Shader: Sternenhimmel + Nebel + Schwarzes Loch mit echter Lichtkrümmung (Schwarzschild) –
+   seit Version 192 nur noch Sterne und Nebel: das Schwarze Loch ist die ORB-Kugel selbst.
    Sparsam: halbe Auflösung, max. 30 Bilder/s, pausiert wenn ORB versteckt, im Spar-Modus nur ein Standbild. */
 (() => {
   const bg = document.getElementById('dbg');
@@ -40,7 +41,7 @@ void main(){
   vec3 col=vec3(0.);float al=0.;
   float b=dot(ro,rd),cc=dot(ro,ro)-196.,h=b*b-cc;
   vec3 d=rd;
-  if(h>0.){
+  if(h>0.&&false){   // das Schwarze Loch ist jetzt die ORB-Kugel selbst – im Hintergrund nur Sterne und Nebel
     vec3 p=ro+rd*max(-b-sqrt(h),0.);
     vec3 hc=cross(p,d);float h2v=dot(hc,hc);bool hole=false;
     for(int i=0;i<170;i++){
@@ -92,7 +93,7 @@ void main(){
   };
   farbe(); new MutationObserver(farbe).observe(document.documentElement, { attributes: true, attributeFilter: ['data-thema'] });
 
-  const SKALA = 0.5;
+  const SKALA = Math.min(devicePixelRatio || 1, 2);   // volle Auflösung bis 4K – ohne Loch im Hintergrund ist der Shader leicht
   const groesse = () => { const w = Math.max(2, Math.round(innerWidth * SKALA)), h = Math.max(2, Math.round(innerHeight * SKALA)); if (cv.width !== w || cv.height !== h) { cv.width = w; cv.height = h; gl.viewport(0, 0, w, h); } };
   addEventListener('resize', groesse); groesse();
 
@@ -112,4 +113,12 @@ void main(){
     letzt = now; malen(now);
   }
   requestAnimationFrame(schleife);
+  // Rundes Fenster in der Hauptkarte: dort ist das Schwarze Loch (die ORB-Kugel) klar und tiefschwarz zu sehen
+  setInterval(() => {
+    const held = document.getElementById('d-held'), k = document.getElementById('d-kugel'); if (!held || !k) return;
+    const a = held.getBoundingClientRect(), b = k.getBoundingClientRect(); if (!b.width) return;
+    held.style.setProperty('--bhx', (b.left + b.width / 2 - a.left).toFixed(0) + 'px');
+    held.style.setProperty('--bhy', (b.top + b.height / 2 - a.top).toFixed(0) + 'px');
+    held.style.setProperty('--bhr', (b.width * .62).toFixed(0) + 'px');
+  }, 400);
 })();
