@@ -98,7 +98,7 @@
               <div class="dw-std" id="dw-w-std"></div></div>
             <div class="dw" id="dw-notiz" data-geh="notizen"><div class="dw-k"><span>📌</span>Notiz</div><b id="dw-n-t">Keine Notiz</b><small id="dw-n-x">Sag „Jarvis, notier dir …“</small></div>
             <div class="dw" id="dw-timer"><div class="dw-k"><span>⏱</span>Fokus</div><div class="tz"><svg viewBox="0 0 40 40"><circle class="sp" cx="20" cy="20" r="16"/><circle class="wt" id="dw-tm-r" cx="20" cy="20" r="16" stroke-dasharray="100.5" stroke-dashoffset="0"/></svg>
-              <b id="dw-tm">25:00</b></div><div class="dw-knopf"><button id="dw-tm-go">▶ Start</button><button data-min="5">5</button><button data-min="25">25</button><button data-min="50">50</button></div></div>
+              <b id="dw-tm">25:00</b></div><div class="dw-knopf"><button id="dw-tm-go">▶ Start</button><button data-min="25">25</button><button data-min="50">50</button><input id="dw-tm-eigen" inputmode="numeric" maxlength="3" placeholder="min" title="Eigene Minuten eintippen, Enter"></div></div>
           </div>
           <div id="d-antwort"></div>
           <form class="gespr" id="d-form" onsubmit="return false"><input id="d-eingabe" placeholder="Nachricht an ORB …" autocomplete="off"><button title="Senden">↑</button></form>
@@ -606,7 +606,17 @@
   const tmStop = () => { clearInterval(tmIv); tmEnde = 0; $d('dw-timer').classList.remove('laeuft'); $d('dw-tm-go').textContent = '▶ Start'; tmZeigen(); };
   $d('dw-tm-go').onclick = e => { e.stopPropagation(); if (tmEnde) return tmStop();
     tmEnde = Date.now() + tmMin * 60000; $d('dw-timer').classList.add('laeuft'); $d('dw-tm-go').textContent = '■ Stopp'; tmIv = setInterval(tmZeigen, 1000); tmZeigen(); };
-  document.querySelectorAll('#dw-timer [data-min]').forEach(b => b.onclick = e => { e.stopPropagation(); if (tmEnde) tmStop(); tmMin = +b.dataset.min; tmZeigen(); });
+  const tmSetzen = m => { m = Math.round(+m); if (!(m >= 1 && m <= 600)) return false; if (tmEnde) tmStop(); tmMin = m; tmZeigen(); return true; };
+  document.querySelectorAll('#dw-timer [data-min]').forEach(b => b.onclick = e => { e.stopPropagation(); tmSetzen(b.dataset.min); });
+  // eigene Zahl: im kleinen Feld tippen + Enter (oder auf die Zeit klicken)
+  const eig = $d('dw-tm-eigen');
+  eig.addEventListener('click', e => e.stopPropagation());
+  eig.addEventListener('input', () => { eig.value = eig.value.replace(/[^0-9]/g, '').slice(0, 3); });
+  eig.addEventListener('keydown', e => { e.stopPropagation();
+    if (e.key === 'Enter') { if (tmSetzen(eig.value)) { eig.value = ''; eig.blur(); eig.classList.remove('falsch'); } else { eig.classList.add('falsch'); } }
+    if (e.key === 'Escape') { eig.value = ''; eig.blur(); } });
+  $d('dw-tm').style.cursor = 'text'; $d('dw-tm').title = 'Klicken, um eigene Minuten einzugeben';
+  $d('dw-tm').onclick = e => { e.stopPropagation(); eig.focus(); };
   tmZeigen();
 
   // ---------- Notizen ----------

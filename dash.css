@@ -677,3 +677,10 @@ body.d-sofort #dash { transition:none !important; }
 .mu-knoepfe button.gedrueckt { animation:d-klick .45s var(--d-spring); }
 .d-kachel.eq .zahl { line-height:1.24 !important; padding-bottom:3px; }
 @media (max-width:1500px), (max-height:920px) { .d-kachel.eq .zahl { font-size:14px !important; } }
+
+/* Fokus: eigene Minuten */
+#dw-tm-eigen { width:42px; height:22px; border-radius:999px; border:1px solid var(--d-line); background:var(--d-glass3); color:var(--d-ink); text-align:center;
+  font:600 11px inherit; font-family:inherit; outline:0; padding:0 4px; transition:box-shadow .25s, width .3s var(--d-ease); }
+#dw-tm-eigen:focus { width:52px; box-shadow:0 0 0 2px color-mix(in srgb, var(--d-acc1) 50%, transparent); }
+#dw-tm-eigen::placeholder { color:var(--d-sub); }
+#dw-tm-eigen.falsch { box-shadow:0 0 0 2px #de4636; animation:d-klick .4s; }

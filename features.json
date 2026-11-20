@@ -531,7 +531,7 @@
     },
     {
      "name": "Fokus-Timer",
-     "text": "Widget im Kalender: 5, 25 oder 50 Minuten Fokuszeit – ORB sagt Bescheid, wenn sie um ist.",
+     "text": "Widget im Kalender: 25, 50 oder eigene Minuten (Feld „min“ oder auf die Zeit klicken, 1–600) – ORB sagt Bescheid, wenn die Zeit um ist.",
      "beispiel": "Kalender → Fokus → ▶ Start"
     },
     {

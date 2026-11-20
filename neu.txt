@@ -1,1 +1,1 @@
-185|Flüssigerer Start mit Durchflug-Effekt, Musik-Widget mit Knöpfen, Widgets passen überall
+186|Fokus-Timer mit eigener Minutenzahl
