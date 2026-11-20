@@ -1,1 +1,1 @@
-174|Kein Aufblitzen mehr nach Updates und Autostart
+175|Begrüßung wird nicht mehr unten abgeschnitten

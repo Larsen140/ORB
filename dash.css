@@ -613,3 +613,6 @@ body.d-intro #dash, body.d-intro #d-aurora { opacity:0; }
   text-shadow:0 0 24px var(--d-acc1); }
 @keyframes d-introbuchst { to { opacity:1; transform:none; } }
 #d-introschicht .txt small { display:block; margin-top:12px; font-size:15px; letter-spacing:.08em; color:rgba(255,255,255,.7); opacity:0; animation:d-introbuchst .7s .55s forwards; }
+
+/* Begrüßung: Platz für Unterlängen (g, j, p) – der Farbschimmer schnitt sie ab */
+#d-gruss { padding:.04em 0 .16em; margin-bottom:-.16em; line-height:1.15; }
