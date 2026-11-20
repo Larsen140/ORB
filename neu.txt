@@ -1,1 +1,1 @@
-173|Gesichtssperre robuster bei schlechtem Licht, keine Fehlsperre mehr durch einen einzelnen Scan
+174|Kein Aufblitzen mehr nach Updates und Autostart

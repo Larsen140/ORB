@@ -81,9 +81,20 @@ def bring_front():
     try:
         u = ctypes.windll.user32
         for h in orb_windows():
+            r = (ctypes.c_long * 4)()
+            u.GetWindowRect(h, ctypes.byref(r))
+            draussen = r[0] < -10000   # versteckt gestartet (außerhalb des Bildschirms, damit nichts aufblitzt)
+            if draussen:
+                u.SetWindowPos(h, 0, 0, 0, 1280, 800, 0x0004 | 0x0010)   # zurück auf den Bildschirm (noch unsichtbar)
+                u.ShowWindow(h, 3)   # maximiert zeigen
+            else:
+                u.ShowWindow(h, 9 if u.IsIconic(h) else 5)
             u.keybd_event(0x12, 0, 0, 0); u.keybd_event(0x12, 0, 2, 0)
-            u.ShowWindow(h, 9 if u.IsIconic(h) else 5)
             u.SetForegroundWindow(h)
+            if draussen and server.load_cfg().get("vollbild", True):
+                time.sleep(.25)
+                if u.GetForegroundWindow() == h:
+                    u.keybd_event(0x7A, 0, 0, 0); u.keybd_event(0x7A, 0, 2, 0)   # F11 = Vollbild wie beim normalen Start
     except Exception as e:
         print("Fenster nach vorne:", e)
 
@@ -351,6 +362,8 @@ def show(wake=False, hidden=False):
         return
     profile = os.path.join(os.environ.get("LOCALAPPDATA", os.path.expanduser("~")), "ORB", "fenster")
     extra = ["--start-fullscreen"] if server.load_cfg().get("vollbild", True) else []
+    if hidden:   # unsichtbar starten (Autostart/Update): außerhalb des Bildschirms → kein Aufblitzen
+        extra = ["--window-position=-32000,-32000", "--window-size=1280,800"]
     t0 = time.time()
     subprocess.Popen([browser, "--app=" + url, "--user-data-dir=" + profile] + LEAN + extra)
     if hidden:
