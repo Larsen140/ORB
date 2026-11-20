@@ -77,7 +77,7 @@ DEFAULT_CFG = {
 }
 # Damit ORB immer dein Claude-Code-Login (Max-Abo) nutzt und nie einen API-Schlüssel
 CLAUDE_ENV_DROP = ("ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "ANTHROPIC_BASE_URL")
-VERSION = "187"
+VERSION = "188"
 ORB_UI = ("Deine Oberfläche (die Larsen gerade sieht): in der Mitte du als flüssige leuchtende Kugel mit Tropfen, "
           "Orbit-Ringen und Sternenhimmel; links eine Uhr und darunter der Gesprächsverlauf mit Eingabefeld; rechts "
           "Karten für System (CPU, RAM, Akku), Wetter mit Stundenvorschau, Aktivität (was du gerade tust) und Vorschläge; "
@@ -589,15 +589,16 @@ CALL_FREI_T = [0.0]   # wann Larsen ORB im Meeting zuletzt selbst geholt hat
 OHR_WAKE_T = [0.0]    # wann zuletzt „Jarvis“ gehört wurde (Weckwort oder Name im Satz)
 
 
+MEETING_ZUHOEREN = [False]   # nur Larsen schaltet das ausdrücklich an (Knopf, „hör zu“ tippen, Telegram) – gilt bis Meeting-Ende
+
+
 def call_aktiv():
-    """Meeting läuft UND Larsen hat ORB nicht selbst dazugeholt → nicht zuhören.
-    Die Freigabe (Klatschen im Meeting) läuft nach 3 Min. ohne Gespräch von selbst ab – nie mehr dauerhaft mithören."""
+    """Meeting läuft und Larsen hat das Zuhören NICHT ausdrücklich erlaubt → Mikrofon für Sprache komplett zu
+    (kein Mitschreiben, kein Weckwort, keine Online-Erkennung). Klatschen holt ORB nur nach vorne, gibt nichts frei."""
     if not in_call():
-        CALL_FREI[0] = False
+        MEETING_ZUHOEREN[0] = False   # Meeting vorbei → beim nächsten wieder taub
         return False
-    if CALL_FREI[0] and time.time() - max(CALL_FREI_T[0], LAST_ACTIVE[0]) > 180:
-        CALL_FREI[0] = False
-    return not CALL_FREI[0]
+    return not MEETING_ZUHOEREN[0]
 
 
 def in_call():
@@ -1637,7 +1638,20 @@ def pause_schalten(an, heard=""):
                  "Beenden mit /weiter." if an else "Pausemodus aus, ich höre wieder zu.", heard=heard)
 
 
+MEETING_AN = re.compile(r"(?i)^\W*(jarvis[,\s]*)?(hör|hoer)\w*\s+(im\s+meeting\s+|jetzt\s+|ab\s+jetzt\s+)?(zu|mit)\b")
+MEETING_AUS = re.compile(r"(?i)^\W*(jarvis[,\s]*)?(hör|hoer)\w*\s+auf\b|nicht\s+mehr\s+zuh(ö|oe)ren")
+
+
 def ask(text):
+    roh = re.sub(r"^\[Per Telegram[^\]]*\]\s*", "", text)
+    if in_call() and MEETING_AN.search(roh):
+        MEETING_ZUHOEREN[0] = True
+        write_answer("Okay, ich höre im Meeting zu, bis es vorbei ist.", heard=text)
+        return True
+    if in_call() and MEETING_AUS.search(roh):
+        MEETING_ZUHOEREN[0] = False
+        write_answer("Okay, ich höre im Meeting nicht mehr zu.", heard=text)
+        return True
     HANDY["t"] = time.time() if text.startswith("[Per Telegram") else 0.0
     if aus_befehl(text):
         orb_aus(text)
@@ -3258,6 +3272,8 @@ class Handler(BaseHTTPRequestHandler):
                          "lebt": web_lebt(), "rein": WEB["rein"]}   # Web-Hologramm
             st["spiel"] = spiel_laeuft()
             # Meeting oder Spiel: nicht zuhören – außer Minecraft: da hört ORB weiter auf „Jarvis“ (Befehle im Spiel)
+            st["meeting"] = in_call()
+            st["meeting_zuhoeren"] = MEETING_ZUHOEREN[0]
             st["anruf"] = call_aktiv() or bool(st["spiel"] and st["spiel"] != "Minecraft")   # während Meet/Teams/Zoom nicht zuhören
             st["tarn"] = tarnmodus.aktiv()   # Tarnmodus: Oberfläche ganz stumm
             st["handy"] = handy_still()   # Gespräch per Telegram: Oberfläche stumm, Sprachnachricht trotzdem fürs Handy
@@ -3276,7 +3292,7 @@ class Handler(BaseHTTPRequestHandler):
             an = load_cfg().get("ohr", True) and not call_aktiv() and not (spiel and spiel != "Minecraft")
             # im Meeting nur direkt nach „Jarvis“ mitschreiben – sonst hört das Ohr nur aufs Weckwort (kein Mitschreiben des Meetings)
             im_meeting = in_call()
-            self.send(200, {"an": an, "mitschreiben": an and time.time() - LAST_WACH[0] < 3 and (not im_meeting or time.time() - OHR_WAKE_T[0] < 20),
+            self.send(200, {"an": an, "mitschreiben": an and time.time() - LAST_WACH[0] < 3,
                             "stimmcheck": load_cfg().get("nur_meine_stimme", True)})
         elif u.path == "/stimmung":
             self.send(200, stimmung())
@@ -3577,6 +3593,8 @@ class Handler(BaseHTTPRequestHandler):
             name_stopp = re.search(r"(?i)\b(jarvis|orb|stopp?|hör auf|aufhören|sei still|ruhe)\b", text) and not eigen
             if typ == "text" and echo and not name_stopp:
                 return self.send(200, {"ok": False, "grund": "Echo – ORB sprach gerade"})
+            if call_aktiv():   # Meeting ohne ausdrückliche Erlaubnis: nichts annehmen
+                return self.send(200, {"ok": False, "grund": "meeting"})
             if fremd_gesperrt():   # Fremder am PC: „Jarvis“ & Fragen ignorieren, nur neu scannen lassen
                 if typ == "wake":
                     weckversuch()
@@ -3599,6 +3617,10 @@ class Handler(BaseHTTPRequestHandler):
             self.send(200, notizen_aendern(b))
         elif u.path == "/tv_dock":   # Dashboard: TradingView-Konto in der Chart-Karte zeigen/ausblenden
             self.send(200, {"ok": tv_dock(bool(b.get("an")), b.get("rect"), str(b.get("symbol") or "VANTAGE:XAUUSD"))})
+        elif u.path == "/meeting_zuhoeren":   # Larsen erlaubt/verbietet ausdrücklich das Zuhören im Meeting
+            MEETING_ZUHOEREN[0] = bool(b.get("an"))
+            log_close("Meeting: Zuhören %s" % ("erlaubt" if MEETING_ZUHOEREN[0] else "aus"), HOER_LOG)
+            self.send(200, {"ok": True, "an": MEETING_ZUHOEREN[0]})
         elif u.path == "/abgedeckt":   # Seite meldet: Abdeckung ist gemalt
             ABGEDECKT[0] = time.time()
             self.send(200, {"ok": True})

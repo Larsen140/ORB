@@ -57,6 +57,7 @@
   <header id="d-top" class="dg d-rein" style="animation-delay:.12s">
     <div class="av">L</div><div class="wil">Willkommen, Larsen</div>
     <form class="mitte" id="d-frag" onsubmit="return false"><i class="punkt"></i><span class="d-pegel" id="d-pegel"><b></b><b></b><b></b><b></b><b></b></span><input placeholder="Frag ORB etwas … z. B. „Wie wird das Wetter morgen?“" autocomplete="off"><span id="d-status">Bereit</span></form>
+    <div class="d-meeting" id="d-meeting"><i></i><span id="d-meeting-t">Meeting – ich höre nicht zu</span><button id="d-meeting-b">Zuhören erlauben</button></div>
     <div class="rechts"><button class="d-rund" id="d-farbe" title="Farbthema">${svg('farbe')}</button></div>
   </header>
   <div id="d-themen" class="dg"><div class="d-modus"><button data-m="hell">☀ Hell</button><button data-m="dunkel">☾ Dunkel</button><button data-m="auto">◐ Auto</button></div>${THEMEN.map(([k, n, g]) => `<button data-t="${k}"><i style="background:${g}"></i>${n}</button>`).join('')}</div>
@@ -427,6 +428,17 @@
     zeit();
   }
 
+  // ---------- Meeting: ORB hört nicht zu, bis Larsen es ausdrücklich erlaubt ----------
+  let meetingZu = false;
+  async function meetingLage() {
+    try { const st = await (await fetch('/state?von=extern', { cache:'no-store' })).json();
+      const m = !!st.meeting; meetingZu = !!st.meeting_zuhoeren;
+      $d('d-meeting').classList.toggle('an', m); $d('d-meeting').classList.toggle('erlaubt', meetingZu);
+      $d('d-meeting-t').textContent = meetingZu ? 'Meeting – ich höre zu' : 'Meeting – ich höre nicht zu';
+      $d('d-meeting-b').textContent = meetingZu ? 'Nicht mehr zuhören' : 'Zuhören erlauben'; } catch (e) {}
+  }
+  $d('d-meeting-b').onclick = async () => { await fetch('/meeting_zuhoeren', { method:'POST', headers:{ 'Content-Type':'application/json' }, body:JSON.stringify({ an:!meetingZu }) }).catch(() => {}); meetingLage(); };
+  setInterval(meetingLage, 2500); setTimeout(meetingLage, 800);
   // ---------- ORBs Zustand spiegeln (Status, Hauptkarte, letzte Antwort) ----------
   const antwortText = m => m.textContent.replace(/\s*\d{1,2}:\d{2}\s*$/, '').trim();   // Uhrzeit der Nachricht nicht mitlesen
   let txtAlt = '';

@@ -353,8 +353,7 @@ def show(wake=False, hidden=False):
     if server.tarnmodus.aktiv():
         return   # Tarnmodus: Klatschen & Co. holen das Fenster nicht hervor
     if wake:
-        server.CALL_FREI[0] = True   # per Klatschen geholt → auch während eines Meetings zuhören
-        server.CALL_FREI_T[0] = time.time()
+        pass   # Klatschen holt ORB nur nach vorne – Zuhören im Meeting gibt es nur auf ausdrückliche Erlaubnis
     if window_open() or window_process_running():
         if hidden:
             return

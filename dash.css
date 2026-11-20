@@ -684,3 +684,15 @@ body.d-sofort #dash { transition:none !important; }
 #dw-tm-eigen:focus { width:52px; box-shadow:0 0 0 2px color-mix(in srgb, var(--d-acc1) 50%, transparent); }
 #dw-tm-eigen::placeholder { color:var(--d-sub); }
 #dw-tm-eigen.falsch { box-shadow:0 0 0 2px #de4636; animation:d-klick .4s; }
+
+/* Meeting-Hinweis in der oberen Leiste */
+.d-meeting { display:none; align-items:center; gap:8px; height:34px; padding:0 6px 0 12px; border-radius:999px; font-size:12px; font-weight:600;
+  background:rgba(222,70,54,.14); color:#de4636; border:1px solid rgba(222,70,54,.3); margin-left:auto; }
+.d-meeting.an { display:flex; }
+.d-meeting.an + .rechts { margin-left:8px; }
+.d-meeting i { width:8px; height:8px; border-radius:50%; background:#de4636; box-shadow:0 0 8px #de4636; }
+.d-meeting.erlaubt { background:rgba(20,164,110,.14); color:#14a46e; border-color:rgba(20,164,110,.3); }
+.d-meeting.erlaubt i { background:#14a46e; box-shadow:0 0 8px #14a46e; animation:d-puls 1.6s infinite; }
+.d-meeting button { height:26px; padding:0 10px; border-radius:999px; border:0; cursor:pointer; font:600 11.5px inherit; font-family:inherit; color:#fff; background:#de4636; }
+.d-meeting.erlaubt button { background:#14a46e; }
+html[data-modus="dunkel"] .d-meeting { color:#ff7a68; } html[data-modus="dunkel"] .d-meeting.erlaubt { color:#4fd69c; }
