@@ -351,9 +351,61 @@ def show(wake=False, hidden=False):
         return
     profile = os.path.join(os.environ.get("LOCALAPPDATA", os.path.expanduser("~")), "ORB", "fenster")
     extra = ["--start-fullscreen"] if server.load_cfg().get("vollbild", True) else []
+    t0 = time.time()
     subprocess.Popen([browser, "--app=" + url, "--user-data-dir=" + profile] + LEAN + extra)
     if hidden:
         threading.Thread(target=hide_hidden_soon, daemon=True).start()
+    else:
+        threading.Thread(target=verdeckt_starten, args=(t0,), daemon=True).start()
+
+
+def _fenster_der_profilprozesse():
+    """Alle sichtbaren Hauptfenster der ORB-Edge-Prozesse (auch bevor die Seite ihren Titel „ORB“ gesetzt hat)."""
+    import psutil
+    from ctypes import wintypes
+    u = ctypes.windll.user32
+    pids = {p.pid for p in psutil.process_iter(["name", "cmdline"])
+            if (p.info["name"] or "").lower() == "msedge.exe" and any("ORB\\fenster" in (c or "") for c in p.info["cmdline"] or [])}
+    out = []
+
+    @ctypes.WINFUNCTYPE(wintypes.BOOL, wintypes.HWND, wintypes.LPARAM)
+    def cb(h, _):
+        pid = wintypes.DWORD()
+        u.GetWindowThreadProcessId(h, ctypes.byref(pid))
+        if pid.value in pids and u.IsWindowVisible(h) and u.GetParent(h) == 0:
+            r = (ctypes.c_long * 4)()
+            u.GetWindowRect(h, ctypes.byref(r))
+            if r[2] - r[0] > 300:
+                out.append(h)
+        return True
+    u.EnumWindows(cb, 0)
+    return out
+
+
+def verdeckt_starten(t0):
+    """Startbild ohne Flackern: das neue Fenster sofort verstecken (kein Grau/Schwarz/halbfertiges Laden zu sehen) und erst
+    zeigen, wenn das Dashboard „bereit“ meldet – dann spielt dort die Intro-Animation. Spätestens nach 7 s wird es gezeigt."""
+    u = ctypes.windll.user32
+    versteckt = []
+    ende = time.time() + 7
+    while time.time() < ende:
+        try:
+            for h in _fenster_der_profilprozesse():
+                if h not in versteckt:
+                    u.ShowWindow(h, 0)
+                    versteckt.append(h)
+        except Exception:
+            pass
+        if versteckt and server.FENSTER_BEREIT[0] > t0:
+            break
+        time.sleep(.03)
+    time.sleep(.12)
+    for h in versteckt:
+        try:
+            u.ShowWindow(h, 5)
+        except Exception:
+            pass
+    bring_front()
 
 
 def spiel_mini_oeffnen():

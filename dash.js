@@ -446,9 +446,11 @@
   }, 400);
 
   // ---------- Kugel in den Ring setzen (gleitet mit, wenn die Seite wechselt) ----------
-  const ziel = { x:innerWidth / 2, y:innerHeight * .44, r:100 }, ist = { ...ziel };
+  const ziel = { x:innerWidth / 2, y:innerHeight * .46, r:Math.min(innerWidth, innerHeight) * .16 }, ist = { ...ziel };
+  let introKugel = document.body.classList.contains('d-intro');   // während des Intros: Kugel groß in der Mitte
   window.DASH_LAY = () => ({ mid:ist.x, cw:innerWidth, cy:ist.y, rb:ist.r });
   function zielBerechnen() {
+    if (introKugel) { ziel.x = innerWidth / 2; ziel.y = innerHeight * .46; ziel.r = Math.min(innerWidth, innerHeight) * .16; return; }
     const el = seite === 'home' ? $d('d-kugel') : document.querySelector('#d-rail .orb');
     const r = el && el.getBoundingClientRect(); if (!r || !r.width) return;
     ziel.x = r.left + r.width / 2; ziel.y = r.top + r.height / 2; ziel.r = seite === 'home' ? r.width * .34 : r.width * .5;
@@ -661,6 +663,60 @@
     if (tippt) { if (e.key === 'Escape') e.target.blur(); return; }
     if (!e.ctrlKey && !e.altKey && !e.metaKey && /^[1-6]$/.test(e.key)) { e.preventDefault(); e.stopPropagation(); geh(SEITEN[+e.key - 1]); }
   }, true);
+  // ---------- Start-Sound (live erzeugt): Rauschen steigt an, Schimmer-Akkord, Wusch, weicher Aufschlag ----------
+  function introSound() {
+    try {
+      if (typeof cfg !== 'undefined' && cfg.sfx === false) return;
+      if (typeof S !== 'undefined' && (S.handy || S.tarn)) return;   // Telegram-Gespräch / Tarnmodus: still
+      const AC = window.AudioContext || window.webkitAudioContext, ac = new AC(), t = ac.currentTime + .05;
+      const laut = Math.min(1, ((typeof cfg !== 'undefined' && +cfg.sfxlaut) || 60) / 100) * .9;
+      const out = ac.createGain(); out.gain.value = laut; out.connect(ac.destination);
+      const echo = ac.createDelay(.5); echo.delayTime.value = .19; const eg = ac.createGain(); eg.gain.value = .28;
+      echo.connect(eg); eg.connect(echo); eg.connect(out);
+      const rausch = (start, dauer, von, bis, staerke) => {
+        const b = ac.createBuffer(1, ac.sampleRate * dauer, ac.sampleRate), d = b.getChannelData(0);
+        for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+        const q = ac.createBufferSource(); q.buffer = b; const f = ac.createBiquadFilter(); f.type = 'bandpass'; f.Q.value = 1.1;
+        f.frequency.setValueAtTime(von, start); f.frequency.exponentialRampToValueAtTime(bis, start + dauer);
+        const g = ac.createGain(); g.gain.setValueAtTime(0, start); g.gain.linearRampToValueAtTime(staerke, start + dauer * .7); g.gain.linearRampToValueAtTime(0, start + dauer);
+        q.connect(f); f.connect(g); g.connect(out); q.start(start); q.stop(start + dauer);
+      };
+      const ton = (start, freq, dauer, staerke, typ = 'sine') => {
+        [-4, 4].forEach(ct => { const o = ac.createOscillator(), g = ac.createGain(); o.type = typ; o.frequency.value = freq; o.detune.value = ct;
+          g.gain.setValueAtTime(0, start); g.gain.linearRampToValueAtTime(staerke, start + .02); g.gain.exponentialRampToValueAtTime(.0001, start + dauer);
+          o.connect(g); g.connect(out); g.connect(echo); o.start(start); o.stop(start + dauer + .05); });
+      };
+      rausch(t, .95, 180, 3200, .22);                                   // Kugel zündet
+      [659.3, 987.8, 1318.5, 1975.5].forEach((f, i) => ton(t + .18 + i * .07, f, 1.4, .07 - i * .01, 'triangle'));   // Ringe: Schimmer-Akkord
+      rausch(t + .9, .35, 2600, 500, .14);                              // Kugel fliegt in den Ring
+      const o = ac.createOscillator(), g = ac.createGain(); o.frequency.setValueAtTime(110, t + 1.08); o.frequency.exponentialRampToValueAtTime(52, t + 1.5);
+      g.gain.setValueAtTime(0, t + 1.08); g.gain.linearRampToValueAtTime(.32, t + 1.1); g.gain.exponentialRampToValueAtTime(.0001, t + 1.6);
+      o.connect(g); g.connect(out); o.start(t + 1.08); o.stop(t + 1.65);                 // weicher Aufschlag
+      ton(t + 1.1, 440, 1.1, .05); ton(t + 1.1, 659.3, 1.1, .035);
+      setTimeout(() => ac.close().catch(() => {}), 3500);
+    } catch (e) {}
+  }
+  // ---------- Start-Intro: Kugel zündet in der Mitte, Ringe, „ORB“, dann fliegt sie in den Ring und das Dashboard baut sich auf ----------
+  function introStarten() {
+    if (!document.body.classList.contains('d-intro') || introStarten.lief) return; introStarten.lief = true;
+    const h = new Date().getHours(), gruss = (h < 5 ? 'Gute Nacht' : h < 11 ? 'Guten Morgen' : h < 17 ? 'Guten Tag' : h < 22 ? 'Guten Abend' : 'Gute Nacht') + ', Larsen';
+    const ov = document.createElement('div'); ov.id = 'd-introschicht';
+    ov.innerHTML = `<i class="r1"></i><i class="r2"></i><i class="r3"></i><div class="txt"><b>${'ORB'.split('').map((c, i) => `<span style="animation-delay:${.25 + i * .09}s">${c}</span>`).join('')}</b><small>${gruss}</small></div>`;
+    document.body.appendChild(ov);
+    introSound();
+    setTimeout(() => { introKugel = false; }, 950);   // Kugel fliegt in den Ring
+    setTimeout(() => {
+      document.body.classList.remove('d-intro'); ov.classList.add('weg');
+      d.querySelectorAll('.d-rein').forEach((k, i) => { k.style.animation = 'none'; k.offsetHeight; k.style.animation = ''; });
+    }, 1050);
+    setTimeout(() => ov.remove(), 2000);
+  }
+  if (document.body.classList.contains('d-intro')) {
+    const los = () => { if (document.visibilityState === 'visible') requestAnimationFrame(() => introStarten()); };
+    document.addEventListener('visibilitychange', los); los();
+    setTimeout(() => { if (document.body.classList.contains('d-intro')) { introKugel = false; document.body.classList.remove('d-intro'); } }, 9000);   // Notfall
+  }
+  setTimeout(() => fetch('/bereit', { method:'POST', headers:{ 'Content-Type':'application/json' }, body:'{}' }).catch(() => {}), 250);
   zeit(); woche(); ladeTermine(); ladeSys();
   setTimeout(ladeWetter, 500); setTimeout(ladeMusik, 900); setTimeout(ladeGold, 1400);   // gestaffelt: Start bleibt flüssig
   setInterval(zeit, 30000); setInterval(ladeTermine, 30000); setInterval(ladeGold, 20000);
