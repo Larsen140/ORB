@@ -1,1 +1,1 @@
-189|Meeting-Hinweis sitzt richtig, Listen laufen sauber aus, alle Farbthemen geprüft
+190|ORB schläft im Hintergrund nicht mehr ein, kein Selbst-Einschalten und kein Start-Sound-Dauerfeuer, lässt dich ausreden

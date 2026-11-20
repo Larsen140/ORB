@@ -298,7 +298,7 @@ def main():
             orb("/ohr", {"typ": "wake"})   # sofort „Ich höre …“ zeigen, Frage kommt gleich
         frage = re.search(r"[?!]\s*$", txt)   # „Hörst du mich?“ ist fertig, auch wenn es auf „mich“ endet
         if (HAENGT.search(txt) and not frage) or not re.search(r"[.!?…]\s*$", txt) or name_allein:
-            offen.update(text=txt, bis=time.time() + (3.5 if name_allein else 1.8))
+            offen.update(text=txt, bis=time.time() + (4.0 if name_allein else 2.4))
             log("halte (unvollständig):", txt)
             return
         log("sende:", txt)
@@ -356,7 +356,7 @@ def main():
             puffer.append(x)
             stille = stille + 1 if pegel < max(rausch * 2.2, 200) else 0
             dauer = len(puffer) * BLOCK / SR
-            if stille >= 8 or dauer > 20:           # 0,64 s Pause = Satzende (ORB fügt Fortsetzungen selbst zusammen)
+            if stille >= 11 or dauer > 25:          # 0,9 s Pause = Satzende – Larsen ausreden lassen (vorher 0,64 s schnitt ihn ab)
                 sprache = False
                 if dauer - stille * BLOCK / SR >= 0.35:
                     audio = np.concatenate(puffer).astype(np.float32) / 32768.0

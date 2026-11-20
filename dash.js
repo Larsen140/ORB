@@ -704,6 +704,7 @@
   // ---------- Start-Sound (live erzeugt): Rauschen steigt an, Schimmer-Akkord, Wusch, weicher Aufschlag ----------
   function introSound() {
     try {
+      if (Date.now() - (introSound.t || 0) < 20000) return; introSound.t = Date.now();   // nie mehrfach hintereinander
       if (typeof cfg !== 'undefined' && cfg.sfx === false) return;
       if (typeof S !== 'undefined' && (S.handy || S.tarn)) return;   // Telegram-Gespräch / Tarnmodus: still
       const AC = window.AudioContext || window.webkitAudioContext, ac = new AC(), t = ac.currentTime + .05;
@@ -770,7 +771,7 @@
     return _holen.apply(this, arguments);
   };
   document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'hidden') abdecken();
+    if (document.visibilityState === 'hidden') return;   // verdeckt ≠ weggeschickt: nichts tun (sonst Intro + Sound bei jedem Fensterwechsel)
     else if (document.body.classList.contains('d-intro') && !introStarten.lief) {
       requestAnimationFrame(() => requestAnimationFrame(() => introStarten()));
     }

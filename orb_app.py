@@ -27,13 +27,17 @@ LEAN = [
     "--disable-component-update", "--disable-default-apps", "--disable-breakpad",
     "--disable-features=Translate,msEdgeShopping,EdgeCollections,msEdgeSidebarV2,"
     "AutofillServerCommunication,OptimizationHints,MediaRouter,BackForwardCache,Prerender2,"
-    "SpareRendererForSitePerProcess,msEdgeEnableNurturingFramework,EdgeShoppingAssistant",
+    "SpareRendererForSitePerProcess,msEdgeEnableNurturingFramework,EdgeShoppingAssistant,"
+    # ORB ist meist versteckt: nicht schlafen legen/verwerfen/drosseln, sonst „hängt“ er und lädt beim Holen neu (Intro + Sound)
+    "IntensiveWakeUpThrottling,CalculateNativeWinOcclusion,AutomaticTabDiscarding,msSleepingTabs,msEdgeSleepingTabs,"
+    "HighEfficiencyModeAvailable,msEfficiencyMode,BatterySaverModeAvailable,TabFreeze,FreezeBackgroundTabs",
     "--disk-cache-size=1048576",
     # KEINE Grafikspeicher-Grenze mehr: mit 192 MB hat Edge beim Glas-Dashboard (2560×1440, viele Ebenen) fertig gemalte
     # Flächen verworfen und neu gemalt → alles flackerte. Shader-Zwischenspeicher an (schnellerer Start), JS-Heap großzügig.
     "--js-flags=--max-old-space-size=512",
     # damit Zuhören/Klatschen auch weiterläuft, wenn das Fenster nicht im Vordergrund ist
     "--disable-background-timer-throttling", "--disable-renderer-backgrounding", "--disable-backgrounding-occluded-windows",
+    "--disable-hang-monitor",
     "--window-size=1200,820",
 ]
 _win = {"opened": 0.0}
@@ -608,12 +612,12 @@ def window_watch():
                 gemeldet = True
             # Fenster läuft noch, meldet sich aber 30 s nicht (z. B. Fehlerseite nach Update-Neustart):
             # neu öffnen, sonst sind Schnipsen und Klatschen im Fenster tot (höchstens alle 2 Min.)
-            if time.time() - lp > 30 and time.time() - geheilt > 120 and window_process_running():
+            try:
+                sichtbar = any(ctypes.windll.user32.IsWindowVisible(h) for h in orb_windows())
+            except Exception:
+                sichtbar = True
+            if sichtbar and time.time() - lp > 30 and time.time() - geheilt > 120 and window_process_running():
                 geheilt = time.time()
-                try:
-                    sichtbar = any(ctypes.windll.user32.IsWindowVisible(h) for h in orb_windows())
-                except Exception:
-                    sichtbar = True
                 server.log_close("Fenster hing → neu geöffnet")
                 hide_window()
                 for _ in range(20):   # warten, bis Edge wirklich weg ist – sonst öffnet show() nichts
