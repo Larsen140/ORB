@@ -557,7 +557,15 @@ def hide_window(keep=False):
     server.CALL_FREI[0] = False
     if keep:
         try:
-            for h in orb_windows():
+            hs = orb_windows()
+            if any(ctypes.windll.user32.IsWindowVisible(h) for h in hs):
+                # erst die Seite die Intro-Abdeckung malen lassen, dann verstecken – sonst zeigt Windows beim Holen kurz das alte Bild
+                t = time.time()
+                server.write_state(abdecken=t)
+                ende = t + 1.2
+                while time.time() < ende and server.ABGEDECKT[0] < t:
+                    time.sleep(.02)
+            for h in hs:
                 ctypes.windll.user32.ShowWindow(h, 0)
             return
         except Exception as e:

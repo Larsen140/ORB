@@ -1,1 +1,1 @@
-179|Kein Flackern mehr: ORB versteckt sein Fenster nur noch und zeigt beim Holen sofort das Intro
+180|Holen ohne Aufblitzen des alten Bildes

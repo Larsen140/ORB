@@ -2738,6 +2738,7 @@ async function poll() {
     const resp = await fetch('/state?aktiv=' + aktiv + '&spricht=' + (speakingNow() ? 1 : 0) + '&wach=' + (!S.sleep && !document.hidden && !verborgen ? 1 : 0), { cache:'no-store', signal:ctl.signal });
     if (resp.status === 403 && !poll._reload) { poll._reload = true; setTimeout(() => location.reload(), 300); }   // ORB neu gestartet → neues Token
     const st = await resp.json(); lastOk = performance.now(); S.busy = !!st.busy; renderTasks(st.aufgaben);
+    if (st.abdecken && st.abdecken !== window._abdeckT) { const neu = window._abdeckT !== undefined; window._abdeckT = st.abdecken; if (neu && window.dAbdecken) window.dAbdecken(); }
     if (st.karten_v !== undefined && st.karten_v !== kartenV) { kartenV = st.karten_v; ladeKarten(); } if (st.bild) bildHolo(st.bild); if (st.gold !== undefined) goldHolo(st.gold); if (st.kamera_foto !== undefined) kamFoto(st.kamera_foto); if (st.kam_n !== undefined) kamInhalt(st.kam_n); if (st.web) webHolo(st.web);
     S.spiel = st.spiel || '';
     if (!!st.tarn !== !!S.tarn) { S.tarn = !!st.tarn; applyAudio(); hlog('Tarnmodus ' + (S.tarn ? 'an' : 'aus')); }

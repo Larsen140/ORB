@@ -77,7 +77,7 @@ DEFAULT_CFG = {
 }
 # Damit ORB immer dein Claude-Code-Login (Max-Abo) nutzt und nie einen API-Schlüssel
 CLAUDE_ENV_DROP = ("ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "ANTHROPIC_BASE_URL")
-VERSION = "179"
+VERSION = "180"
 ORB_UI = ("Deine Oberfläche (die Larsen gerade sieht): in der Mitte du als flüssige leuchtende Kugel mit Tropfen, "
           "Orbit-Ringen und Sternenhimmel; links eine Uhr und darunter der Gesprächsverlauf mit Eingabefeld; rechts "
           "Karten für System (CPU, RAM, Akku), Wetter mit Stundenvorschau, Aktivität (was du gerade tust) und Vorschläge; "
@@ -580,7 +580,8 @@ CALL_APPS = ("opera.exe", "chrome.exe", "firefox.exe", "brave.exe", "discord.exe
              "zoom.exe", "ciscocollabhost.exe", "webex.exe", "skype.exe")
 
 
-FENSTER_BEREIT = [0.0]   # Dashboard hat fertig geladen (dann zeigt ORB das Fenster – ohne Zwischenbilder)
+FENSTER_BEREIT = [0.0]
+ABGEDECKT = [0.0]   # Seite hat die Intro-Abdeckung gemalt (erst dann darf das Fenster verschwinden)   # Dashboard hat fertig geladen (dann zeigt ORB das Fenster – ohne Zwischenbilder)
 CALL_FREI = [False]   # im Meet: Larsen hat ORB selbst geholt (Klatschen) → ORB hört zu, bis er wieder weg ist
 
 
@@ -3587,6 +3588,9 @@ class Handler(BaseHTTPRequestHandler):
             self.send(200, notizen_aendern(b))
         elif u.path == "/tv_dock":   # Dashboard: TradingView-Konto in der Chart-Karte zeigen/ausblenden
             self.send(200, {"ok": tv_dock(bool(b.get("an")), b.get("rect"), str(b.get("symbol") or "VANTAGE:XAUUSD"))})
+        elif u.path == "/abgedeckt":   # Seite meldet: Abdeckung ist gemalt
+            ABGEDECKT[0] = time.time()
+            self.send(200, {"ok": True})
         elif u.path == "/bereit":   # Dashboard fertig geladen → Fenster darf sichtbar werden
             FENSTER_BEREIT[0] = time.time()
             self.send(200, {"ok": True})

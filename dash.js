@@ -722,6 +722,9 @@
     introStarten.lief = false; introKugel = true; ist.x = innerWidth / 2; ist.y = innerHeight * .46; ist.r = Math.min(innerWidth, innerHeight) * .16;
     document.body.classList.add('d-sofort', 'd-intro');
   }
+  // ORB will das Fenster verstecken (Einschlafen usw.): abdecken, 2 Bilder malen lassen, dann „abgedeckt“ melden
+  window.dAbdecken = () => { abdecken(); requestAnimationFrame(() => requestAnimationFrame(() =>
+    fetch('/abgedeckt', { method:'POST', headers:{ 'Content-Type':'application/json' }, body:'{}' }).catch(() => {}))); };
   const _holen = window.fetch;
   window.fetch = function (url, opt) {
     if (typeof url === 'string' && url.startsWith('/hide') && document.visibilityState === 'visible' && !document.body.classList.contains('d-intro')) {
