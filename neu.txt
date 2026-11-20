@@ -1,1 +1,1 @@
-178|Start: kein schwarzes Aufblitzen mehr
+179|Kein Flackern mehr: ORB versteckt sein Fenster nur noch und zeigt beim Holen sofort das Intro

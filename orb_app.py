@@ -362,14 +362,9 @@ def show(wake=False, hidden=False):
         return
     profile = os.path.join(os.environ.get("LOCALAPPDATA", os.path.expanduser("~")), "ORB", "fenster")
     extra = ["--start-fullscreen"] if server.load_cfg().get("vollbild", True) else []
-    if hidden:   # unsichtbar starten (Autostart/Update): außerhalb des Bildschirms → kein Aufblitzen
-        extra = ["--window-position=-32000,-32000", "--window-size=1280,800"]
     t0 = time.time()
     proc = subprocess.Popen([browser, "--app=" + url, "--user-data-dir=" + profile] + LEAN + extra)
-    if hidden:
-        threading.Thread(target=hide_hidden_soon, daemon=True).start()
-    else:
-        threading.Thread(target=verdeckt_starten, args=(t0, proc.pid), daemon=True).start()
+    threading.Thread(target=verdeckt_starten, args=(t0, proc.pid, hidden), daemon=True).start()
 
 
 def _fenster_der_profilprozesse():
@@ -412,7 +407,7 @@ def _fenster_von_pid(pid):
     return out
 
 
-def verdeckt_starten(t0, pid=0):
+def verdeckt_starten(t0, pid=0, verstecken=False):
     """Startbild ohne Flackern: das neue Fenster sofort DURCHSICHTIG schalten (nicht verstecken – so rendert der Browser ganz
     normal weiter und nichts reißt), bis das Dashboard „bereit“ meldet; dann in 0,3 s weich einblenden. Spätestens nach 7 s."""
     u = ctypes.windll.user32
@@ -437,6 +432,15 @@ def verdeckt_starten(t0, pid=0):
         if fenster and server.FENSTER_BEREIT[0] > t0:
             break
         time.sleep(.004 if not fenster else .02)
+    if verstecken:   # Start im Hintergrund: fertig geladen verstecken, dann wieder undurchsichtig (fürs spätere Zeigen)
+        for h, ex in fenster.items():
+            try:
+                u.ShowWindow(h, 0)
+                u.SetLayeredWindowAttributes(h, 0, 255, 2)
+                u.SetWindowLongW(h, -20, ex & ~0x80000)
+            except Exception:
+                pass
+        return
     for stufe in range(1, 13):   # weich einblenden (~0,3 s)
         for h in fenster:
             try:

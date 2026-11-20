@@ -702,6 +702,7 @@
   // ---------- Start-Intro: Kugel zündet in der Mitte, Ringe, „ORB“, dann fliegt sie in den Ring und das Dashboard baut sich auf ----------
   function introStarten() {
     if (!document.body.classList.contains('d-intro') || introStarten.lief) return; introStarten.lief = true;
+    requestAnimationFrame(() => document.body.classList.remove('d-sofort'));   // ab jetzt wieder weich überblenden
     const h = new Date().getHours(), gruss = (h < 5 ? 'Gute Nacht' : h < 11 ? 'Guten Morgen' : h < 17 ? 'Guten Tag' : h < 22 ? 'Guten Abend' : 'Gute Nacht') + ', Larsen';
     const ov = document.createElement('div'); ov.id = 'd-introschicht';
     ov.innerHTML = `<i class="r1"></i><i class="r2"></i><i class="r3"></i><div class="txt"><b>${'ORB'.split('').map((c, i) => `<span style="animation-delay:${.25 + i * .09}s">${c}</span>`).join('')}</b><small>${gruss}</small></div>`;
@@ -714,6 +715,27 @@
     }, 1050);
     setTimeout(() => ov.remove(), 2000);
   }
+  // Wegschicken (Schnipsen/Schlaf): ERST die Intro-Abdeckung malen, DANN verstecken – sonst zeigt Windows beim Holen kurz das alte Bild
+  function abdecken() {
+    if (document.body.classList.contains('d-intro')) return;
+    document.querySelectorAll('#d-introschicht').forEach(x => x.remove());
+    introStarten.lief = false; introKugel = true; ist.x = innerWidth / 2; ist.y = innerHeight * .46; ist.r = Math.min(innerWidth, innerHeight) * .16;
+    document.body.classList.add('d-sofort', 'd-intro');
+  }
+  const _holen = window.fetch;
+  window.fetch = function (url, opt) {
+    if (typeof url === 'string' && url.startsWith('/hide') && document.visibilityState === 'visible' && !document.body.classList.contains('d-intro')) {
+      abdecken();
+      return new Promise(fertig => requestAnimationFrame(() => requestAnimationFrame(() => setTimeout(() => fertig(_holen.call(this, url, opt)), 30))));
+    }
+    return _holen.apply(this, arguments);
+  };
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden') abdecken();
+    else if (document.body.classList.contains('d-intro') && !introStarten.lief) {
+      requestAnimationFrame(() => requestAnimationFrame(() => introStarten()));
+    }
+  });
   if (document.body.classList.contains('d-intro')) {
     // Fenster ist anfangs durchsichtig: Intro erst starten, wenn ORB es einblendet (kurz nach „bereit“)
     const los = () => { if (document.visibilityState === 'visible') setTimeout(() => requestAnimationFrame(() => introStarten()), 380); };
@@ -723,7 +745,7 @@
   // „bereit“ erst, wenn die Seite wirklich gemalt hat (2 Bilder nach dem Aufbau) – dann blendet ORB das Fenster ein und das Intro startet
   setTimeout(() => requestAnimationFrame(() => requestAnimationFrame(() => {
     fetch('/bereit', { method:'POST', headers:{ 'Content-Type':'application/json' }, body:'{}' }).catch(() => {});
-    if (document.body.classList.contains('d-intro') && document.visibilityState === 'visible') setTimeout(() => requestAnimationFrame(() => introStarten()), 120);
+    if (document.body.classList.contains('d-intro') && !document.body.classList.contains('d-schlafstart') && document.visibilityState === 'visible') setTimeout(() => requestAnimationFrame(() => introStarten()), 120);   // Start im Hintergrund: Intro erst beim ersten Holen
   })), 200);
   zeit(); woche(); ladeTermine(); ladeSys();
   setTimeout(ladeWetter, 500); setTimeout(ladeMusik, 900); setTimeout(ladeGold, 1400);   // gestaffelt: Start bleibt flüssig

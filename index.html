@@ -873,7 +873,7 @@
 <link rel="stylesheet" href="/dash/dash.css">
 </head>
 <body>
-<script>if (!document.documentElement.classList.contains('spiel')) { document.body.classList.add('dash'); if (location.hash !== '#schlaf') document.body.classList.add('d-intro'); }</script>
+<script>if (!document.documentElement.classList.contains('spiel')) { document.body.classList.add('dash'); document.body.classList.add('d-intro'); if (location.hash === '#schlaf') document.body.classList.add('d-schlafstart'); }</script>
 <canvas id="gl"></canvas>
 <canvas id="fx"></canvas>
 <div id="grain"></div>
@@ -1084,7 +1084,7 @@ const PAL = () => [BASE, BASE2, BASE3, BASE4];
 const pcol = (i, a, k = 0) => `rgba(${rgb(mix(PAL()[i % 4], [255,255,255], k))},${a})`;
 let cfg = { farbe:'rot', effekte:'mittel', untertitel:true, lautstaerke:160, sfx:true, sfxlaut:60, ambient:false,
   steuerung:'wort', schnipsen:true, wakeword:'Jarvis', stimme:'', tempo:'+15%', hoehe:'+0Hz', laenge:'kurz', rechte:'auto', tempo_claude:'low', ordner:'',
-  schlaf_schliessen:true, bildschirm:false, klatschen:true, dauerzuhoeren:true, unterbrechen:true, sprechen_unterbrechen:true, nur_jarvis:true, streng_jarvis:true, jarvis_effekt:true, musik_schutz:true, ducking:true, empfindlichkeit:6, schnips_empf:6, mikro:'TONOR', kalib:{}, begruessung:true, ort:'', name:'', schlafen:5, vollbild:true, autostart:true };
+  schlaf_schliessen:false, bildschirm:false, klatschen:true, dauerzuhoeren:true, unterbrechen:true, sprechen_unterbrechen:true, nur_jarvis:true, streng_jarvis:true, jarvis_effekt:true, musik_schutz:true, ducking:true, empfindlichkeit:6, schnips_empf:6, mikro:'TONOR', kalib:{}, begruessung:true, ort:'', name:'', schlafen:5, vollbild:true, autostart:true };
 const S = { mode:'idle', seq:-1, busy:false, energy:.12, holo:0, think:0, speakVis:0, listenVis:0, level:0, warn:0, boot:0, sleep:false, sleepVis:0, px:0, py:0, bands:[0, 0, 0, 0] };
 const mix = (a, b, t) => a.map((v, i) => Math.round(v + (b[i] - v) * t));
 const rgb = c => `${c[0]},${c[1]},${c[2]}`;
