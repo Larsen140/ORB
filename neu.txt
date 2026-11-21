@@ -1,1 +1,1 @@
-195|Repariert: das lokale Gehirn läuft jetzt schnell auf der Grafikkarte und antwortet in etwa zwei Sekunden, ich hänge nicht mehr beim Denken, und das Design braucht deutlich weniger Grafikleistung.
+196|Repariert: Hey Jarvis wird jetzt richtig erkannt und deine Frage danach beantwortet, ich halte deine Sätze nicht mehr zurück, und ich belaste die Grafikkarte viel weniger – dadurch verstehe ich dich auch schneller.

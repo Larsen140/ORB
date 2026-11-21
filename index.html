@@ -1358,7 +1358,9 @@ function renderGL(t, cx, cy, R, speaking) {
     const a = d.ph + t * d.sp * (.45 + S.energy * 1.6 + S.think * 2) * (k % 2 ? -1 : 1);
     dropArr.set([Math.cos(a) * d.d, Math.sin(a) * d.d * Math.cos(d.tilt), Math.sin(a) * d.d * Math.sin(d.tilt), d.r], k * 4);
   });
-  const kino = Q() === 3 && kinoBereit(), P = kino ? KINO.scene : MAIN, U = P.U;
+  // Dashboard: die Kugel ist nur ein kleiner Kreis → nur dort rechnen, keine Kino-Nachbearbeitung (spart viel Grafikleistung)
+  const dashKlein = document.body.classList.contains('dash') && !document.body.classList.contains('mini') && !document.body.classList.contains('d-intro');
+  const kino = Q() === 3 && kinoBereit() && !dashKlein, P = kino ? KINO.scene : MAIN, U = P.U;
   gl.useProgram(P.p);
   gl.bindFramebuffer(gl.FRAMEBUFFER, kino ? KINO.S.f : null); gl.viewport(0, 0, glc.width, glc.height);
   const c1 = cur().map(v => v / 255), c2 = mix(BASE2, AMBER, S.warn).map(v => v / 255);
@@ -1373,7 +1375,13 @@ function renderGL(t, cx, cy, R, speaking) {
   gl.uniform1f(U.uListen, S.listenVis); gl.uniform1f(U.uSleep, S.sleepVis); gl.uniform1f(U.uThink, S.think);
   gl.uniform4fv(U.uD, dropArr); gl.uniform4f(U.uB, S.bands[0], S.bands[1], S.bands[2], S.bands[3]);
   gl.uniform1f(U.uHim, document.body.classList.contains('dash') && !document.body.classList.contains('mini') ? 0 : 1);
+  if (dashKlein) {
+    gl.disable(gl.SCISSOR_TEST); gl.clearColor(0, 0, 0, 1); gl.clear(gl.COLOR_BUFFER_BIT);
+    const rr = R * glScale * 2.4, x0 = Math.max(0, Math.floor(cx * glScale - rr)), y0 = Math.max(0, Math.floor((H - cy) * glScale - rr));
+    gl.enable(gl.SCISSOR_TEST); gl.scissor(x0, y0, Math.ceil(rr * 2), Math.ceil(rr * 2));
+  }
   gl.drawArrays(gl.TRIANGLES, 0, 3);
+  gl.disable(gl.SCISSOR_TEST);
   if (kino) { KINO.cx = cx * glScale; KINO.cy = (H - cy) * glScale; KINO.r = R * glScale; kinoPost(t, c1, c2); }
 }
 

@@ -291,25 +291,25 @@ def main():
     def senden(txt, dauer=0.0):
         """Angefangene Sätze („Jarvis.“, „… und“, ohne Satzende) kurz halten und mit der Fortsetzung verbinden."""
         if offen["text"]:
-            txt = offen["text"].rstrip(" .") + (", " if re.match(r"(?i)^\W*jarvis\W*$", offen["text"]) else " ") + txt[0].lower() + txt[1:]
+            txt = offen["text"].rstrip(" .") + (", " if re.match(r"(?i)^\W*((hey|hallo|hi|okay|ok|he)\W+)?jarvis\W*$", offen["text"]) else " ") + txt[0].lower() + txt[1:]
             offen["text"] = ""
-        name_allein = re.match(r"(?i)^\W*jarvis\W*$", txt)
+        name_allein = re.match(r"(?i)^\W*((hey|hallo|hi|okay|ok|he)\W+)?jarvis\W*$", txt)
         if name_allein:
             orb("/ohr", {"typ": "wake"})   # sofort „Ich höre …“ zeigen, Frage kommt gleich
         frage = re.search(r"[?!]\s*$", txt)   # „Hörst du mich?“ ist fertig, auch wenn es auf „mich“ endet
         if (HAENGT.search(txt) and not frage) or not re.search(r"[.!?…]\s*$", txt) or name_allein:
-            offen.update(text=txt, bis=time.time() + (4.0 if name_allein else 2.6), dauer=dauer)
+            offen.update(text=txt, bis=time.time() + (4.0 if name_allein else 1.8), dauer=dauer)
             log("halte (unvollständig):", txt)
             return
         # Auch fertige Sätze kurz halten: spricht Larsen gleich weiter, wird es EIN Auftrag (nicht unterbrechen)
-        offen.update(text=txt, bis=time.time() + (0.7 if frage else 1.1), dauer=dauer)
+        offen.update(text=txt, bis=time.time() + (0.4 if frage else 0.6), dauer=dauer)
         log("halte kurz (vielleicht geht es weiter):", txt)
 
     while True:
-        if offen["text"] and time.time() > offen["bis"]:   # keine Fortsetzung gekommen → so abschicken
+        if offen["text"] and time.time() > offen["bis"] and not sprache:   # keine Fortsetzung gekommen → so abschicken
             t_ = offen["text"]
             offen["text"] = ""
-            if not re.match(r"(?i)^\W*jarvis\W*$", t_):
+            if not re.match(r"(?i)^\W*((hey|hallo|hi|okay|ok|he)\W+)?jarvis\W*$", t_):
                 log("sende:", t_)
                 orb("/ohr", {"typ": "text", "text": t_, "dauer": round(offen.get("dauer", 0.0), 1)})
         try:
@@ -353,13 +353,11 @@ def main():
             vorlauf = (vorlauf + [x])[-4:]           # 0,3 s vor dem Einsatz mitnehmen
             if pegel > max(rausch * 3.2, 260):
                 sprache, stille, puffer = True, 0, list(vorlauf)
-                if offen["text"]:   # Larsen redet weiter → mit dem Abschicken warten, bis auch dieser Teil verstanden ist
-                    offen["bis"] = max(offen["bis"], time.time() + 8)
         if sprache:
             puffer.append(x)
             stille = stille + 1 if pegel < max(rausch * 1.9, 180) else 0   # leise Satzenden zählen noch als Sprache
             dauer = len(puffer) * BLOCK / SR
-            if stille >= 15 or dauer > 45:          # 1,2 s Pause = Satzende – Larsen ausreden lassen (vorher 0,9 s schnitt ihn ab)
+            if stille >= 13 or dauer > 45:          # ~1 s Pause = Satzende – Larsen ausreden lassen (vorher 0,9 s schnitt ihn ab)
                 sprache = False
                 if dauer - stille * BLOCK / SR >= 0.35:
                     audio = np.concatenate(puffer).astype(np.float32) / 32768.0
