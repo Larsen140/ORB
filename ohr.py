@@ -306,7 +306,7 @@ def main():
         log("halte kurz (vielleicht geht es weiter):", txt)
 
     while True:
-        if offen["text"] and time.time() > offen["bis"] and not sprache:   # keine Fortsetzung gekommen → so abschicken
+        if offen["text"] and time.time() > offen["bis"] and (not sprache or time.time() > offen["bis"] + 1.5):   # abschicken – höchstens 1,5 s länger warten, falls Larsen weiterredet
             t_ = offen["text"]
             offen["text"] = ""
             if not re.match(r"(?i)^\W*((hey|hallo|hi|okay|ok|he)\W+)?jarvis\W*$", t_):
@@ -355,9 +355,9 @@ def main():
                 sprache, stille, puffer = True, 0, list(vorlauf)
         if sprache:
             puffer.append(x)
-            stille = stille + 1 if pegel < max(rausch * 1.9, 180) else 0   # leise Satzenden zählen noch als Sprache
+            stille = stille + 1 if pegel < max(rausch * 2.2, 200) else 0   # bewährte Grenze (1,9/180 hielt Hintergrundgeräusche für Sprache)
             dauer = len(puffer) * BLOCK / SR
-            if stille >= 13 or dauer > 45:          # ~1 s Pause = Satzende – Larsen ausreden lassen (vorher 0,9 s schnitt ihn ab)
+            if stille >= 13 or dauer > 25:          # ~1 s Pause = Satzende – Larsen ausreden lassen (vorher 0,9 s schnitt ihn ab)
                 sprache = False
                 if dauer - stille * BLOCK / SR >= 0.35:
                     audio = np.concatenate(puffer).astype(np.float32) / 32768.0
