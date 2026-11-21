@@ -21,7 +21,7 @@ vec3 sky(vec3 d){
   vec3 c=vec3(0.);
   for(int l=0;l<3;l++){
     float sc=90.+float(l)*70.;vec3 q=d*sc;vec3 id=floor(q);vec3 f=fract(q)-.5;float h=h1(id);
-    if(h>.982){float tw=.65+.35*sin(uTime*(1.+h*3.)+h*50.);vec3 col=mix(vec3(1.,.84,.68),vec3(.74,.84,1.),h1(id+7.));c+=col*smoothstep(.16,0.,length(f))*tw*(1.4-float(l)*.35);}
+    if(h>.982){float tw=.75+.25*sin(uTime*(.25+h*.5)+h*50.);vec3 col=mix(vec3(1.,.84,.68),vec3(.74,.84,1.),h1(id+7.));c+=col*smoothstep(.16,0.,length(f))*tw*(1.4-float(l)*.35);}
   }
   vec2 uv=vec2(atan(d.z,d.x),asin(clamp(d.y,-1.,1.)));
   float band=exp(-pow((d.y+.18*sin(uv.x*1.3))/.22,2.));
@@ -109,7 +109,7 @@ void main(){
   function schleife(now) {
     requestAnimationFrame(schleife);
     if (document.hidden || spar()) { if (!letzt) { malen(now); letzt = now; } return; }
-    if (now - letzt < 50) return;   // 20 Bilder/s – der Himmel bewegt sich langsam, spart Grafikleistung   // max. ~60 Bilder/s – flüssig, der Shader ist leicht
+    if (now - letzt < (document.body.classList.contains('d-intro') ? 33 : 200)) return;   // Intro flüssig, danach 5 Bilder/s – der Himmel bewegt sich sehr langsam; jedes neue Bild zwingt alle Glasflächen zum Neuberechnen   // max. ~60 Bilder/s – flüssig, der Shader ist leicht
     letzt = now; malen(now);
   }
   requestAnimationFrame(schleife);

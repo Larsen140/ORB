@@ -1339,7 +1339,8 @@ function kinoPost(t, c1, c2) {
 }
 function glResize() {
   W = innerWidth; H = innerHeight; if (W < 2 || H < 2) return;
-  glScale = [.45, .62, .9, 1][Q()] * Math.min(devicePixelRatio || 1, 1.5);   // gestochen scharf bei deinem Bildschirm, ohne die Grafikkarte zu überlasten
+  const dashKl = document.body.classList.contains('dash') && !document.body.classList.contains('mini') && !document.body.classList.contains('d-intro');
+  glScale = [.45, .62, .9, 1][Q()] * Math.min(devicePixelRatio || 1, dashKl ? 1 : 1.5);   // Dashboard: Kugel ist klein → normale Auflösung reicht   // gestochen scharf bei deinem Bildschirm, ohne die Grafikkarte zu überlasten
   glc.width = Math.round(W * glScale); glc.height = Math.round(H * glScale);
   fxc.width = W; fxc.height = H;
   if (gl) gl.viewport(0, 0, glc.width, glc.height);
@@ -1360,6 +1361,7 @@ function renderGL(t, cx, cy, R, speaking) {
   });
   // Dashboard: die Kugel ist nur ein kleiner Kreis → nur dort rechnen, keine Kino-Nachbearbeitung (spart viel Grafikleistung)
   const dashKlein = document.body.classList.contains('dash') && !document.body.classList.contains('mini') && !document.body.classList.contains('d-intro');
+  if (dashKlein !== renderGL.dk) { renderGL.dk = dashKlein; glResize(); }   // Auflösung an die Ansicht anpassen
   const kino = Q() === 3 && kinoBereit() && !dashKlein, P = kino ? KINO.scene : MAIN, U = P.U;
   gl.useProgram(P.p);
   gl.bindFramebuffer(gl.FRAMEBUFFER, kino ? KINO.S.f : null); gl.viewport(0, 0, glc.width, glc.height);
@@ -4325,7 +4327,8 @@ function frame(now) {
   const speaking = speakingNow();
   const active = speaking || listening || convoRec || S.mode === 'denkt' || S.mode === 'auftrag' || S.mode === 'wartet' || S.boot < 1 || waves.length || sparks.length;
   const fps = Math.min(KAM.an ? (KAM.stufe ? 20 : 30) : 999, SPIEL_HTML ? (active ? 30 : 15) : 999,   // im Spiel: Grafikkarte fürs Spiel lassen   // Kamera-Ansicht verdeckt die Kugel fast ganz → Kugel sparsam, damit die Kamera flüssig läuft
-    S.sleep && S.sleepVis > .95 && !active ? 24 : active ? [30, 60, 120, 60][Q()] : [24, 40, 60, 60][Q()]);   // Kino: gleichmäßig 60 fps   // im Leerlauf weniger Bilder = weniger CPU
+    S.sleep && S.sleepVis > .95 && !active ? 24 : active ? [30, 60, 120, 60][Q()] : [24, 40, 60, 60][Q()],
+    document.body.classList.contains('dash') && !active ? 30 : 999);   // Dashboard im Leerlauf: 30 Bilder/s reichen   // Kino: gleichmäßig 60 fps   // im Leerlauf weniger Bilder = weniger CPU
   if (now - lastT < 1000 / fps - 3) return;
   const t = now / 1000, dt = Math.min(.08, (now - lastT) / 1000); lastT = now; EASE_DT = Math.max(.001, dt);
   if (innerWidth < 2 || innerHeight < 2) return;
