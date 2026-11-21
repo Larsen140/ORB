@@ -211,7 +211,8 @@ def antworten(frage):
               "kurz und gesprochen-tauglich (1–3 Sätze), ohne Listen, Tabellen, Markdown oder Emojis. "
               f"Heute ist {jetzt:%A, %d.%m.%Y}, {jetzt:%H:%M} Uhr.\n"
               "Unten steht Wissen aus Larsens Second Brain (seine Notizen, Projekte, früheren Chats). Nutze es, wenn es passt. "
-              "Erfinde nichts: wirkt das Wissen unvollständig, sag das ehrlich.\n"
+              "Erfinde nichts: wirkt das Wissen unvollständig, sag das ehrlich. Ergibt Larsens Satz keinen Sinn (falsch verstanden), "
+              "sag kurz, dass du ihn nicht verstanden hast, und bitte ihn, es nochmal zu sagen.\n"
               "WICHTIG: Wenn die Anfrage eine Aktion am PC, im Internet oder in Apps verlangt, aktuelle Daten braucht "
               "(News, Kurse, Wetter), Code/Dateien betrifft, mehrere Schritte braucht oder du dir nicht sicher bist, "
               "antworte NUR mit dem Wort [CLAUDE] und sonst nichts.\n\n"
@@ -228,7 +229,8 @@ def antworten(frage):
     # Sicherheitsnetz: englische „Überlegungen“ statt Antwort → lieber Claude fragen als Unsinn vorlesen
     if re.match(r"(?i)(okay|ok|alright|let me|first|the user|so,|hmm|wait)", txt) or re.search(r"(?i)(the user|let me|i need to|translates to)", txt):
         return None
-    txt = re.sub(r"[*#_`>|]", "", txt).strip()
+    txt = re.sub(r"[*#_`>|]", "", txt)
+    txt = re.sub("[🀀-🫿☀-➿️]", "", txt).strip()   # keine Emojis in der Sprachausgabe
     VERLAUF.extend([{"role": "user", "content": frage}, {"role": "assistant", "content": txt}])
     del VERLAUF[:-12]
     return txt

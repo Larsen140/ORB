@@ -342,9 +342,10 @@ def main():
             letzter_wake = time.time()
             log("Aktivierungswort erkannt (%.2f)" % p)
             orb("/ohr", {"typ": "wake"})
-            sprache, puffer = False, []
+            # Direkt weiter aufnehmen: wer „Hey Jarvis, wie spät …“ in einem Atemzug sagt, verliert sonst den Anfang der Frage
+            sprache, stille, puffer = True, 0, list(vorlauf[-2:])
             continue
-        if not modus["mit"]:
+        if not modus["mit"] and time.time() - letzter_wake > 5:   # gerade geweckt: mitschreiben, auch wenn ORB noch aufwacht
             continue
         # 2) Sprachabschnitte finden (Pegel über dem Grundrauschen) und mit Whisper mitschreiben
         pegel = float(np.sqrt(np.mean(x.astype(np.float32) ** 2)))

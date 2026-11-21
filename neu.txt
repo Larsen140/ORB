@@ -1,1 +1,1 @@
-200|Flüssiger: Die Kugel hat jetzt eine eigene kleine Zeichenfläche, dadurch laufe ich wieder mit bis zu 60 Bildern pro Sekunde – gestochen scharf und trotzdem sparsam.
+201|Besser verstehen: Nach Hey Jarvis nehme ich sofort weiter auf, so geht der Anfang deiner Frage nicht mehr verloren. Verstehe ich etwas nicht, frage ich nach.
