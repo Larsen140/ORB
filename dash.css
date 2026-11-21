@@ -742,3 +742,6 @@ html.galaxie[data-modus="dunkel"] #d-held, html.galaxie[data-modus="dunkel"] .d-
 html.galaxie[data-modus="dunkel"] #d-held::before { background:radial-gradient(40% 40% at 72% 45%, color-mix(in srgb, var(--d-acc1) 16%, transparent), transparent 70%); }
 html.galaxie[data-modus="dunkel"] .d-kachel.akzent .zahl, html.galaxie[data-modus="dunkel"] #d-held .werte b { color:color-mix(in srgb, var(--d-acc3) 45%, #fff); }
 html.galaxie[data-modus="dunkel"] .d-kachel.akzent .ik, html.galaxie[data-modus="dunkel"] .d-kachel.akzent .bad { background:color-mix(in srgb, var(--d-acc1) 22%, rgba(255,255,255,.05)); }
+/* ===== Sparpaket (Version 198): gleiche Optik, viel weniger Grafiklast – im Weltraum-Design ersetzt der Sternenhimmel die Farbschleier ===== */
+html.galaxie body.dash #d-aurora, html.galaxie body.dash #fx { display:none !important; }
+html.galaxie #d-held::before, html.galaxie #d-held::after, html.galaxie .d-kachel.akzent::after, html.galaxie #d-gruss, html.galaxie .rim::after { animation:none !important; }

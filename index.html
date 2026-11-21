@@ -4328,7 +4328,7 @@ function frame(now) {
   const active = speaking || listening || convoRec || S.mode === 'denkt' || S.mode === 'auftrag' || S.mode === 'wartet' || S.boot < 1 || waves.length || sparks.length;
   const fps = Math.min(KAM.an ? (KAM.stufe ? 20 : 30) : 999, SPIEL_HTML ? (active ? 30 : 15) : 999,   // im Spiel: Grafikkarte fürs Spiel lassen   // Kamera-Ansicht verdeckt die Kugel fast ganz → Kugel sparsam, damit die Kamera flüssig läuft
     S.sleep && S.sleepVis > .95 && !active ? 24 : active ? [30, 60, 120, 60][Q()] : [24, 40, 60, 60][Q()],
-    document.body.classList.contains('dash') && !active ? 30 : 999);   // Dashboard im Leerlauf: 30 Bilder/s reichen   // Kino: gleichmäßig 60 fps   // im Leerlauf weniger Bilder = weniger CPU
+    document.body.classList.contains('dash') && !document.body.classList.contains('d-intro') ? (active ? 40 : 24) : 999);   // Dashboard: kleine Kugel – 24 Bilder/s im Leerlauf, 40 beim Sprechen/Zuhören   // Kino: gleichmäßig 60 fps   // im Leerlauf weniger Bilder = weniger CPU
   if (now - lastT < 1000 / fps - 3) return;
   const t = now / 1000, dt = Math.min(.08, (now - lastT) / 1000); lastT = now; EASE_DT = Math.max(.001, dt);
   if (innerWidth < 2 || innerHeight < 2) return;
