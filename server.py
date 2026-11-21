@@ -77,7 +77,7 @@ DEFAULT_CFG = {
 }
 # Damit ORB immer dein Claude-Code-Login (Max-Abo) nutzt und nie einen API-Schlüssel
 CLAUDE_ENV_DROP = ("ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "ANTHROPIC_BASE_URL")
-VERSION = "194"
+VERSION = "195"
 ORB_UI = ("Deine Oberfläche (die Larsen gerade sieht): in der Mitte du als flüssige leuchtende Kugel mit Tropfen, "
           "Orbit-Ringen und Sternenhimmel; links eine Uhr und darunter der Gesprächsverlauf mit Eingabefeld; rechts "
           "Karten für System (CPU, RAM, Akku), Wetter mit Stundenvorschau, Aktivität (was du gerade tust) und Vorschläge; "
@@ -1737,20 +1737,17 @@ def _hirn():
 
 
 def hirn_wache():
-    """Hintergrund: Ollama bei Bedarf starten, Second-Brain-Index aktuell halten, Beobachter prüfen."""
+    """Hintergrund: Modell auf der Grafikkarte halten, Second-Brain-Index aktuell halten, Beobachter prüfen."""
     time.sleep(20)   # erst ORB in Ruhe starten lassen
     letzter_index = 0.0
     while True:
         try:
             hirn = _hirn()
-            if not any(hirn.verfuegbar()):
-                exe = os.path.join(os.environ.get("LOCALAPPDATA", ""), "Programs", "Ollama", "ollama.exe")
-                if os.path.isfile(exe):
-                    subprocess.Popen([exe, "serve"], creationflags=NO_WINDOW, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-                    time.sleep(8)
-            if time.time() - letzter_index > 600:
+            # Ollama startet sich selbst mit Windows (eigener Autostart) – hier nur nutzen, nie doppelt starten
+            if time.time() - letzter_index > 600 or not hirn.auf_gpu():
                 letzter_index = time.time()
                 hirn.index_aktualisieren()
+                hirn.vorwaermen()   # Modell auf der Grafikkarte halten (keep_alive 30 Min.)
 
             def melden(t):
                 write_answer(t, heard="")

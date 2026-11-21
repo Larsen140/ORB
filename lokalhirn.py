@@ -10,7 +10,7 @@ Nur Standardbibliothek (ORB.exe enthält kein numpy).
 import array, datetime, hashlib, json, math, os, re, threading, time, urllib.request
 
 OLLAMA = "http://127.0.0.1:11434"
-MODELL = "qwen3:8b"
+MODELL = "qwen3:4b-instruct"                          # passt neben Design + Whisper in die 8 GB der RTX 4060
 EMBED = "nomic-embed-text"
 DIM = 256                                    # Matryoshka-Kürzung: schnell genug für reines Python
 BASIS = os.path.join(os.environ.get("LOCALAPPDATA", os.path.expanduser("~")), "ORB")
@@ -28,6 +28,29 @@ def _post(pfad, daten, frist=60):
     req = urllib.request.Request(OLLAMA + pfad, data=json.dumps(daten).encode("utf-8"), headers={"Content-Type": "application/json"})
     with urllib.request.urlopen(req, timeout=frist) as r:
         return json.loads(r.read().decode("utf-8"))
+
+
+def auf_gpu():
+    """Läuft das Modell (falls geladen) wirklich auf der Grafikkarte? Auf der CPU wäre es viel zu langsam."""
+    try:
+        with urllib.request.urlopen(OLLAMA + "/api/ps", timeout=2) as r:
+            for m in json.loads(r.read().decode("utf-8")).get("models", []):
+                if m.get("name", "").startswith(MODELL):
+                    return m.get("size_vram", 0) >= .85 * max(1, m.get("size", 1))
+        return True   # noch nicht geladen → lädt gleich auf die Grafikkarte
+    except Exception:
+        return False
+
+
+def vorwaermen():
+    """Modell auf die Grafikkarte laden, damit die erste Frage nicht wartet. Hängt es auf der CPU fest: entladen, neu laden."""
+    try:
+        if not auf_gpu():
+            _post("/api/generate", {"model": MODELL, "prompt": "", "keep_alive": 0}, frist=30)
+            time.sleep(2)
+        _post("/api/generate", {"model": MODELL, "prompt": "", "keep_alive": "30m", "options": {"num_ctx": 4096}}, frist=60)
+    except Exception:
+        pass
 
 
 def verfuegbar():
@@ -179,7 +202,7 @@ def _persoenlichkeit():
 def antworten(frage):
     """Gibt eine kurze Antwort zurück – oder None, wenn Claude übernehmen soll."""
     hat_modell, _ = verfuegbar()
-    if not hat_modell or ACTION_RE.search(frage) or len(frage) > 400:
+    if not hat_modell or ACTION_RE.search(frage) or len(frage) > 400 or not auf_gpu():
         return None
     wissen = suchen(frage)
     kontext = "\n\n".join("[%s]\n%s" % (c["t"], c["x"]) for c in wissen) or "(nichts Passendes gefunden)"
@@ -196,11 +219,14 @@ def antworten(frage):
     msgs = [{"role": "system", "content": system}] + VERLAUF[-6:] + [{"role": "user", "content": frage}]
     try:
         r = _post("/api/chat", {"model": MODELL, "messages": msgs, "stream": False, "think": False, "keep_alive": "30m",
-                                "options": {"temperature": .4, "num_ctx": 8192, "num_predict": 220}}, frist=40)
+                                "options": {"temperature": .4, "num_ctx": 4096, "num_predict": 160}}, frist=12)
     except Exception:
         return None
-    txt = re.sub(r"<think>.*?</think>", "", (r.get("message") or {}).get("content", ""), flags=re.S).strip()
+    txt = re.sub(r"(?s)<think>.*?(</think>|$)", "", (r.get("message") or {}).get("content", "")).strip()
     if not txt or "[CLAUDE]" in txt.upper() or len(txt) < 2:
+        return None
+    # Sicherheitsnetz: englische „Überlegungen“ statt Antwort → lieber Claude fragen als Unsinn vorlesen
+    if re.match(r"(?i)(okay|ok|alright|let me|first|the user|so,|hmm|wait)", txt) or re.search(r"(?i)(the user|let me|i need to|translates to)", txt):
         return None
     txt = re.sub(r"[*#_`>|]", "", txt).strip()
     VERLAUF.extend([{"role": "user", "content": frage}, {"role": "assistant", "content": txt}])
@@ -248,12 +274,12 @@ def beobachter_befehl(text):
         return None
     prompt = ("Zerlege Larsens Auftrag in JSON mit genau diesen Feldern: "
               '{"was": was beobachtet wird als kurzes Substantiv (z. B. Goldpreis, Bitcoin-Kurs, die Webseite von X), "quelle": "gold"|"bitcoin"|"ethereum"|"wetter"|"url", '
-              '"url": URL falls quelle=url sonst "", "art": "zahl"|"text", "op": ">"|"<"|"aenderung", "wert": Zahl oder null, '
+              '"url": URL falls quelle=url sonst "", "art": "zahl"|"text", "op": ">"|"<"|"aenderung", "wert": reine Zahl ohne Tausenderpunkte (z. B. 80000) oder null, '
               '"bedingung": die Bedingung als kurze Aussage ohne wenn (z. B. Gold steigt über 2700 Dollar), "minuten": Prüfabstand (Standard 10)}. '
               "Nur JSON ausgeben.\nAuftrag: " + text)
     try:
         r = _post("/api/chat", {"model": MODELL, "messages": [{"role": "user", "content": prompt}], "stream": False,
-                                "think": False, "format": "json", "options": {"temperature": 0}}, frist=40)
+                                "think": False, "format": "json", "options": {"temperature": 0, "num_ctx": 4096}}, frist=25)
         b = json.loads((r.get("message") or {}).get("content", "{}"))
     except Exception:
         return None
@@ -262,6 +288,20 @@ def beobachter_befehl(text):
         if not m:
             return "Welche Webseite soll ich beobachten? Sag mir bitte die Adresse."
         b["url"] = m.group(0) if m.group(0).startswith("http") else "https://" + m.group(0)
+    # Zahl aus Larsens eigenem Satz bevorzugen (das Modell liest „80.000“ gern als 80)
+    zahlen = [float(z.replace(".", "").replace(",", ".")) for z in re.findall(r"\d[\d.]*(?:,\d+)?", text)]
+    if b.get("art") == "zahl" and zahlen:
+        try:
+            w = float(b.get("wert") or 0)
+        except (TypeError, ValueError):
+            w = 0
+        if not w or max(zahlen) / w >= 999:
+            b["wert"] = max(zahlen)
+        if b.get("op") in (">", "<") and b.get("wert") is not None:
+            was = (b.get("was") or "es"); was = was[:1].upper() + was[1:]
+            b["was"] = was
+            b["bedingung"] = "%s %s %s %s" % (was, "über" if b["op"] == ">" else "unter",
+                                               ("{:,.0f}".format(float(b["wert"]))).replace(",", "."), "steigt" if b["op"] == ">" else "fällt")
     b.update(id=hashlib.md5((text + str(time.time())).encode()).hexdigest()[:8], auftrag=text, aktiv=True,
              erstellt=time.time(), zuletzt=0, letzter_stand="", minuten=max(2, min(1440, int(b.get("minuten") or 10))))
     l = _beob_laden() + [b]

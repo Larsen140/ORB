@@ -1339,7 +1339,7 @@ function kinoPost(t, c1, c2) {
 }
 function glResize() {
   W = innerWidth; H = innerHeight; if (W < 2 || H < 2) return;
-  glScale = [.45, .62, .9, 1][Q()] * Math.min(devicePixelRatio || 1, Q() === 3 ? 2 : 1.5);   // Kino: bis 4K-Pixeldichte, sonst sparsamer
+  glScale = [.45, .62, .9, 1][Q()] * Math.min(devicePixelRatio || 1, 1.5);   // gestochen scharf bei deinem Bildschirm, ohne die Grafikkarte zu überlasten
   glc.width = Math.round(W * glScale); glc.height = Math.round(H * glScale);
   fxc.width = W; fxc.height = H;
   if (gl) gl.viewport(0, 0, glc.width, glc.height);

@@ -93,7 +93,7 @@ void main(){
   };
   farbe(); new MutationObserver(farbe).observe(document.documentElement, { attributes: true, attributeFilter: ['data-thema'] });
 
-  const SKALA = Math.min(devicePixelRatio || 1, 2);   // volle Auflösung bis 4K – ohne Loch im Hintergrund ist der Shader leicht
+  const SKALA = .75;   // Hintergrund liegt hinter Glas – 0,75-fach reicht und schont die Grafikkarte   // volle Auflösung bis 4K – ohne Loch im Hintergrund ist der Shader leicht
   const groesse = () => { const w = Math.max(2, Math.round(innerWidth * SKALA)), h = Math.max(2, Math.round(innerHeight * SKALA)); if (cv.width !== w || cv.height !== h) { cv.width = w; cv.height = h; gl.viewport(0, 0, w, h); } };
   addEventListener('resize', groesse); groesse();
 
@@ -109,7 +109,7 @@ void main(){
   function schleife(now) {
     requestAnimationFrame(schleife);
     if (document.hidden || spar()) { if (!letzt) { malen(now); letzt = now; } return; }
-    if (now - letzt < 15) return;   // max. ~60 Bilder/s – flüssig, der Shader ist leicht
+    if (now - letzt < 33) return;   // max. ~60 Bilder/s – flüssig, der Shader ist leicht
     letzt = now; malen(now);
   }
   requestAnimationFrame(schleife);
