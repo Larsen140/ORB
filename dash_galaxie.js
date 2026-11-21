@@ -109,7 +109,7 @@ void main(){
   function schleife(now) {
     requestAnimationFrame(schleife);
     if (document.hidden || spar()) { if (!letzt) { malen(now); letzt = now; } return; }
-    if (now - letzt < (document.body.classList.contains('d-intro') ? 33 : 200)) return;   // Intro flüssig, danach 5 Bilder/s – der Himmel bewegt sich sehr langsam; jedes neue Bild zwingt alle Glasflächen zum Neuberechnen   // max. ~60 Bilder/s – flüssig, der Shader ist leicht
+    if (now - letzt < (document.body.classList.contains('d-intro') ? 33 : 66)) return;   // Intro flüssig, danach 5 Bilder/s – der Himmel bewegt sich sehr langsam; jedes neue Bild zwingt alle Glasflächen zum Neuberechnen   // max. ~60 Bilder/s – flüssig, der Shader ist leicht
     letzt = now; malen(now);
   }
   requestAnimationFrame(schleife);

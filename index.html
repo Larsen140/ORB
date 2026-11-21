@@ -1340,8 +1340,9 @@ function kinoPost(t, c1, c2) {
 function glResize() {
   W = innerWidth; H = innerHeight; if (W < 2 || H < 2) return;
   const dashKl = document.body.classList.contains('dash') && !document.body.classList.contains('mini') && !document.body.classList.contains('d-intro');
-  glScale = [.45, .62, .9, 1][Q()] * Math.min(devicePixelRatio || 1, dashKl ? 1 : 1.5);   // Dashboard: Kugel ist klein → normale Auflösung reicht   // gestochen scharf bei deinem Bildschirm, ohne die Grafikkarte zu überlasten
-  glc.width = Math.round(W * glScale); glc.height = Math.round(H * glScale);
+  glScale = dashKl ? Math.min(2, Math.max(1.5, devicePixelRatio || 1))   // Dashboard: eigene kleine Fläche → gestochen scharf, kostet kaum etwas
+    : [.45, .62, .9, 1][Q()] * Math.min(devicePixelRatio || 1, 1.5);   // gestochen scharf bei deinem Bildschirm, ohne die Grafikkarte zu überlasten
+  if (!renderGL.dk) { glc.width = Math.round(W * glScale); glc.height = Math.round(H * glScale); }
   fxc.width = W; fxc.height = H;
   if (gl) gl.viewport(0, 0, glc.width, glc.height);
   setupBubbles();
@@ -1361,13 +1362,22 @@ function renderGL(t, cx, cy, R, speaking) {
   });
   // Dashboard: die Kugel ist nur ein kleiner Kreis → nur dort rechnen, keine Kino-Nachbearbeitung (spart viel Grafikleistung)
   const dashKlein = document.body.classList.contains('dash') && !document.body.classList.contains('mini') && !document.body.classList.contains('d-intro');
-  if (dashKlein !== renderGL.dk) { renderGL.dk = dashKlein; glResize(); }   // Auflösung an die Ansicht anpassen
+  if (dashKlein !== renderGL.dk) { renderGL.dk = dashKlein; glc._st = ''; glc.style.cssText = ''; glResize(); }   // Ansicht gewechselt
+  // Dashboard: eigene kleine Zeichenfläche nur um die Kugel (statt bildschirmgroß) – spart sehr viel Grafikleistung
+  if (dashKlein) {
+    const box = Math.ceil(R * 4.8 / 16) * 16, px = Math.max(16, Math.round(box * glScale));
+    if (glc.width !== px || glc.height !== px) { glc.width = px; glc.height = px; }
+    const st = `inset:auto;left:0;top:0;width:${box}px;height:${box}px;transform:translate(${(cx - box / 2).toFixed(1)}px,${(cy - box / 2).toFixed(1)}px);`
+      + '-webkit-mask-image:radial-gradient(circle closest-side,#000 56%,transparent 92%);mask-image:radial-gradient(circle closest-side,#000 56%,transparent 92%)';
+    if (glc._st !== st) { glc._st = st; glc.style.cssText = st; }
+  }
   const kino = Q() === 3 && kinoBereit() && !dashKlein, P = kino ? KINO.scene : MAIN, U = P.U;
   gl.useProgram(P.p);
   gl.bindFramebuffer(gl.FRAMEBUFFER, kino ? KINO.S.f : null); gl.viewport(0, 0, glc.width, glc.height);
   const c1 = cur().map(v => v / 255), c2 = mix(BASE2, AMBER, S.warn).map(v => v / 255);
   gl.uniform2f(U.uRes, glc.width, glc.height);
-  gl.uniform2f(U.uC, cx * glScale, (H - cy) * glScale);
+  if (dashKlein) gl.uniform2f(U.uC, glc.width / 2, glc.height / 2);
+  else gl.uniform2f(U.uC, cx * glScale, (H - cy) * glScale);
   gl.uniform2f(U.uPar, S.px, S.py);
   gl.uniform1f(U.uR, R * glScale); gl.uniform1f(U.uT, t);
   gl.uniform3f(U.uCol, c1[0], c1[1], c1[2]); gl.uniform3f(U.uCol2, c2[0], c2[1], c2[2]);
@@ -1377,13 +1387,7 @@ function renderGL(t, cx, cy, R, speaking) {
   gl.uniform1f(U.uListen, S.listenVis); gl.uniform1f(U.uSleep, S.sleepVis); gl.uniform1f(U.uThink, S.think);
   gl.uniform4fv(U.uD, dropArr); gl.uniform4f(U.uB, S.bands[0], S.bands[1], S.bands[2], S.bands[3]);
   gl.uniform1f(U.uHim, document.body.classList.contains('dash') && !document.body.classList.contains('mini') ? 0 : 1);
-  if (dashKlein) {
-    gl.disable(gl.SCISSOR_TEST); gl.clearColor(0, 0, 0, 1); gl.clear(gl.COLOR_BUFFER_BIT);
-    const rr = R * glScale * 2.4, x0 = Math.max(0, Math.floor(cx * glScale - rr)), y0 = Math.max(0, Math.floor((H - cy) * glScale - rr));
-    gl.enable(gl.SCISSOR_TEST); gl.scissor(x0, y0, Math.ceil(rr * 2), Math.ceil(rr * 2));
-  }
   gl.drawArrays(gl.TRIANGLES, 0, 3);
-  gl.disable(gl.SCISSOR_TEST);
   if (kino) { KINO.cx = cx * glScale; KINO.cy = (H - cy) * glScale; KINO.r = R * glScale; kinoPost(t, c1, c2); }
 }
 
@@ -4328,7 +4332,7 @@ function frame(now) {
   const active = speaking || listening || convoRec || S.mode === 'denkt' || S.mode === 'auftrag' || S.mode === 'wartet' || S.boot < 1 || waves.length || sparks.length;
   const fps = Math.min(KAM.an ? (KAM.stufe ? 20 : 30) : 999, SPIEL_HTML ? (active ? 30 : 15) : 999,   // im Spiel: Grafikkarte fürs Spiel lassen   // Kamera-Ansicht verdeckt die Kugel fast ganz → Kugel sparsam, damit die Kamera flüssig läuft
     S.sleep && S.sleepVis > .95 && !active ? 24 : active ? [30, 60, 120, 60][Q()] : [24, 40, 60, 60][Q()],
-    document.body.classList.contains('dash') && !document.body.classList.contains('d-intro') ? (active ? 40 : 24) : 999);   // Dashboard: kleine Kugel – 24 Bilder/s im Leerlauf, 40 beim Sprechen/Zuhören   // Kino: gleichmäßig 60 fps   // im Leerlauf weniger Bilder = weniger CPU
+    document.body.classList.contains('dash') && !document.body.classList.contains('d-intro') ? (active ? 60 : 45) : 999);   // Dashboard: kleine Zeichenfläche → flüssige 45–60 Bilder/s   // Kino: gleichmäßig 60 fps   // im Leerlauf weniger Bilder = weniger CPU
   if (now - lastT < 1000 / fps - 3) return;
   const t = now / 1000, dt = Math.min(.08, (now - lastT) / 1000); lastT = now; EASE_DT = Math.max(.001, dt);
   if (innerWidth < 2 || innerHeight < 2) return;
