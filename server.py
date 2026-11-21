@@ -77,7 +77,7 @@ DEFAULT_CFG = {
 }
 # Damit ORB immer dein Claude-Code-Login (Max-Abo) nutzt und nie einen API-Schlüssel
 CLAUDE_ENV_DROP = ("ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "ANTHROPIC_BASE_URL")
-VERSION = "202"
+VERSION = "203"
 ORB_UI = ("Deine Oberfläche (die Larsen gerade sieht): in der Mitte du als flüssige leuchtende Kugel mit Tropfen, "
           "Orbit-Ringen und Sternenhimmel; links eine Uhr und darunter der Gesprächsverlauf mit Eingabefeld; rechts "
           "Karten für System (CPU, RAM, Akku), Wetter mit Stundenvorschau, Aktivität (was du gerade tust) und Vorschläge; "
@@ -546,10 +546,39 @@ def mark_running(on=True):
         pass
 
 
-def clean_exit(grund):
-    """Gewolltes Beenden: protokollieren, Markierung entfernen, Prozess sofort beenden."""
+OLLAMA_EXE = os.path.join(os.environ.get("LOCALAPPDATA", ""), "Programs", "Ollama", "ollama app.exe")
+
+
+def ollama_beenden():
+    """ORB ganz aus → lokales KI-Gehirn (Ollama + Modell im Grafik-/Arbeitsspeicher) mit beenden."""
+    try:   # Modell sauber entladen, dann die Prozesse schließen
+        req = urllib.request.Request("http://127.0.0.1:11434/api/generate", data=json.dumps({"model": "qwen3:4b-instruct", "keep_alive": 0}).encode(),
+                                     headers={"Content-Type": "application/json"})
+        urllib.request.urlopen(req, timeout=3).read()
+    except Exception:
+        pass
+    for exe in ("ollama app.exe", "ollama.exe", "ollama_llama_server.exe", "llama-server.exe"):
+        subprocess.run(["taskkill", "/F", "/T", "/IM", exe], capture_output=True, creationflags=NO_WINDOW)
+
+
+def ollama_starten():
+    """Beim ORB-Start: läuft Ollama nicht (z. B. nach „ORB ganz beenden“), wieder starten."""
+    try:
+        urllib.request.urlopen("http://127.0.0.1:11434/api/version", timeout=2).read()
+        return
+    except Exception:
+        pass
+    if os.path.isfile(OLLAMA_EXE):
+        subprocess.Popen([OLLAMA_EXE], creationflags=NO_WINDOW, close_fds=True)
+
+
+def clean_exit(grund, alles=False):
+    """Gewolltes Beenden: protokollieren, Markierung entfernen, Prozess sofort beenden.
+    alles=True (Larsen beendet ORB ganz): auch Ollama/KI-Modell schließen – gibt Arbeits- und Grafikspeicher frei."""
     log_close(grund)
     mark_running(False)
+    if alles:
+        ollama_beenden()
     for k in ("pid", "stimme_pid"):   # lokales Ohr und KI-Stimme mitbeenden
         if OHR.get(k):
             subprocess.run(["taskkill", "/F", "/PID", str(OHR[k])], capture_output=True, creationflags=NO_WINDOW)
@@ -1607,7 +1636,7 @@ def orb_aus(heard=""):
             tarnmodus.aufraeumen()
         except Exception:
             pass
-        clean_exit("Beendet: Befehl „komplett aus“" + (" (Telegram)" if per_telegram else ""))
+        clean_exit("Beendet: Befehl „komplett aus“" + (" (Telegram)" if per_telegram else ""), alles=True)
     threading.Thread(target=ende, daemon=True).start()
 
 
@@ -1743,7 +1772,7 @@ def hirn_wache():
     while True:
         try:
             hirn = _hirn()
-            # Ollama startet sich selbst mit Windows (eigener Autostart) – hier nur nutzen, nie doppelt starten
+            ollama_starten()   # nach „ORB ganz beenden“ ist Ollama aus – mit ORB wieder starten (nie doppelt: prüft erst den Port)
             if time.time() - letzter_index > 600 or not hirn.auf_gpu():
                 letzter_index = time.time()
                 hirn.index_aktualisieren()
@@ -3723,7 +3752,8 @@ class Handler(BaseHTTPRequestHandler):
             self.send(200, {"ok": True})
             BRAIN.kill()
             grund = "Beendet: " + str(b.get("grund") or "neue ORB-Instanz übernimmt")
-            threading.Thread(target=lambda: (time.sleep(.3), clean_exit(grund)), daemon=True).start()
+            ganz = bool(b.get("grund"))   # mit Grund = Larsen beendet ORB ganz; ohne = neue Version übernimmt (Ollama bleibt)
+            threading.Thread(target=lambda: (time.sleep(.3), clean_exit(grund, alles=ganz)), daemon=True).start()
         elif u.path == "/new":
             BRAIN.stopped, BRAIN.busy = True, False
             BRAIN.kill()
