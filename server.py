@@ -71,13 +71,13 @@ DEFAULT_CFG = {
     "steuerung": "wort", "wakeword": "Jarvis", "schnipsen": True, "trading_start": True, "gaming_modus": False, "stimmung": True, "razer": True, "gesten": False, "ohr": True, "unterbrechen": True, "sprechen_unterbrechen": True, "nur_jarvis": True, "musik_schutz": True, "ducking": True,
     "tts_anbieter": "edge",
     "klatschen": True, "dauerzuhoeren": True, "empfindlichkeit": 6, "schnips_empf": 6, "mikro": "TONOR", "kalib": {}, "satzpause": 2.0, "begruessung": True, "ort": "", "name": "",
-    "schlafen": 5, "vollbild": True, "spiel_mini": False, "nur_meine_stimme": True, "streng_jarvis": True, "tastatur_farbe": False, "autostart": True, "schlaf_schliessen": False, "bildschirm": False,
+    "schlafen": 5, "vollbild": True, "spiel_mini": False, "nur_meine_stimme": True, "streng_jarvis": True, "tastatur_farbe": False, "lokales_hirn": True, "autostart": True, "schlaf_schliessen": False, "bildschirm": False,
     "modell": "claude-opus-5-5", "laenge": "kurz", "rechte": "auto", "tempo_claude": "low",
     "ordner": os.path.join(os.path.expanduser("~"), "Documents", "Jarvis"), "sitzung": "",
 }
 # Damit ORB immer dein Claude-Code-Login (Max-Abo) nutzt und nie einen API-Schlüssel
 CLAUDE_ENV_DROP = ("ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "ANTHROPIC_BASE_URL")
-VERSION = "193"
+VERSION = "194"
 ORB_UI = ("Deine Oberfläche (die Larsen gerade sieht): in der Mitte du als flüssige leuchtende Kugel mit Tropfen, "
           "Orbit-Ringen und Sternenhimmel; links eine Uhr und darunter der Gesprächsverlauf mit Eingabefeld; rechts "
           "Karten für System (CPU, RAM, Akku), Wetter mit Stundenvorschau, Aktivität (was du gerade tust) und Vorschläge; "
@@ -1671,6 +1671,47 @@ def ask(text):
 
         threading.Thread(target=done, daemon=True).start()
         return True
+    # ---- OpenJarvis-Idee: lokal zuerst (Beobachter, Recherche, lokales Gehirn mit Second Brain), Claude nur wenn nötig ----
+    if load_cfg().get("lokales_hirn", True):
+        frage = re.sub(r"(?i)^(jarvis|orb)[,\s]+", "", roh).strip()
+        try:
+            hirn = _hirn()
+            rech = hirn.recherche_auftrag(frage)
+        except Exception as e:
+            print("Lokales Gehirn:", e)
+            hirn, rech = None, None
+        if rech:
+            task_start(*rech)
+            write_answer("Mach ich. Ich recherchiere das gründlich im Hintergrund und sag Bescheid, wenn der Bericht fertig ist.", heard=text)
+            return True
+        if hirn and hirn.BEOB_START.search(frage) or hirn and (hirn.BEOB_LISTE.search(frage) or hirn.BEOB_STOP.search(frage)):
+            write_state(mode="auftrag", heard=text, task="Beobachter", detail="", say="", parts=[], aid="", log=["Beobachter"])
+
+            def beob():
+                try:
+                    say = hirn.beobachter_befehl(frage)
+                except Exception as e:
+                    print("Beobachter:", e); say = None
+                if say:
+                    write_answer(say, heard=text)
+                else:
+                    BRAIN.send(text)
+            threading.Thread(target=beob, daemon=True).start()
+            return True
+        if hirn and not BRAIN.busy and not hirn.ACTION_RE.search(frage):
+            write_state(mode="denkt", heard=text, say="", parts=[], aid="")
+
+            def lokal():
+                try:
+                    a = hirn.antworten(frage)
+                except Exception as e:
+                    print("Lokales Gehirn:", e); a = None
+                if a:
+                    write_answer(a, heard=text)
+                else:
+                    BRAIN.send(text)
+            threading.Thread(target=lokal, daemon=True).start()
+            return True
     if BRAIN.busy:
         worte = re.sub(r"^(jarvis|orb)[,\s]+", "", text, flags=re.I).split()
         titel = " ".join(worte[:4]).strip(" ,.!?") or "Aufgabe"
@@ -1681,6 +1722,46 @@ def ask(text):
 
 def stop():
     return BRAIN.stop()
+
+
+# ---------- Lokales Gehirn (lokalhirn.py): Ollama + Second Brain, Dauer-Beobachter, Tiefenrecherche ----------
+def _hirn():
+    m = sys.modules.get("lokalhirn")
+    if m is None:
+        import importlib.util
+        spec = importlib.util.spec_from_file_location("lokalhirn", os.path.join(os.path.dirname(os.path.abspath(__file__)), "lokalhirn.py"))
+        m = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(m)
+        sys.modules["lokalhirn"] = m
+    return m
+
+
+def hirn_wache():
+    """Hintergrund: Ollama bei Bedarf starten, Second-Brain-Index aktuell halten, Beobachter prüfen."""
+    time.sleep(20)   # erst ORB in Ruhe starten lassen
+    letzter_index = 0.0
+    while True:
+        try:
+            hirn = _hirn()
+            if not any(hirn.verfuegbar()):
+                exe = os.path.join(os.environ.get("LOCALAPPDATA", ""), "Programs", "Ollama", "ollama.exe")
+                if os.path.isfile(exe):
+                    subprocess.Popen([exe, "serve"], creationflags=NO_WINDOW, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                    time.sleep(8)
+            if time.time() - letzter_index > 600:
+                letzter_index = time.time()
+                hirn.index_aktualisieren()
+
+            def melden(t):
+                write_answer(t, heard="")
+                try:
+                    telegram_nachricht(t)
+                except Exception:
+                    pass
+            hirn.beobachter_pruefen(melden, lambda q: gold_text() if q == "gold" else weather_text())
+        except Exception as e:
+            print("Hirn-Wache:", e)
+        time.sleep(60)
 
 
 TERMIN_RE = re.compile(r"^\s*[-*]?\s*(\d{4}-\d{2}-\d{2}|\d{1,2}\.\d{1,2}\.\d{4})(?:\s+(\d{1,2}[:.]\d{2}))?\s*[-–:]?\s*(.+)$")

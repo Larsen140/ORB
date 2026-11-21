@@ -2,6 +2,42 @@
  "_hinweis": "Zentrale Liste aller ORB-Funktionen für das Widget „Was Jarvis kann“. Bei JEDEM Update mit neuer Funktion ergänzen: Bereich wählen (oder neu anlegen), Eintrag mit name, text, beispiel.",
  "bereiche": [
   {
+   "name": "Lokales Gehirn & Second Brain",
+   "icon": "🧠",
+   "features": [
+    {
+     "name": "Lokales Gehirn",
+     "text": "Einfache Fragen und Smalltalk beantwortet ORB mit einem eigenen KI-Modell auf deiner Grafikkarte (Ollama, qwen3) – sofort, gratis, auch offline. Nur Schwieriges geht an Claude.",
+     "beispiel": "Jarvis, erklär mir kurz, was ein Stop-Loss ist"
+    },
+    {
+     "name": "Kennt dein Second Brain",
+     "text": "Das lokale Gehirn durchsucht deinen ganzen Jarvis-Ordner – Notizen, Projekte, alle früheren Chats, ORB-Daten – und antwortet mit diesem Wissen.",
+     "beispiel": "Jarvis, was hab ich gestern mit Claude gemacht?"
+    },
+    {
+     "name": "Dauer-Beobachter",
+     "text": "ORB behält Webseiten, Gold, Bitcoin, Ethereum oder das Wetter im Auge und meldet sich laut und per Telegram, sobald deine Bedingung eintritt.",
+     "beispiel": "Jarvis, sag mir Bescheid, wenn Gold über 2700 Dollar steigt"
+    },
+    {
+     "name": "Beobachter verwalten",
+     "text": "Fragen, was gerade beobachtet wird, oder Beobachter wieder stoppen.",
+     "beispiel": "Jarvis, was beobachtest du? / Hör auf, Gold zu beobachten"
+    },
+    {
+     "name": "Tiefenrecherche",
+     "text": "Recherchiert ein Thema gründlich über viele Quellen im Hintergrund und legt einen Bericht mit Quellenangaben in Jarvis/wissen/recherche ab – erscheint auch im Second Brain.",
+     "beispiel": "Jarvis, recherchiere gründlich, welche Grafikkarte sich 2027 lohnt"
+    },
+    {
+     "name": "Ausreden lassen",
+     "text": "ORB wartet länger auf das Satzende und hängt Fortsetzungen an, statt dich zu unterbrechen – auch bei kurzen Denkpausen.",
+     "beispiel": "Einfach mit Pausen reden"
+    }
+   ]
+  },
+  {
    "name": "Sprache & Steuerung",
    "icon": "🎙",
    "features": [

@@ -1010,6 +1010,7 @@ def main():
     threading.Thread(target=stimme_wache, daemon=True).start()         # lokale KI-Stimme (Chatterbox)
     threading.Thread(target=server.live_bildschirm, daemon=True).start()  # Bildschirm in Echtzeit
     threading.Thread(target=telegram_start, daemon=True).start()
+    threading.Thread(target=server.hirn_wache, daemon=True).start()     # lokales Gehirn: Index, Beobachter, Ollama
     threading.Thread(target=orb_unsichtbar_fuer_aufnahme, daemon=True).start()
     threading.Thread(target=update_loop, daemon=True).start()
     threading.Thread(target=announce_update, daemon=True).start()
