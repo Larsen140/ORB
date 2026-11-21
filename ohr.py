@@ -367,7 +367,7 @@ def main():
                         t0 = time.time()
                         txt = wh.text(audio)
                         anfang = ("untertitel", "vielen dank fürs zuschauen", "sous-titr", "amara", "copyright", "swr ", "zdf",
-                                  "bis zum nächsten mal", "danke fürs zuschauen", "thank you", "thanks for watching")
+                                  "bis zum nächsten mal", "danke fürs zuschauen", "thank you", "thanks for watching", "nice to meet you", "see you", "i'm sorry")
                         ganz = ("musik", "amen", "you", "bye", "hm", "mhm")   # nur wenn das ALLES ist
                         klein = txt.lower().strip(" .!?…,*[]()")
                         if txt and len(txt) > 1 and klein not in ganz and not any(klein.startswith(u) for u in anfang):

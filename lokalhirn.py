@@ -212,9 +212,10 @@ def antworten(frage):
               f"Heute ist {jetzt:%A, %d.%m.%Y}, {jetzt:%H:%M} Uhr.\n"
               "Unten steht Wissen aus Larsens Second Brain (seine Notizen, Projekte, früheren Chats). Nutze es, wenn es passt. "
               "Erfinde nichts: wirkt das Wissen unvollständig, sag das ehrlich. Ergibt Larsens Satz keinen Sinn (falsch verstanden), "
-              "sag kurz, dass du ihn nicht verstanden hast, und bitte ihn, es nochmal zu sagen.\n"
+              "sag kurz, dass du ihn nicht verstanden hast, und bitte ihn, es nochmal zu sagen. Du hast keine Kamera und siehst Larsen nicht – "
+              "behaupte nie, ihn gesehen zu haben. Bei einer einfachen Begrüßung grüß kurz zurück und frag, was er braucht.\n"
               "WICHTIG: Wenn die Anfrage eine Aktion am PC, im Internet oder in Apps verlangt, aktuelle Daten braucht "
-              "(News, Kurse, Wetter), Code/Dateien betrifft, mehrere Schritte braucht oder du dir nicht sicher bist, "
+              "(News, Kurse, Wetter), Code/Dateien betrifft, nach dir selbst, deinen Funktionen oder Fehlern fragt, mehrere Schritte braucht oder du dir nicht sicher bist, "
               "antworte NUR mit dem Wort [CLAUDE] und sonst nichts.\n\n"
               "Persönlichkeit:\n" + _persoenlichkeit() + "\n\nWissen aus dem Second Brain:\n" + kontext)
     msgs = [{"role": "system", "content": system}] + VERLAUF[-6:] + [{"role": "user", "content": frage}]

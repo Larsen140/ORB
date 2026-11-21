@@ -2408,7 +2408,7 @@ function pttDown() { if (S.sleep) return wake(); startPTT(); }
 let convo = false, convoRec = null, convoLastStart = 0, convoLastSpeech = 0, askGap = 0, followUntil = 0;
 // „Nur auf Jarvis reagieren“: ohne Namen nur kurz nach einer Antwort (Nachfrage-Fenster) annehmen
 let wachBis = 0;   // streng: nur kurz nach „Jarvis“/Klatschen hört ORB auch ohne Namen
-const FOLLOW_MS = 8000, followOpen = () => cfg.streng_jarvis !== false ? performance.now() < wachBis
+const FOLLOW_MS = 8000, followOpen = () => cfg.streng_jarvis !== false ? performance.now() < wachBis || (performance.now() < followUntil && !musikAn())   // streng: nach dem Weckwort UND kurz nach jeder Antwort (Nachfrage ohne „Jarvis“) – Echo filtert ask()
   : (!cfg.nur_jarvis && !musikAn()) || performance.now() < followUntil;
 
 /* ---------- Musik: Songtexte sind keine Sprache ---------- */
